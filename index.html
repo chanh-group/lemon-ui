@@ -13,6 +13,25 @@
       rel="stylesheet"
     />
     <title>LemonChat — Nhắn tin an toàn</title>
+    <script>
+      // GitHub Pages SPA redirect — decode URL encoded by 404.html
+      ;(function () {
+        var p = window.location.search.slice(1)
+        if (p && p[0] === 'p') {
+          var decoded = decodeURIComponent(p.slice(2))
+          var parts = decoded.split('&q=')
+          window.history.replaceState(
+            null,
+            null,
+            window.location.pathname.split('/').slice(0, 2).join('/') +
+              '/' +
+              parts[0] +
+              (parts[1] ? '?' + parts[1] : '') +
+              window.location.hash,
+          )
+        }
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

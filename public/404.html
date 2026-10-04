@@ -1,0 +1,22 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>LemonUI</title>
+    <script>
+      // GitHub Pages SPA redirect trick
+      // Encode the full URL into the query string so the main index.html can decode it
+      var l = window.location
+      l.replace(
+        l.protocol +
+          '//' +
+          l.hostname +
+          (l.port ? ':' + l.port : '') +
+          l.pathname.split('/').slice(0, 2).join('/') +
+          '/?p=' +
+          encodeURIComponent(l.pathname.slice(1) + (l.search ? '&q=' + l.search.slice(1) : '') + l.hash),
+      )
+    </script>
+  </head>
+  <body></body>
+</html>

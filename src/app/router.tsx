@@ -33,37 +33,42 @@ function RedirectIfAuthed({ children }: { children: ReactNode }) {
   return <>{children}</>
 }
 
-export const router = createBrowserRouter([
+export const router = createBrowserRouter(
+  [
+    {
+      path: ROUTES.home,
+      element: <Navigate to={ROUTES.login} replace />,
+    },
+    {
+      path: ROUTES.login,
+      element: (
+        <RedirectIfAuthed>
+          <LoginPage />
+        </RedirectIfAuthed>
+      ),
+    },
+    {
+      path: ROUTES.register,
+      element: (
+        <RedirectIfAuthed>
+          <RegisterPage />
+        </RedirectIfAuthed>
+      ),
+    },
+    {
+      path: ROUTES.messages,
+      element: (
+        <RequireAuth>
+          <DashboardPage />
+        </RequireAuth>
+      ),
+    },
+    {
+      path: '*',
+      element: <NotFoundPage />,
+    },
+  ],
   {
-    path: ROUTES.home,
-    element: <Navigate to={ROUTES.login} replace />,
+    basename: import.meta.env.BASE_URL,
   },
-  {
-    path: ROUTES.login,
-    element: (
-      <RedirectIfAuthed>
-        <LoginPage />
-      </RedirectIfAuthed>
-    ),
-  },
-  {
-    path: ROUTES.register,
-    element: (
-      <RedirectIfAuthed>
-        <RegisterPage />
-      </RedirectIfAuthed>
-    ),
-  },
-  {
-    path: ROUTES.messages,
-    element: (
-      <RequireAuth>
-        <DashboardPage />
-      </RequireAuth>
-    ),
-  },
-  {
-    path: '*',
-    element: <NotFoundPage />,
-  },
-])
+)
