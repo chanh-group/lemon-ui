@@ -42,8 +42,16 @@ export const registerSchema = z
 
 export const otpSchema = z.object({
   email: emailSchema,
-  code: z.string().min(1, 'Vui lòng nhập mã OTP').max(6, 'Mã OTP phải có 6 chữ số'),
+  code: z
+    .string()
+    .regex(/^\d{6}$/, 'Mã OTP phải có đúng 6 chữ số'),
+})
+
+export const otpLocationStateSchema = z.object({
+  email: z.string().email().optional(),
+  flow: z.enum(['registration', 'forgot-password']).optional(),
 })
 
 export type LoginInput = z.infer<typeof loginSchema>
 export type RegisterInput = z.infer<typeof registerSchema>
+export type OtpInput = z.infer<typeof otpSchema>

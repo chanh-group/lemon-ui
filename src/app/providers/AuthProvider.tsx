@@ -19,12 +19,12 @@ import {
   restoreSession,
   verifyOtp as verifyOtpApi,
 } from '@/features/auth/api/auth.api'
-import type { VerifyOtpPayload } from '@/features/auth/api/auth.api'
 import type {
   AuthSession,
   LoginPayload,
   RegisterPayload,
   User,
+  VerifyOtpPayload,
 } from '@/features/auth/types/auth.types'
 
 export type AuthStatus = 'restoring' | 'authenticated' | 'anonymous'
@@ -56,25 +56,7 @@ interface AuthProviderProps {
  * - Dev bypass: đánh dấu phiên trong storage (không chứa token thật) để F5
  *   không đá về trang đăng nhập khi đang phát triển.
  */
-function applySession(session: AuthSession): AuthSession {
-  setAccessToken(session.accessToken)
-  return session
-}
-
-function createDevSession(payload: { email: string; fullName?: string }): AuthSession {
-  return {
-    accessToken: 'dev.access.token',
-    user: {
-      id: 'dev-user',
-      fullName: payload.fullName ?? payload.email.split('@')[0] ?? 'Người dùng dev',
-      email: payload.email,
-      createdAt: new Date().toISOString(),
-    },
-  }
-}
-
 export function AuthProvider({ children }: AuthProviderProps) {
-  // Dev bypass: khôi phục phiên từ storage ngay lúc khởi tạo (không qua effect)
   const [session, setSession] = useState<{ user: User | null; status: AuthStatus }>(() => {
     if (!isAuthBypass()) return { user: null, status: 'restoring' }
     const devUser = getItem<User>(DEV_SESSION_KEY)
@@ -88,7 +70,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     if (restored.current || isAuthBypass()) return
     restored.current = true
 
-    // Silent restore sau F5 — chạy ngầm, không chặn UI
     restoreSession()
       .then((restoredUser) => {
         setSession({
@@ -120,19 +101,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     [establishSession],
   )
 
-  const register = useCallback(
-    async (payload: RegisterPayload) => {
-      if (isAuthBypass()) {
-        const devSession = createDevSession(payload)
-        applySession(devSession)
-        return devSession.user
-      }
-
-      const next = await registerApi(payload)
-      return next.user
-    },
-    [establishSession],
-  )
+  /** Đăng ký — không tạo session. Trả về user info để chuyển sang OTP. */
+  const register = useCallback(async (payload: RegisterPayload) => {
+    return registerApi(payload)
+  }, [])
 
   const verifyOtp = useCallback(
     async (payload: VerifyOtpPayload) => {

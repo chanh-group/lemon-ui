@@ -5,13 +5,10 @@ import type {
   AuthSession,
   LoginPayload,
   RegisterPayload,
+  ResendOtpPayload,
   User,
+  VerifyOtpPayload,
 } from '@/features/auth/types/auth.types'
-
-export interface VerifyOtpPayload {
-  email: string
-  code: string
-}
 
 /* ------------------------------------------------------------------ */
 /* Dev bypass (VITE_APP_ENV=dev): bỏ qua API thật, chỉ còn zod validate */
@@ -48,14 +45,19 @@ export async function login(payload: LoginPayload): Promise<AuthSession> {
   return applySession(session)
 }
 
-export async function register(payload: RegisterPayload): Promise<AuthSession> {
-  if (isAuthBypass()) return applySession(createDevSession(payload))
+/**
+ * Đăng ký — KHÔNG áp dụng session. Phải xác minh OTP trước khi có phiên.
+ * Server trả về user info để hiển thị trên trang OTP.
+ */
+export async function register(payload: RegisterPayload): Promise<User> {
+  if (isAuthBypass()) {
+    return createDevSession(payload).user
+  }
 
-  const session = await request<AuthSession>('/auth/register', {
+  return request<User>('/auth/register', {
     method: 'POST',
     body: payload,
   })
-  return applySession(session)
 }
 
 export async function verifyOtp(payload: VerifyOtpPayload): Promise<AuthSession> {
@@ -66,6 +68,15 @@ export async function verifyOtp(payload: VerifyOtpPayload): Promise<AuthSession>
     body: payload,
   })
   return applySession(session)
+}
+
+export async function resendOtp(payload: ResendOtpPayload): Promise<void> {
+  if (isAuthBypass()) return
+
+  await request<void>('/auth/resend-otp', {
+    method: 'POST',
+    body: payload,
+  })
 }
 
 export async function forgotPassword(payload: { email: string }): Promise<void> {
