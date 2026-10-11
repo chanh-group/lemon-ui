@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { EyeIcon, EyeOffIcon, Loader2Icon } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -18,7 +18,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { ROUTES } from '@/config/constants'
 import { loginSchema, type LoginInput } from '@/features/auth/schemas/auth.schema'
-import { useLogin } from '@/features/auth/hooks/useAuth'
+import { useForgotPassword, useLogin } from '@/features/auth/hooks/useAuth'
 
 function GoogleIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
@@ -44,8 +44,10 @@ function GoogleIcon(props: React.SVGProps<SVGSVGElement>) {
 }
 
 export function LoginForm() {
+  const navigate = useNavigate()
   const [showPassword, setShowPassword] = useState(false)
   const login = useLogin()
+  const forgotPassword = useForgotPassword()
 
   const form = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
@@ -60,6 +62,40 @@ export function LoginForm() {
 
   const onSubmit = (values: LoginInput) => {
     login.mutate(values)
+  }
+
+  const handleForgotPassword = async () => {
+    const emailValue = form.getValues('email').trim()
+
+    if (!emailValue) {
+      form.setError('email', {
+        type: 'manual',
+        message: 'Vui lòng nhập email để đặt lại mật khẩu.',
+      })
+      form.setFocus('email')
+      return
+    }
+
+    const emailCheck = loginSchema.shape.email.safeParse(emailValue)
+    if (!emailCheck.success) {
+      form.setError('email', {
+        type: 'manual',
+        message: 'Vui lòng nhập email hợp lệ.',
+      })
+      form.setFocus('email')
+      return
+    }
+
+    forgotPassword.mutate(
+      { email: emailValue },
+      {
+        onSuccess: () => {
+          navigate(ROUTES.otp, {
+            state: { email: emailValue, flow: 'forgot-password' },
+          })
+        },
+      },
+    )
   }
 
   return (
@@ -189,12 +225,14 @@ export function LoginForm() {
         </Button>
 
         <div className="mt-2 flex items-center justify-between gap-2 text-sm">
-          <Link
-            to={ROUTES.login}
-            className="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+          <button
+            type="button"
+            onClick={handleForgotPassword}
+            disabled={forgotPassword.isPending}
+            className="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline disabled:opacity-50"
           >
-            Quên mật khẩu?
-          </Link>
+            {forgotPassword.isPending ? 'Đang gửi...' : 'Quên mật khẩu?'}
+          </button>
           <p className="text-muted-foreground">
             Chưa có tài khoản?{' '}
             <Link

@@ -4,6 +4,7 @@ import { useAuth } from '@/app/providers/AuthProvider'
 import { ROUTES } from '@/config/constants'
 import { LoginPage } from '@/pages/LoginPage'
 import { RegisterPage } from '@/pages/RegisterPage'
+import { OtpPage } from '@/pages/OtpPage'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
 
@@ -52,6 +53,14 @@ export const router = createBrowserRouter(
       element: (
         <RedirectIfAuthed>
           <RegisterPage />
+        </RedirectIfAuthed>
+      ),
+    },
+    {
+      path: ROUTES.otp,
+      element: (
+        <RedirectIfAuthed>
+          <OtpPage />
         </RedirectIfAuthed>
       ),
     },

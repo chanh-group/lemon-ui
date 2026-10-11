@@ -4,6 +4,7 @@ export const ROUTES = {
   home: '/',
   login: '/signin',
   register: '/signup',
+  otp: '/otp',
   messages: '/messages',
 } as const
 

@@ -68,6 +68,15 @@ export async function verifyOtp(payload: VerifyOtpPayload): Promise<AuthSession>
   return applySession(session)
 }
 
+export async function forgotPassword(payload: { email: string }): Promise<void> {
+  if (isAuthBypass()) return
+
+  await request<void>('/auth/forgot-password', {
+    method: 'POST',
+    body: payload,
+  })
+}
+
 /** Khôi phục phiên làm việc sau F5: cookie refresh → access token mới. */
 export async function restoreSession(): Promise<User | null> {
   if (isAuthBypass()) return null

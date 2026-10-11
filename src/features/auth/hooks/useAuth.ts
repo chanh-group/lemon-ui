@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import { ROUTES } from '@/config/constants'
 import { useAuth } from '@/app/providers/AuthProvider'
 import type { LoginPayload, RegisterPayload } from '@/features/auth/types/auth.types'
+import { forgotPassword as forgotPasswordApi } from '@/features/auth/api/auth.api'
 import type { VerifyOtpPayload } from '@/features/auth/api/auth.api'
 
 export { useAuth } from '@/app/providers/AuthProvider'
@@ -32,7 +33,10 @@ export function useRegister() {
     mutationFn: (payload: RegisterPayload) => register(payload),
     onSuccess: (user) => {
       toast.success(`Tạo tài khoản thành công! Chào mừng ${user.fullName}.`)
-      navigate(ROUTES.messages, { replace: true })
+      navigate(ROUTES.otp, {
+        replace: true,
+        state: { email: user.email, flow: 'registration' },
+      })
     },
     onError: (error: Error) => {
       toast.error(error.message || 'Đăng ký không thành công')
@@ -52,6 +56,15 @@ export function useVerifyOtp() {
     },
     onError: (error: Error) => {
       toast.error(error.message || 'Mã OTP không hợp lệ')
+    },
+  })
+}
+
+export function useForgotPassword() {
+  return useMutation({
+    mutationFn: (payload: { email: string }) => forgotPasswordApi(payload),
+    onError: (error: Error) => {
+      toast.error(error.message || 'Không thể gửi mã đặt lại mật khẩu')
     },
   })
 }

@@ -40,5 +40,10 @@ export const registerSchema = z
     path: ['confirmPassword'],
   })
 
+export const otpSchema = z.object({
+  email: emailSchema,
+  code: z.string().min(1, 'Vui lòng nhập mã OTP').max(6, 'Mã OTP phải có 6 chữ số'),
+})
+
 export type LoginInput = z.infer<typeof loginSchema>
 export type RegisterInput = z.infer<typeof registerSchema>

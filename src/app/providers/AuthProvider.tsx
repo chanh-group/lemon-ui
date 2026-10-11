@@ -56,6 +56,23 @@ interface AuthProviderProps {
  * - Dev bypass: đánh dấu phiên trong storage (không chứa token thật) để F5
  *   không đá về trang đăng nhập khi đang phát triển.
  */
+function applySession(session: AuthSession): AuthSession {
+  setAccessToken(session.accessToken)
+  return session
+}
+
+function createDevSession(payload: { email: string; fullName?: string }): AuthSession {
+  return {
+    accessToken: 'dev.access.token',
+    user: {
+      id: 'dev-user',
+      fullName: payload.fullName ?? payload.email.split('@')[0] ?? 'Người dùng dev',
+      email: payload.email,
+      createdAt: new Date().toISOString(),
+    },
+  }
+}
+
 export function AuthProvider({ children }: AuthProviderProps) {
   // Dev bypass: khôi phục phiên từ storage ngay lúc khởi tạo (không qua effect)
   const [session, setSession] = useState<{ user: User | null; status: AuthStatus }>(() => {
@@ -105,8 +122,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const register = useCallback(
     async (payload: RegisterPayload) => {
+      if (isAuthBypass()) {
+        const devSession = createDevSession(payload)
+        applySession(devSession)
+        return devSession.user
+      }
+
       const next = await registerApi(payload)
-      establishSession(next)
       return next.user
     },
     [establishSession],
