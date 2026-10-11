@@ -12,13 +12,38 @@ const passwordSchema = z
   .min(1, 'Vui lòng nhập mật khẩu')
   .min(PASSWORD_MIN_LENGTH, `Mật khẩu phải có ít nhất ${PASSWORD_MIN_LENGTH} ký tự`)
 
+const otpCodeSchema = z
+  .string()
+  .regex(/^\d{6}$/, 'Mã OTP phải có đúng 6 chữ số')
+
+/* ------------------------------------------------------------------ */
+/* Login                                                               */
+/* ------------------------------------------------------------------ */
+
 export const loginSchema = z.object({
   email: emailSchema,
-  password: passwordSchema,
-  rememberMe: z.boolean(),
+  password: z.string().min(1, 'Vui lòng nhập mật khẩu'),
 })
+export type LoginInput = z.infer<typeof loginSchema>
 
-export const registerSchema = z
+/* ------------------------------------------------------------------ */
+/* Signup wizard                                                       */
+/* ------------------------------------------------------------------ */
+
+export const requestOtpSchema = z.object({
+  email: emailSchema,
+})
+export type RequestOtpInput = z.infer<typeof requestOtpSchema>
+
+export const verifyOtpSchema = z.object({
+  email: emailSchema,
+  otp: otpCodeSchema,
+  purpose: z.enum(['signup', 'reset']),
+})
+export type VerifyOtpInput = z.infer<typeof verifyOtpSchema>
+
+/** Bước cuối wizard signup: tên + mật khẩu + nhập lại (email/otp đã chốt trước đó). */
+export const signupInfoSchema = z
   .object({
     fullName: z
       .string()
@@ -26,7 +51,6 @@ export const registerSchema = z
       .min(1, 'Vui lòng nhập họ và tên')
       .min(2, 'Họ và tên phải có ít nhất 2 ký tự')
       .max(60, 'Họ và tên tối đa 60 ký tự'),
-    email: emailSchema,
     password: z
       .string()
       .min(1, 'Vui lòng nhập mật khẩu')
@@ -39,19 +63,28 @@ export const registerSchema = z
     message: 'Mật khẩu xác nhận không khớp',
     path: ['confirmPassword'],
   })
+export type SignupInfoInput = z.infer<typeof signupInfoSchema>
+
+/** Full signup payload — dùng khi gọi API signup. */
+export const signupSchema = z.object({
+  email: emailSchema,
+  fullName: z.string().min(1).max(255),
+  password: passwordSchema,
+  otp: otpCodeSchema,
+})
+export type SignupInput = z.infer<typeof signupSchema>
+
+/* ------------------------------------------------------------------ */
+/* OTP (cho forgot-password flow)                                       */
+/* ------------------------------------------------------------------ */
 
 export const otpSchema = z.object({
   email: emailSchema,
-  code: z
-    .string()
-    .regex(/^\d{6}$/, 'Mã OTP phải có đúng 6 chữ số'),
+  code: otpCodeSchema,
 })
+export type OtpInput = z.infer<typeof otpSchema>
 
 export const otpLocationStateSchema = z.object({
   email: z.string().email().optional(),
   flow: z.enum(['registration', 'forgot-password']).optional(),
 })
-
-export type LoginInput = z.infer<typeof loginSchema>
-export type RegisterInput = z.infer<typeof registerSchema>
-export type OtpInput = z.infer<typeof otpSchema>

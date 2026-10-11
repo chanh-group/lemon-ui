@@ -1,16 +1,35 @@
-export { loginSchema, registerSchema, otpSchema, otpLocationStateSchema } from './schemas/auth.schema'
-export type { LoginInput, RegisterInput, OtpInput } from './schemas/auth.schema'
+export {
+  loginSchema,
+  requestOtpSchema,
+  verifyOtpSchema,
+  signupInfoSchema,
+  signupSchema,
+  otpSchema,
+  otpLocationStateSchema,
+} from './schemas/auth.schema'
+export type {
+  LoginInput,
+  RequestOtpInput,
+  VerifyOtpInput,
+  SignupInfoInput,
+  SignupInput,
+  OtpInput,
+} from './schemas/auth.schema'
 export {
   useAuth,
   useLogin,
-  useRegister,
-  useLogout,
+  useRequestOtp,
+  useVerifyOtpEarly,
+  useSignup,
+  useAutoSignin,
   useVerifyOtp,
   useForgotPassword,
   useResendOtp,
+  useLogout,
 } from './hooks/useAuth'
+export { useOtpCountdown, formatCountdown } from './helpers'
 export { LoginForm } from './components/LoginForm'
-export { RegisterForm } from './components/RegisterForm'
+export { SignupWizard, EmailStep, OtpStep, InfoStep } from './components/signup'
 export { OtpInputGroup, ResendOtp, VerificationMessage } from './components/otp'
 export type {
   User,
@@ -19,8 +38,12 @@ export type {
   OtpLocationState,
   VerificationState,
   VerificationErrorCode,
+  RequestOtpPayload,
   VerifyOtpPayload,
+  VerifyOtpEarlyPayload,
+  SignupPayload,
   ResendOtpPayload,
   LoginPayload,
   RegisterPayload,
+  SignupStep,
 } from './types/auth.types'

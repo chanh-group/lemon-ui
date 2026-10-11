@@ -18,7 +18,6 @@ export interface AuthSession {
 export interface LoginPayload {
   email: string
   password: string
-  rememberMe?: boolean
 }
 
 export interface RegisterPayload {
@@ -42,11 +41,31 @@ export type VerificationState = 'idle' | 'loading' | 'error' | 'success'
 
 export type VerificationErrorCode = 'incorrect' | 'expired' | 'too-many-attempts' | 'network'
 
+export interface RequestOtpPayload {
+  email: string
+}
+
 export interface VerifyOtpPayload {
   email: string
   code: string
 }
 
+export interface VerifyOtpEarlyPayload {
+  email: string
+  otp: string
+  purpose: 'signup' | 'reset'
+}
+
+export interface SignupPayload {
+  email: string
+  fullName: string
+  password: string
+  otp: string
+}
+
 export interface ResendOtpPayload {
   email: string
 }
+
+/** Bước trong signup wizard */
+export type SignupStep = 'email' | 'otp' | 'info'

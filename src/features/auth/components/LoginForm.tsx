@@ -5,7 +5,6 @@ import { EyeIcon, EyeOffIcon, Loader2Icon } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Separator } from '@/components/ui/separator'
 import {
   Form,
@@ -54,7 +53,6 @@ export function LoginForm() {
     defaultValues: {
       email: '',
       password: '',
-      rememberMe: false,
     },
     mode: 'onBlur',
     reValidateMode: 'onChange',
@@ -110,13 +108,13 @@ export function LoginForm() {
           name="email"
           render={({ field }) => (
             <FormItem>
-              <FormLabel className="sr-only">Email hoặc số điện thoại</FormLabel>
+              <FormLabel className="sr-only">Email</FormLabel>
               <FormControl>
                 <Input
                   type="email"
                   autoComplete="email"
                   inputMode="email"
-                  placeholder="Email hoặc số điện thoại"
+                  placeholder="Email"
                   aria-invalid={!!form.formState.errors.email}
                   {...field}
                 />
@@ -177,31 +175,6 @@ export function LoginForm() {
             'Tiếp tục'
           )}
         </Button>
-
-        <FormField
-          control={form.control}
-          name="rememberMe"
-          render={({ field }) => (
-            <FormItem>
-              <div className="flex items-center justify-center gap-2">
-                <FormControl>
-                  <Checkbox
-                    id="rememberMe"
-                    checked={field.value}
-                    onCheckedChange={field.onChange}
-                    onBlur={field.onBlur}
-                  />
-                </FormControl>
-                <FormLabel
-                  htmlFor="rememberMe"
-                  className="cursor-pointer text-sm font-normal text-muted-foreground"
-                >
-                  Duy trì đăng nhập
-                </FormLabel>
-              </div>
-            </FormItem>
-          )}
-        />
 
         <div className="mt-2 flex items-center gap-3">
           <Separator className="flex-1" />

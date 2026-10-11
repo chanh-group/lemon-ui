@@ -4,9 +4,11 @@ import { clearAccessToken, setAccessToken } from '@/lib/token-manager'
 import type {
   AuthSession,
   LoginPayload,
-  RegisterPayload,
+  RequestOtpPayload,
   ResendOtpPayload,
+  SignupPayload,
   User,
+  VerifyOtpEarlyPayload,
   VerifyOtpPayload,
 } from '@/features/auth/types/auth.types'
 
@@ -45,21 +47,42 @@ export async function login(payload: LoginPayload): Promise<AuthSession> {
   return applySession(session)
 }
 
-/**
- * Đăng ký — KHÔNG áp dụng session. Phải xác minh OTP trước khi có phiên.
- * Server trả về user info để hiển thị trên trang OTP.
- */
-export async function register(payload: RegisterPayload): Promise<User> {
-  if (isAuthBypass()) {
-    return createDevSession(payload).user
-  }
+/** Gửi OTP đăng ký. 429 nếu spam — UI đếm ngược, không spam. */
+export async function requestOtp(payload: RequestOtpPayload): Promise<void> {
+  if (isAuthBypass()) return
 
-  return request<User>('/auth/register', {
+  await request<void>('/auth/request-otp', {
     method: 'POST',
     body: payload,
   })
 }
 
+/**
+ * Verify OTP sớm, KHÔNG tiêu thụ mã (signup sau vẫn dùng được).
+ * Sai cộng dồn — đủ MAX_OTP_ATTEMPTS mã bị hủy phía server.
+ */
+export async function verifyOtpEarly(payload: VerifyOtpEarlyPayload): Promise<boolean> {
+  if (isAuthBypass()) return true
+
+  return request<boolean>('/auth/verify-otp', {
+    method: 'POST',
+    body: payload,
+  })
+}
+
+/** Tạo user sau đối chiếu OTP. Thành công → caller auto-signin. */
+export async function signup(payload: SignupPayload): Promise<User> {
+  if (isAuthBypass()) {
+    return createDevSession(payload).user
+  }
+
+  return request<User>('/auth/signup', {
+    method: 'POST',
+    body: payload,
+  })
+}
+
+/** Verify OTP (cho forgot-password flow) — tiêu thụ mã. */
 export async function verifyOtp(payload: VerifyOtpPayload): Promise<AuthSession> {
   if (isAuthBypass()) return applySession(createDevSession(payload))
 

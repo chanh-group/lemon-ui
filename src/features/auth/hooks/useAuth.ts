@@ -5,13 +5,18 @@ import { ROUTES } from '@/config/constants'
 import { useAuth } from '@/app/providers/AuthProvider'
 import type {
   LoginPayload,
-  RegisterPayload,
+  RequestOtpPayload,
   ResendOtpPayload,
+  SignupPayload,
+  VerifyOtpEarlyPayload,
   VerifyOtpPayload,
 } from '@/features/auth/types/auth.types'
 import {
   forgotPassword as forgotPasswordApi,
+  requestOtp as requestOtpApi,
   resendOtp as resendOtpApi,
+  signup as signupApi,
+  verifyOtpEarly as verifyOtpEarlyApi,
 } from '@/features/auth/api/auth.api'
 
 export { useAuth } from '@/app/providers/AuthProvider'
@@ -32,33 +37,60 @@ export function useLogin() {
   })
 }
 
-export function useRegister() {
-  const navigate = useNavigate()
-  const { register } = useAuth()
-
+/** Gửi OTP đăng ký. */
+export function useRequestOtp() {
   return useMutation({
-    mutationFn: (payload: RegisterPayload) => register(payload),
-    onSuccess: (user) => {
-      navigate(ROUTES.otp, {
-        replace: true,
-        state: { email: user.email, flow: 'registration' },
-      })
-    },
-    onError: (error: Error) => {
-      toast.error(error.message || 'Đăng ký không thành công')
-    },
+    mutationFn: (payload: RequestOtpPayload) => requestOtpApi(payload),
+  })
+}
+
+/** Verify OTP sớm (không tiêu thụ mã). */
+export function useVerifyOtpEarly() {
+  return useMutation({
+    mutationFn: (payload: VerifyOtpEarlyPayload) => verifyOtpEarlyApi(payload),
+  })
+}
+
+/** Tạo user sau verify OTP. */
+export function useSignup() {
+  return useMutation({
+    mutationFn: (payload: SignupPayload) => signupApi(payload),
   })
 }
 
 /**
- * Xác minh OTP — KHÔNG navigate. Caller tự quyết định điều hướng
- * (OtpPage cần hiển thị success state trước khi redirect).
+ * Auto-signin sau signup — backend chỉ set refresh cookie ở login.
  */
+export function useAutoSignin() {
+  const navigate = useNavigate()
+  const { login } = useAuth()
+
+  return useMutation({
+    mutationFn: (payload: LoginPayload) => login(payload),
+    onSuccess: () => {
+      toast.success('Tạo tài khoản thành công!')
+      navigate(ROUTES.messages, { replace: true })
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Đăng nhập tự động thất bại')
+    },
+  })
+}
+
+/** Verify OTP (cho forgot-password) — tiêu thụ mã. */
 export function useVerifyOtp() {
+  const navigate = useNavigate()
   const { verifyOtp } = useAuth()
 
   return useMutation({
     mutationFn: (payload: VerifyOtpPayload) => verifyOtp(payload),
+    onSuccess: () => {
+      toast.success('Xác thực thành công!')
+      navigate(ROUTES.messages, { replace: true })
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Mã OTP không hợp lệ')
+    },
   })
 }
 

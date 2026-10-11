@@ -15,14 +15,12 @@ import { getItem, removeItem, setItem } from '@/lib/storage'
 import {
   login as loginApi,
   logout as logoutApi,
-  register as registerApi,
   restoreSession,
   verifyOtp as verifyOtpApi,
 } from '@/features/auth/api/auth.api'
 import type {
   AuthSession,
   LoginPayload,
-  RegisterPayload,
   User,
   VerifyOtpPayload,
 } from '@/features/auth/types/auth.types'
@@ -33,7 +31,6 @@ export interface AuthContextValue {
   user: User | null
   status: AuthStatus
   login: (payload: LoginPayload) => Promise<User>
-  register: (payload: RegisterPayload) => Promise<User>
   verifyOtp: (payload: VerifyOtpPayload) => Promise<User>
   logout: () => Promise<void>
 }
@@ -101,11 +98,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     [establishSession],
   )
 
-  /** Đăng ký — không tạo session. Trả về user info để chuyển sang OTP. */
-  const register = useCallback(async (payload: RegisterPayload) => {
-    return registerApi(payload)
-  }, [])
-
   const verifyOtp = useCallback(
     async (payload: VerifyOtpPayload) => {
       const next = await verifyOtpApi(payload)
@@ -126,8 +118,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, [])
 
   const value = useMemo(
-    () => ({ user, status, login, register, verifyOtp, logout }),
-    [user, status, login, register, verifyOtp, logout],
+    () => ({ user, status, login, verifyOtp, logout }),
+    [user, status, login, verifyOtp, logout],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

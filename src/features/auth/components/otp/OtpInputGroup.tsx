@@ -61,7 +61,7 @@ export function OtpInputGroup({
 
   return (
     <div
-      className={`flex gap-2 ${invalid ? 'ring-2 ring-destructive rounded-lg' : ''}`}
+      className="flex gap-3"
       onPaste={handlePaste}
       role="group"
       aria-label="Mã xác minh gồm 6 chữ số"
@@ -74,11 +74,9 @@ export function OtpInputGroup({
             ref={(el) => {
               inputs.current[index] = el
             }}
-            className={`h-12 w-10 rounded-lg border text-center text-lg font-semibold transition-colors sm:h-14 sm:w-12 sm:text-xl ${
-              digit
-                ? 'border-input bg-card text-foreground'
-                : 'border-input bg-background text-foreground'
-            } ${invalid ? 'border-destructive' : 'focus:border-ring focus:ring-2 focus:ring-ring/30'} disabled:cursor-not-allowed disabled:opacity-50`}
+            className={`h-12 w-full rounded-md border bg-card text-center font-mono text-xl text-card-foreground outline-none transition-colors duration-150 placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 sm:h-14 ${
+              invalid ? 'border-destructive' : 'border-border'
+            } ${disabled ? 'cursor-not-allowed opacity-50' : ''}`}
             value={digit}
             onChange={(event) => updateDigit(index, event.target.value)}
             onKeyDown={(event) => handleKeyDown(event, index)}
