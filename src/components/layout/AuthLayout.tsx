@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { BrandMark } from '@/components/common/BrandMark'
 import { LanguageSwitcher } from '@/components/common/LanguageSwitcher'
 import { APP_NAME } from '@/config/constants'
@@ -14,6 +15,8 @@ interface AuthLayoutProps {
  * tiêu đề lớn, form gọn ở giữa — nền trắng thoáng, animation nhẹ.
  */
 export function AuthLayout({ title, subtitle, children }: AuthLayoutProps) {
+  const { t } = useTranslation()
+
   return (
     <main className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden bg-background px-4 py-10">
       <div className="absolute top-4 right-4 z-50">
@@ -72,7 +75,7 @@ export function AuthLayout({ title, subtitle, children }: AuthLayoutProps) {
           className="mt-8 text-center text-xs text-balance text-muted-foreground animate-fade-in"
           style={{ animationDelay: '520ms' }}
         >
-          {APP_NAME} — Nhắn tin dễ dàng, trò chuyện vui vẻ mỗi ngày.
+          {t('layout.footer', { appName: APP_NAME, tagline: t('layout.brandTagline') })}
         </p>
       </div>
     </main>

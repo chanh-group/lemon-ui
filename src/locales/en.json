@@ -62,5 +62,14 @@
     "errorVerifyOtp": "Unable to verify the OTP code",
     "errorSignup": "Unable to create account",
     "errorResetPassword": "Unable to reset password"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "An error occurred, please try again"
+  },
+  "layout": {
+    "brandTagline": "Easy messaging, fun chats every day.",
+    "footer": "{appName} — {tagline}",
+    "backToLogin": "Back to login page"
   }
 }

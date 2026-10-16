@@ -62,5 +62,14 @@
     "errorVerifyOtp": "Không thể xác minh mã OTP",
     "errorSignup": "Không thể tạo tài khoản",
     "errorResetPassword": "Không thể đặt lại mật khẩu"
+  },
+  "common": {
+    "loading": "Đang tải...",
+    "error": "Đã có lỗi xảy ra, vui lòng thử lại"
+  },
+  "layout": {
+    "brandTagline": "Nhắn tin dễ dàng, trò chuyện vui vẻ mỗi ngày.",
+    "footer": "{appName} — {tagline}",
+    "backToLogin": "Về trang đăng nhập"
   }
 }

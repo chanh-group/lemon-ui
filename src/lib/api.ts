@@ -14,6 +14,11 @@ interface RequestOptions extends Omit<RequestInit, 'body'> {
   skipAuthRefresh?: boolean
 }
 
+/** Ngôn ngữ hiện tại cho header Accept-Language — đọc mỗi request, không cache. */
+function acceptLanguage(): string {
+  return localStorage.getItem('lang') || 'vi'
+}
+
 export class RequestError extends Error {
   status: number
   code?: string
@@ -46,7 +51,10 @@ export function refreshAccessToken(): Promise<string | null> {
       const response = await fetch(`${env.API_URL}/auth/refresh`, {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept-Language': acceptLanguage(),
+        },
       })
 
       if (!response.ok) {
@@ -102,6 +110,7 @@ export async function request<T>(
       credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
+        'Accept-Language': acceptLanguage(),
         ...(token ? { Authorization: `Bearer ${token}` } : null),
         ...headers,
       },
