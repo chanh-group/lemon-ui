@@ -103,14 +103,14 @@ export function SignupWizard() {
           setStep('info')
         },
         onError: (error: Error) => {
-          const msg = error.message.toLowerCase()
-          if (msg.includes('invalid') || msg.includes('sai')) {
+          const code = (error as { code?: string }).code
+          if (code === 'INVALID_OTP') {
             if (!handleInvalidOtp()) {
               toast.error(t('auth.errorIncorrectOtp'))
             }
-          } else if (msg.includes('expired') || msg.includes('hết hạn')) {
+          } else if (code === 'OTP_EXPIRED') {
             handleExpired()
-          } else if (msg.includes('already') || msg.includes('tồn tại')) {
+          } else if (code === 'USER_ALREADY_EXISTS' || code === 'CONFLICT') {
             toast.error(t('auth.errorEmailExists'))
             setStep('email')
           } else {
@@ -134,12 +134,12 @@ export function SignupWizard() {
         autoSignin.mutate({ email, password: values.password })
       },
       onError: (error: Error) => {
-        const msg = error.message.toLowerCase()
-        if (msg.includes('already') || msg.includes('tồn tại')) {
+        const code = (error as { code?: string }).code
+        if (code === 'USER_ALREADY_EXISTS' || code === 'CONFLICT') {
           toast.error(t('auth.errorEmailExists'))
           setStep('email')
           resetOtpState()
-        } else if (msg.includes('invalid') || msg.includes('sai')) {
+        } else if (code === 'INVALID_OTP') {
           if (!handleInvalidOtp()) {
             toast.error(t('auth.errorInvalidOtp'))
           }

@@ -63,7 +63,8 @@
     "errorSignup": "Không thể tạo tài khoản",
     "errorResetPassword": "Không thể đặt lại mật khẩu",
     "autoSigninFailed": "Đăng nhập tự động thất bại",
-    "forgotOtpError": "Không thể gửi mã đặt lại mật khẩu"
+    "forgotOtpError": "Không thể gửi mã đặt lại mật khẩu",
+    "resetError": "Không thể đặt lại mật khẩu"
   },
   "common": {
     "loading": "Đang tải...",

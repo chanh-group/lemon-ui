@@ -63,7 +63,8 @@
     "errorSignup": "Unable to create account",
     "errorResetPassword": "Unable to reset password",
     "autoSigninFailed": "Auto sign-in failed",
-    "forgotOtpError": "Could not send reset code"
+    "forgotOtpError": "Could not send reset code",
+    "resetError": "Could not reset password"
   },
   "common": {
     "loading": "Loading...",
