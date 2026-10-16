@@ -1,0 +1,120 @@
+/* ============================================================
+   LemonChat — Chat experience (3-pane: nav / list / thread)
+   Tokens ánh xạ đúng bảng màu brief Lemon:
+   #F5E85B lemon · #DDF4A7 lime nhạt · #3D7A36 leaf
+   #FAFBF5 canvas · #FFFFFF surface · #20271F / #788074 text · #E7EBDD border
+   ============================================================ */
+
+@keyframes msg-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes story-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes story-progress {
+  from {
+    width: 0%;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+.msg-in {
+  animation: msg-in 0.2s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Icon nav: scale nhẹ khi active, nền chuyển mượt */
+.chat-nav-btn {
+  transition:
+    background-color 0.16s ease,
+    color 0.16s ease,
+    transform 0.16s ease;
+}
+.chat-nav-btn:hover {
+  transform: scale(1.06);
+}
+.chat-nav-btn:active {
+  transform: scale(0.94);
+}
+.chat-nav-btn[aria-selected="true"] svg {
+  transform: scale(1.08);
+}
+
+/* Item danh sách: hover dịch tối đa 2px */
+.chat-item {
+  transition:
+    background-color 0.15s ease,
+    transform 0.15s ease;
+}
+
+.chat-icon-btn {
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    transform 0.12s ease;
+}
+
+/* Vòng story chưa xem — viền chanh/xanh lá theo brand */
+.chat-story-ring {
+  box-shadow:
+    0 0 0 2px #fafbf5,
+    0 0 0 4px #3d7a36,
+    0 0 0 6px #f5e85b;
+}
+
+.story-overlay {
+  animation: story-in 0.18s ease-out both;
+}
+.story-overlay .story-card {
+  animation: story-in 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.story-progress {
+  animation: story-progress 5s linear forwards;
+}
+
+/* Nút gửi: scale khi nhấn */
+.chat-send {
+  transition:
+    background-color 0.15s ease,
+    transform 0.12s ease,
+    box-shadow 0.15s ease;
+}
+.chat-send:not(:disabled):hover {
+  transform: translateY(-1px);
+}
+
+/* Tooltip fade nhanh */
+[data-slot="tooltip-content"] {
+  animation-duration: 0.12s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .msg-in,
+  .story-overlay,
+  .story-overlay .story-card,
+  .story-progress {
+    animation: none;
+  }
+  .chat-nav-btn:hover,
+  .chat-item,
+  .chat-send:not(:disabled):hover {
+    transform: none;
+  }
+}
