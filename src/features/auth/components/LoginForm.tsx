@@ -65,7 +65,7 @@ export function LoginForm() {
                   <button
                     type="button"
                     onClick={() => setShowPassword((p) => !p)}
-                    aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                    aria-label={showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
                     aria-pressed={showPassword}
                     className="absolute inset-y-0 right-0 flex w-12 cursor-pointer items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
                   >

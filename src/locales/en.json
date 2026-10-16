@@ -11,6 +11,8 @@
     "confirmPasswordPlaceholder": "Re-enter password",
     "confirmNewPasswordPlaceholder": "Re-enter new password",
     "passwordHint": "At least 8 characters",
+    "hidePassword": "Hide password",
+    "showPassword": "Show password",
     "forgotPassword": "Forgot password?",
     "continueWithGoogle": "Continue with Google",
     "or": "or",
