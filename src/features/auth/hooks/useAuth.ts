@@ -1,4 +1,5 @@
 import { useMutation } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { ROUTES } from '@/config/constants'
@@ -25,15 +26,16 @@ export { useAuth } from '@/app/providers/AuthProvider'
 export function useLogin() {
   const navigate = useNavigate()
   const { login } = useAuth()
+  const { t } = useTranslation()
 
   return useMutation({
     mutationFn: (payload: LoginPayload) => login(payload),
     onSuccess: (user) => {
-      toast.success(`Chào mừng ${user.fullName} trở lại!`)
+      toast.success(t('auth.loginSuccess', { name: user.fullName }))
       navigate(ROUTES.messages, { replace: true })
     },
     onError: (error: Error) => {
-      toast.error(error.message || 'Đăng nhập không thành công')
+      toast.error(error.message || t('auth.errorUnknown'))
     },
   })
 }
@@ -59,24 +61,26 @@ export function useSignup() {
 export function useAutoSignin() {
   const navigate = useNavigate()
   const { login } = useAuth()
+  const { t } = useTranslation()
 
   return useMutation({
     mutationFn: (payload: LoginPayload) => login(payload),
     onSuccess: () => {
-      toast.success('Tạo tài khoản thành công!')
+      toast.success(t('auth.signupSuccess'))
       navigate(ROUTES.messages, { replace: true })
     },
     onError: (error: Error) => {
-      toast.error(error.message || 'Đăng nhập tự động thất bại')
+      toast.error(error.message || t('auth.autoSigninFailed'))
     },
   })
 }
 
 export function useForgotPassword() {
+  const { t } = useTranslation()
   return useMutation({
     mutationFn: (payload: { email: string }) => forgotPasswordApi(payload),
     onError: (error: Error) => {
-      toast.error(error.message || 'Không thể gửi mã đặt lại mật khẩu')
+      toast.error(error.message || t('auth.forgotOtpError'))
     },
   })
 }

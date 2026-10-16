@@ -2,9 +2,11 @@ import { useLogout } from '@/features/auth/hooks/useAuth'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { LogOutIcon, MessageCircleIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { useTranslation } from 'react-i18next'
 import { EmptyState } from '@/components/common/EmptyState'
 
 export function DashboardPage() {
+  const { t } = useTranslation()
   const { user } = useAuth()
   const logout = useLogout()
 
@@ -20,7 +22,7 @@ export function DashboardPage() {
           </span>
           <div>
             <p className="text-sm font-semibold leading-tight text-foreground">
-              {user?.fullName ?? 'Khách'}
+              {user?.fullName ?? t('common.guest')}
             </p>
             <p className="text-xs text-muted-foreground">{user?.email ?? ''}</p>
           </div>
@@ -34,15 +36,15 @@ export function DashboardPage() {
           disabled={logout.isPending}
         >
           <LogOutIcon className="size-4" aria-hidden="true" />
-          Đăng xuất
+          {t('common.logout')}
         </Button>
       </header>
 
       <div className="flex flex-1 items-center justify-center px-4">
         <div className="w-full max-w-md">
           <EmptyState
-            title="Hộp thư đang trống"
-            message="Bắt đầu cuộc trò chuyện đầu tiên của bạn trên LemonChat."
+            title={t('pages.inboxEmptyTitle')}
+            message={t('pages.inboxEmptyMessage')}
           />
         </div>
       </div>

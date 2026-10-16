@@ -1,4 +1,5 @@
 import { AlertTriangleIcon } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 
 interface ErrorStateProps {
@@ -7,26 +8,18 @@ interface ErrorStateProps {
   onRetry?: () => void
 }
 
-export function ErrorState({
-  title = 'Đã có lỗi xảy ra',
-  message = 'Không thể tải dữ liệu. Vui lòng thử lại.',
-  onRetry,
-}: ErrorStateProps) {
+export function ErrorState({ title, message, onRetry }: ErrorStateProps) {
+  const { t } = useTranslation()
   return (
-    <div
-      role="alert"
-      className="flex flex-col items-center justify-center gap-3 rounded-lg border border-border bg-card px-6 py-10 text-center"
-    >
-      <AlertTriangleIcon className="size-8 text-destructive" aria-hidden="true" />
-      <div>
-        <p className="text-subheading font-heading text-foreground">{title}</p>
-        <p className="mt-1 text-sm text-muted-foreground">{message}</p>
-      </div>
-      {onRetry ? (
-        <Button type="button" variant="outline" onClick={onRetry} className="cursor-pointer">
-          Thử lại
+    <div className="flex flex-col items-center justify-center py-12 text-center">
+      <AlertTriangleIcon className="mb-4 size-12 text-destructive" aria-hidden="true" />
+      <h3 className="text-lg font-semibold text-foreground">{title ?? t('common.errorTitle')}</h3>
+      <p className="mt-2 text-sm text-muted-foreground">{message ?? t('common.errorMessage')}</p>
+      {onRetry && (
+        <Button variant="outline" className="mt-4" onClick={onRetry}>
+          {t('common.retry')}
         </Button>
-      ) : null}
+      )}
     </div>
   )
 }

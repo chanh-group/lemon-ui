@@ -61,11 +61,24 @@
     "errorSendOtp": "Không thể gửi mã xác minh",
     "errorVerifyOtp": "Không thể xác minh mã OTP",
     "errorSignup": "Không thể tạo tài khoản",
-    "errorResetPassword": "Không thể đặt lại mật khẩu"
+    "errorResetPassword": "Không thể đặt lại mật khẩu",
+    "autoSigninFailed": "Đăng nhập tự động thất bại",
+    "forgotOtpError": "Không thể gửi mã đặt lại mật khẩu"
   },
   "common": {
     "loading": "Đang tải...",
-    "error": "Đã có lỗi xảy ra, vui lòng thử lại"
+    "error": "Đã có lỗi xảy ra, vui lòng thử lại",
+    "retry": "Thử lại",
+    "errorTitle": "Đã có lỗi xảy ra",
+    "errorMessage": "Không thể tải dữ liệu. Vui lòng thử lại.",
+    "emptyTitle": "Chưa có dữ liệu",
+    "emptyMessage": "Nội dung sẽ hiển thị tại đây khi có dữ liệu.",
+    "guest": "Khách",
+    "logout": "Đăng xuất",
+    "notFoundTitle": "Không tìm thấy trang",
+    "notFoundMessage": "Trang bạn đang tìm không tồn tại hoặc đã được di chuyển.",
+    "backToLogin": "Về trang đăng nhập",
+    "networkError": "Đã có lỗi xảy ra, vui lòng thử lại"
   },
   "layout": {
     "brandTagline": "Nhắn tin dễ dàng, trò chuyện vui vẻ mỗi ngày.",
@@ -82,5 +95,15 @@
     "otpInvalid": "Mã OTP phải có đúng 6 chữ số",
     "fullNameMinLength": "Họ và tên phải có ít nhất 2 ký tự",
     "fullNameMaxLength": "Họ và tên tối đa 60 ký tự"
+  },
+  "pages": {
+    "loginTitle": "Kết nối với những người bạn",
+    "loginSubtitle": "Đăng nhập để tiếp tục trò chuyện",
+    "registerTitle": "Bắt đầu trò chuyện cùng LemonChat.",
+    "registerSubtitle": "Tạo tài khoản miễn phí chỉ trong vài giây.",
+    "forgotTitle": "Quên mật khẩu?",
+    "forgotSubtitle": "Đừng lo, chúng tôi sẽ giúp bạn đặt lại mật khẩu.",
+    "inboxEmptyTitle": "Hộp thư đang trống",
+    "inboxEmptyMessage": "Bắt đầu cuộc trò chuyện đầu tiên của bạn trên LemonChat."
   }
 }

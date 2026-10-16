@@ -1,21 +1,18 @@
 import { InboxIcon } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 interface EmptyStateProps {
   title?: string
   message?: string
 }
 
-export function EmptyState({
-  title = 'Chưa có dữ liệu',
-  message = 'Nội dung sẽ hiển thị tại đây khi có dữ liệu.',
-}: EmptyStateProps) {
+export function EmptyState({ title, message }: EmptyStateProps) {
+  const { t } = useTranslation()
   return (
-    <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border bg-card px-6 py-10 text-center">
-      <InboxIcon className="size-8 text-muted-foreground" aria-hidden="true" />
-      <div>
-        <p className="text-subheading font-heading text-foreground">{title}</p>
-        <p className="mt-1 text-sm text-muted-foreground">{message}</p>
-      </div>
+    <div className="flex flex-col items-center justify-center py-12 text-center">
+      <InboxIcon className="mb-4 size-12 text-muted-foreground" aria-hidden="true" />
+      <h3 className="text-lg font-semibold text-foreground">{title ?? t('common.emptyTitle')}</h3>
+      <p className="mt-2 text-sm text-muted-foreground">{message ?? t('common.emptyMessage')}</p>
     </div>
   )
 }

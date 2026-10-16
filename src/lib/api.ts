@@ -1,5 +1,6 @@
 import { env, isAuthBypass } from '@/config/env'
 import { clearAccessToken, getAccessToken, setAccessToken } from '@/lib/token-manager'
+import i18n from '@/i18n'
 
 export interface ApiError {
   message: string
@@ -83,7 +84,7 @@ export function scheduleSilentRefresh(): void {
 }
 
 async function parseError(response: Response): Promise<RequestError> {
-  let message = 'Đã có lỗi xảy ra, vui lòng thử lại'
+  let message = i18n.t('common.networkError')
   let fieldErrors: Record<string, string[]> | undefined
 
   try {

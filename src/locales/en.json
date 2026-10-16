@@ -49,7 +49,7 @@
     "resettingPassword": "Resetting password...",
     "loginSuccess": "Welcome back, {name}!",
     "signupSuccess": "Account created successfully!",
-    "resetSuccess": "Password reset successfully! Please log in again.",
+    "resetSuccess": "Password reset successful! Please sign in again.",
     "errorInvalidCredentials": "Incorrect email or password.",
     "errorNetwork": "A connection error occurred. Please try again.",
     "errorUnknown": "An error occurred. Please try again.",
@@ -61,11 +61,24 @@
     "errorSendOtp": "Unable to send verification code",
     "errorVerifyOtp": "Unable to verify the OTP code",
     "errorSignup": "Unable to create account",
-    "errorResetPassword": "Unable to reset password"
+    "errorResetPassword": "Unable to reset password",
+    "autoSigninFailed": "Auto sign-in failed",
+    "forgotOtpError": "Could not send reset code"
   },
   "common": {
     "loading": "Loading...",
-    "error": "An error occurred, please try again"
+    "error": "An error occurred, please try again",
+    "retry": "Retry",
+    "errorTitle": "Something went wrong",
+    "errorMessage": "Could not load data. Please try again.",
+    "emptyTitle": "No data",
+    "emptyMessage": "Content will appear here when available.",
+    "guest": "Guest",
+    "logout": "Sign out",
+    "notFoundTitle": "Page not found",
+    "notFoundMessage": "The page you're looking for doesn't exist or has been moved.",
+    "backToLogin": "Back to sign in",
+    "networkError": "Something went wrong, please try again"
   },
   "layout": {
     "brandTagline": "Easy messaging, fun chats every day.",
@@ -82,5 +95,15 @@
     "otpInvalid": "OTP must be exactly 6 digits",
     "fullNameMinLength": "Full name must be at least 2 characters",
     "fullNameMaxLength": "Full name must be at most 60 characters"
+  },
+  "pages": {
+    "loginTitle": "Connect with friends",
+    "loginSubtitle": "Sign in to continue chatting",
+    "registerTitle": "Start chatting with LemonChat.",
+    "registerSubtitle": "Create a free account in seconds.",
+    "forgotTitle": "Forgot password?",
+    "forgotSubtitle": "Don't worry, we'll help you reset it.",
+    "inboxEmptyTitle": "Inbox is empty",
+    "inboxEmptyMessage": "Start your first conversation on LemonChat."
   }
 }
