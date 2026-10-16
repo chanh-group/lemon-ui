@@ -4,7 +4,7 @@ import { useAuth } from '@/app/providers/AuthProvider'
 import { ROUTES } from '@/config/constants'
 import { LoginPage } from '@/pages/LoginPage'
 import { RegisterPage } from '@/pages/RegisterPage'
-import { OtpPage } from '@/pages/OtpPage'
+import { ForgotPasswordPage } from '@/pages/ForgotPasswordPage'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
 
@@ -13,7 +13,6 @@ function RequireAuth({ children }: { children: ReactNode }) {
   const location = useLocation()
 
   if (status === 'restoring') {
-    // Silent refresh đang chạy ngầm — không chặn UX, chỉ giữ chỗ trong giây lát
     return <div className="min-h-dvh bg-background" aria-busy="true" />
   }
 
@@ -57,10 +56,10 @@ export const router = createBrowserRouter(
       ),
     },
     {
-      path: ROUTES.otp,
+      path: ROUTES.forgotPassword,
       element: (
         <RedirectIfAuthed>
-          <OtpPage />
+          <ForgotPasswordPage />
         </RedirectIfAuthed>
       ),
     },

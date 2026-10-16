@@ -1,8 +1,8 @@
 @import 'tailwindcss';
 
 /* ============================================================
-   LemonChat — Design tokens (light mode only)
-   Brand: lemon yellow + white (không dùng màu xanh)
+   LemonChat — Design tokens
+   Brand: lemon green + white (dark mode support)
    Font: IBM Plex Sans — kiểu chữ công nghiệp ấm, không "AI"
    Radius: minimal (không bo tròn quá)
    ============================================================ */
@@ -10,18 +10,18 @@
 :root {
   color-scheme: light;
 
-  /* ---- Brand palette: lemon ---- */
-  --lemon-50: #fefce8;
-  --lemon-100: #fef9c3;
-  --lemon-200: #fef08a;
-  --lemon-300: #fde047;
-  --lemon-400: #facc15;
-  --lemon-500: #eab308;
-  --lemon-600: #ca8a04;
-  --lemon-700: #a16207;
-  --lemon-800: #854d0e;
+  /* ---- Brand palette: lemon green ---- */
+  --green-50: #f0fdf4;
+  --green-100: #dcfce7;
+  --green-200: #bbf7d0;
+  --green-300: #86efac;
+  --green-400: #00e676;
+  --green-500: #00c853;
+  --green-600: #009624;
+  --green-700: #15803d;
+  --green-800: #166534;
 
-  /* ---- Semantic tokens ---- */
+  /* ---- Semantic tokens (light) ---- */
   --background: #ffffff;
   --foreground: #1c1917;
 
@@ -31,38 +31,86 @@
   --popover: #ffffff;
   --popover-foreground: #1c1917;
 
-  /* Nút: nền vàng chanh + chữ tối (tương phản ~10:1) */
-  --primary: #facc15;
-  --primary-foreground: #1c1917;
+  --primary: #00e676;
+  --primary-foreground: #052e16;
 
-  --secondary: #fef9c3;
-  --secondary-foreground: #422006;
+  --secondary: #f0fdf4;
+  --secondary-foreground: #14532d;
 
-  --muted: #faf7ed;
-  --muted-foreground: #78716c;
+  --muted: #f6f8f6;
+  --muted-foreground: #57534e;
 
-  --accent: #fef08a;
-  --accent-foreground: #422006;
+  --accent: #dcfce7;
+  --accent-foreground: #14532d;
 
   --destructive: #c2410c;
   --destructive-foreground: #ffffff;
 
-  --border: #e7e2d3;
-  --input: #d6cfb8;
-  --ring: #eab308;
+  --border: #d6e8d6;
+  --input: #c2d9c2;
+  --ring: #00e676;
 
-  /* Chữ link/brand trên nền trắng — đảm bảo tương phản 4.5:1 */
-  --brand-ink: #854d0e;
-
-  --success: #a16207;
+  --brand-ink: #1b5e20;
+  --success: #00c853;
 
   --radius: 0.75rem;
 
-  --chart-1: #eab308;
-  --chart-2: #ca8a04;
-  --chart-3: #facc15;
-  --chart-4: #a16207;
-  --chart-5: #854d0e;
+  --chart-1: #00e676;
+  --chart-2: #00c853;
+  --chart-3: #69f0ae;
+  --chart-4: #009624;
+  --chart-5: #1b5e20;
+}
+
+.dark {
+  color-scheme: dark;
+
+  --green-50: #0a2e14;
+  --green-100: #0d3b1a;
+  --green-200: #14532d;
+  --green-300: #166534;
+  --green-400: #15803d;
+  --green-500: #22c55e;
+  --green-600: #4ade80;
+  --green-700: #86efac;
+  --green-800: #bbf7d0;
+
+  --background: #0a0f0a;
+  --foreground: #e8eee8;
+
+  --card: #111a11;
+  --card-foreground: #e8eee8;
+
+  --popover: #111a11;
+  --popover-foreground: #e8eee8;
+
+  --primary: #00e676;
+  --primary-foreground: #052e16;
+
+  --secondary: #14532d;
+  --secondary-foreground: #dcfce7;
+
+  --muted: #1a2a1a;
+  --muted-foreground: #9ca89c;
+
+  --accent: #14532d;
+  --accent-foreground: #dcfce7;
+
+  --destructive: #f87171;
+  --destructive-foreground: #450a0a;
+
+  --border: #1e3a1e;
+  --input: #2a4a2a;
+  --ring: #00e676;
+
+  --brand-ink: #86efac;
+  --success: #69f0ae;
+
+  --chart-1: #00e676;
+  --chart-2: #00c853;
+  --chart-3: #69f0ae;
+  --chart-4: #16a34a;
+  --chart-5: #15803d;
 }
 
 @theme inline {
@@ -118,15 +166,15 @@
   --color-success: var(--success);
   --color-brand-ink: var(--brand-ink);
 
-  --color-lemon-50: var(--lemon-50);
-  --color-lemon-100: var(--lemon-100);
-  --color-lemon-200: var(--lemon-200);
-  --color-lemon-300: var(--lemon-300);
-  --color-lemon-400: var(--lemon-400);
-  --color-lemon-500: var(--lemon-500);
-  --color-lemon-600: var(--lemon-600);
-  --color-lemon-700: var(--lemon-700);
-  --color-lemon-800: var(--lemon-800);
+  --color-green-50: var(--green-50);
+  --color-green-100: var(--green-100);
+  --color-green-200: var(--green-200);
+  --color-green-300: var(--green-300);
+  --color-green-400: var(--green-400);
+  --color-green-500: var(--green-500);
+  --color-green-600: var(--green-600);
+  --color-green-700: var(--green-700);
+  --color-green-800: var(--green-800);
 
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
@@ -179,8 +227,8 @@
   }
 
   ::selection {
-    background-color: var(--lemon-200);
-    color: var(--lemon-800);
+    background-color: var(--green-200);
+    color: var(--green-800);
   }
 
   /* Focus bàn phím luôn nhìn thấy */

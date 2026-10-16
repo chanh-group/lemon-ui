@@ -20,9 +20,9 @@ export function BrandMark({ className, animated = true }: BrandMarkProps) {
     >
       <defs>
         <linearGradient id="lemonBody" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#fde047" />
-          <stop offset="55%" stopColor="#facc15" />
-          <stop offset="100%" stopColor="#eab308" />
+          <stop offset="0%" stopColor="#69f0ae" />
+          <stop offset="55%" stopColor="#00e676" />
+          <stop offset="100%" stopColor="#00c853" />
         </linearGradient>
         <linearGradient id="lemonShine" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor="#ffffff" stopOpacity="0.65" />
@@ -35,11 +35,11 @@ export function BrandMark({ className, animated = true }: BrandMarkProps) {
         <ellipse cx="48" cy="46" rx="34" ry="27" fill="url(#lemonBody)" />
 
         {/* Núm chanh hai bên */}
-        <path d="M14 46 L6 42 L7 46 L6 50 Z" fill="#eab308" />
-        <path d="M82 46 L90 42 L89 46 L90 50 Z" fill="#eab308" />
+        <path d="M14 46 L6 42 L7 46 L6 50 Z" fill="#00c853" />
+        <path d="M82 46 L90 42 L89 46 L90 50 Z" fill="#00c853" />
 
         {/* Đuôi bong bóng chat phía dưới */}
-        <path d="M34 68 Q32 82 22 86 Q36 84 42 72 Z" fill="#eab308" />
+        <path d="M34 68 Q32 82 22 86 Q36 84 42 72 Z" fill="#00c853" />
 
         {/* Bóng sáng trên vỏ chanh */}
         <ellipse cx="36" cy="33" rx="14" ry="8" fill="url(#lemonShine)" transform="rotate(-18 36 33)" />

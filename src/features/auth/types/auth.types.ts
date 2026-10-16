@@ -6,10 +6,6 @@ export interface User {
   createdAt: string
 }
 
-/**
- * Refresh token KHÔNG nằm ở đây — server set cookie httpOnly (SameSite=Strict,
- * Secure) khi login/refresh; client chỉ giữ access token trong memory.
- */
 export interface AuthSession {
   accessToken: string
   user: User
@@ -27,27 +23,13 @@ export interface RegisterPayload {
 }
 
 /* ------------------------------------------------------------------ */
-/* OTP verification                                                    */
+/* OTP                                                                 */
 /* ------------------------------------------------------------------ */
-
-export type OtpFlow = 'registration' | 'forgot-password'
-
-export type OtpLocationState = {
-  email?: string
-  flow?: OtpFlow
-}
-
-export type VerificationState = 'idle' | 'loading' | 'error' | 'success'
 
 export type VerificationErrorCode = 'incorrect' | 'expired' | 'too-many-attempts' | 'network'
 
 export interface RequestOtpPayload {
   email: string
-}
-
-export interface VerifyOtpPayload {
-  email: string
-  code: string
 }
 
 export interface VerifyOtpEarlyPayload {
@@ -63,9 +45,18 @@ export interface SignupPayload {
   otp: string
 }
 
+export interface ResetPasswordPayload {
+  email: string
+  otp: string
+  newPassword: string
+}
+
 export interface ResendOtpPayload {
   email: string
 }
 
 /** Bước trong signup wizard */
 export type SignupStep = 'email' | 'otp' | 'info'
+
+/** Bước trong forgot password wizard */
+export type ForgotStep = 'email' | 'reset'

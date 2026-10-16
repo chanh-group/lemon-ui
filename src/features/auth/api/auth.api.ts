@@ -6,14 +6,14 @@ import type {
   LoginPayload,
   RequestOtpPayload,
   ResendOtpPayload,
+  ResetPasswordPayload,
   SignupPayload,
   User,
   VerifyOtpEarlyPayload,
-  VerifyOtpPayload,
 } from '@/features/auth/types/auth.types'
 
 /* ------------------------------------------------------------------ */
-/* Dev bypass (VITE_APP_ENV=dev): bỏ qua API thật, chỉ còn zod validate */
+/* Dev bypass (VITE_APP_ENV=dev)                                       */
 /* ------------------------------------------------------------------ */
 
 function createDevSession(payload: { email: string; fullName?: string }): AuthSession {
@@ -34,7 +34,7 @@ function applySession(session: AuthSession): AuthSession {
 }
 
 /* ------------------------------------------------------------------ */
-/* Auth API — refresh token luôn nằm trong cookie httpOnly              */
+/* Auth API                                                            */
 /* ------------------------------------------------------------------ */
 
 export async function login(payload: LoginPayload): Promise<AuthSession> {
@@ -47,85 +47,52 @@ export async function login(payload: LoginPayload): Promise<AuthSession> {
   return applySession(session)
 }
 
-/** Gửi OTP đăng ký. 429 nếu spam — UI đếm ngược, không spam. */
+/** Gửi OTP đăng ký. */
 export async function requestOtp(payload: RequestOtpPayload): Promise<void> {
   if (isAuthBypass()) return
-
-  await request<void>('/auth/request-otp', {
-    method: 'POST',
-    body: payload,
-  })
+  await request<void>('/auth/request-otp', { method: 'POST', body: payload })
 }
 
-/**
- * Verify OTP sớm, KHÔNG tiêu thụ mã (signup sau vẫn dùng được).
- * Sai cộng dồn — đủ MAX_OTP_ATTEMPTS mã bị hủy phía server.
- */
+/** Verify OTP sớm, KHÔNG tiêu thụ mã. */
 export async function verifyOtpEarly(payload: VerifyOtpEarlyPayload): Promise<boolean> {
   if (isAuthBypass()) return true
-
-  return request<boolean>('/auth/verify-otp', {
-    method: 'POST',
-    body: payload,
-  })
+  return request<boolean>('/auth/verify-otp', { method: 'POST', body: payload })
 }
 
-/** Tạo user sau đối chiếu OTP. Thành công → caller auto-signin. */
+/** Tạo user sau đối chiếu OTP. */
 export async function signup(payload: SignupPayload): Promise<User> {
-  if (isAuthBypass()) {
-    return createDevSession(payload).user
-  }
-
-  return request<User>('/auth/signup', {
-    method: 'POST',
-    body: payload,
-  })
+  if (isAuthBypass()) return createDevSession(payload).user
+  return request<User>('/auth/signup', { method: 'POST', body: payload })
 }
 
-/** Verify OTP (cho forgot-password flow) — tiêu thụ mã. */
-export async function verifyOtp(payload: VerifyOtpPayload): Promise<AuthSession> {
-  if (isAuthBypass()) return applySession(createDevSession(payload))
+/** Gửi OTP quên mật khẩu. Luôn OK — chống enumerate email. */
+export async function forgotPassword(payload: { email: string }): Promise<void> {
+  if (isAuthBypass()) return
+  await request<void>('/auth/forgot-password', { method: 'POST', body: payload })
+}
 
-  const session = await request<AuthSession>('/auth/verify-otp', {
-    method: 'POST',
-    body: payload,
-  })
-  return applySession(session)
+/** Đặt lại mật khẩu — tiêu thụ OTP + thu hồi toàn bộ session. */
+export async function resetPassword(payload: ResetPasswordPayload): Promise<void> {
+  if (isAuthBypass()) return
+  await request<void>('/auth/reset-password', { method: 'POST', body: payload })
 }
 
 export async function resendOtp(payload: ResendOtpPayload): Promise<void> {
   if (isAuthBypass()) return
-
-  await request<void>('/auth/resend-otp', {
-    method: 'POST',
-    body: payload,
-  })
+  await request<void>('/auth/resend-otp', { method: 'POST', body: payload })
 }
 
-export async function forgotPassword(payload: { email: string }): Promise<void> {
-  if (isAuthBypass()) return
-
-  await request<void>('/auth/forgot-password', {
-    method: 'POST',
-    body: payload,
-  })
-}
-
-/** Khôi phục phiên làm việc sau F5: cookie refresh → access token mới. */
+/** Khôi phục phiên làm việc sau F5. */
 export async function restoreSession(): Promise<User | null> {
   if (isAuthBypass()) return null
-
   const token = await refreshAccessToken()
   if (!token) return null
-
   return request<User>('/auth/me')
 }
 
 export async function logout(): Promise<void> {
   clearAccessToken()
-
   if (isAuthBypass()) return
-
   await request<void>('/auth/logout', { method: 'POST', skipAuthRefresh: true })
 }
 

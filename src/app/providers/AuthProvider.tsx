@@ -16,13 +16,11 @@ import {
   login as loginApi,
   logout as logoutApi,
   restoreSession,
-  verifyOtp as verifyOtpApi,
 } from '@/features/auth/api/auth.api'
 import type {
   AuthSession,
   LoginPayload,
   User,
-  VerifyOtpPayload,
 } from '@/features/auth/types/auth.types'
 
 export type AuthStatus = 'restoring' | 'authenticated' | 'anonymous'
@@ -31,7 +29,6 @@ export interface AuthContextValue {
   user: User | null
   status: AuthStatus
   login: (payload: LoginPayload) => Promise<User>
-  verifyOtp: (payload: VerifyOtpPayload) => Promise<User>
   logout: () => Promise<void>
 }
 
@@ -47,12 +44,6 @@ interface AuthProviderProps {
   children: ReactNode
 }
 
-/**
- * - Access token: memory (token-manager) — mất khi F5, khôi phục bằng silent refresh.
- * - Refresh token: cookie httpOnly do server quản lý — client không đọc/ghi.
- * - Dev bypass: đánh dấu phiên trong storage (không chứa token thật) để F5
- *   không đá về trang đăng nhập khi đang phát triển.
- */
 export function AuthProvider({ children }: AuthProviderProps) {
   const [session, setSession] = useState<{ user: User | null; status: AuthStatus }>(() => {
     if (!isAuthBypass()) return { user: null, status: 'restoring' }
@@ -69,10 +60,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     restoreSession()
       .then((restoredUser) => {
-        setSession({
-          user: restoredUser,
-          status: restoredUser ? 'authenticated' : 'anonymous',
-        })
+        setSession({ user: restoredUser, status: restoredUser ? 'authenticated' : 'anonymous' })
       })
       .catch(() => {
         clearAccessToken()
@@ -83,7 +71,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const establishSession = useCallback((next: AuthSession) => {
     setAccessToken(next.accessToken)
     setSession({ user: next.user, status: 'authenticated' })
-
     if (isAuthBypass()) {
       setItem(DEV_SESSION_KEY, next.user)
     }
@@ -92,15 +79,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const login = useCallback(
     async (payload: LoginPayload) => {
       const next = await loginApi(payload)
-      establishSession(next)
-      return next.user
-    },
-    [establishSession],
-  )
-
-  const verifyOtp = useCallback(
-    async (payload: VerifyOtpPayload) => {
-      const next = await verifyOtpApi(payload)
       establishSession(next)
       return next.user
     },
@@ -118,8 +96,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, [])
 
   const value = useMemo(
-    () => ({ user, status, login, verifyOtp, logout }),
-    [user, status, login, verifyOtp, logout],
+    () => ({ user, status, login, logout }),
+    [user, status, login, logout],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

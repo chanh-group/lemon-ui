@@ -16,9 +16,7 @@ const otpCodeSchema = z
   .string()
   .regex(/^\d{6}$/, 'Mã OTP phải có đúng 6 chữ số')
 
-/* ------------------------------------------------------------------ */
-/* Login                                                               */
-/* ------------------------------------------------------------------ */
+/* ---- Login ---- */
 
 export const loginSchema = z.object({
   email: emailSchema,
@@ -26,9 +24,7 @@ export const loginSchema = z.object({
 })
 export type LoginInput = z.infer<typeof loginSchema>
 
-/* ------------------------------------------------------------------ */
-/* Signup wizard                                                       */
-/* ------------------------------------------------------------------ */
+/* ---- Signup wizard ---- */
 
 export const requestOtpSchema = z.object({
   email: emailSchema,
@@ -42,7 +38,6 @@ export const verifyOtpSchema = z.object({
 })
 export type VerifyOtpInput = z.infer<typeof verifyOtpSchema>
 
-/** Bước cuối wizard signup: tên + mật khẩu + nhập lại (email/otp đã chốt trước đó). */
 export const signupInfoSchema = z
   .object({
     fullName: z
@@ -65,7 +60,6 @@ export const signupInfoSchema = z
   })
 export type SignupInfoInput = z.infer<typeof signupInfoSchema>
 
-/** Full signup payload — dùng khi gọi API signup. */
 export const signupSchema = z.object({
   email: emailSchema,
   fullName: z.string().min(1).max(255),
@@ -74,17 +68,21 @@ export const signupSchema = z.object({
 })
 export type SignupInput = z.infer<typeof signupSchema>
 
-/* ------------------------------------------------------------------ */
-/* OTP (cho forgot-password flow)                                       */
-/* ------------------------------------------------------------------ */
+/* ---- Forgot password ---- */
 
-export const otpSchema = z.object({
-  email: emailSchema,
-  code: otpCodeSchema,
-})
-export type OtpInput = z.infer<typeof otpSchema>
-
-export const otpLocationStateSchema = z.object({
-  email: z.string().email().optional(),
-  flow: z.enum(['registration', 'forgot-password']).optional(),
-})
+export const resetPasswordSchema = z
+  .object({
+    otp: otpCodeSchema,
+    newPassword: z
+      .string()
+      .min(1, 'Vui lòng nhập mật khẩu mới')
+      .min(PASSWORD_MIN_LENGTH, `Mật khẩu phải có ít nhất ${PASSWORD_MIN_LENGTH} ký tự`)
+      .regex(/[A-Za-z]/, 'Mật khẩu phải chứa ít nhất một chữ cái')
+      .regex(/[0-9]/, 'Mật khẩu phải chứa ít nhất một chữ số'),
+    confirmPassword: z.string().min(1, 'Vui lòng xác nhận mật khẩu'),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: 'Mật khẩu xác nhận không khớp',
+    path: ['confirmPassword'],
+  })
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>
