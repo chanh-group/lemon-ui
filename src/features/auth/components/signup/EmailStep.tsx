@@ -1,6 +1,7 @@
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Loader2Icon } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -20,6 +21,7 @@ type EmailStepProps = {
 }
 
 export function EmailStep({ defaultEmail = '', isPending, onSubmit }: EmailStepProps) {
+  const { t } = useTranslation()
   const form = useForm<RequestOtpInput>({
     resolver: zodResolver(requestOtpSchema),
     defaultValues: { email: defaultEmail },
@@ -39,13 +41,13 @@ export function EmailStep({ defaultEmail = '', isPending, onSubmit }: EmailStepP
           name="email"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Email</FormLabel>
+              <FormLabel>{t('auth.email')}</FormLabel>
               <FormControl>
                 <Input
                   type="email"
                   autoComplete="email"
                   inputMode="email"
-                  placeholder="Nhập email của bạn"
+                  placeholder={t('auth.emailPlaceholder')}
                   aria-invalid={!!form.formState.errors.email}
                   {...field}
                 />
@@ -59,10 +61,10 @@ export function EmailStep({ defaultEmail = '', isPending, onSubmit }: EmailStepP
           {isPending ? (
             <>
               <Loader2Icon className="size-4 animate-spin" aria-hidden="true" />
-              Đang gửi mã...
+              {t('auth.sendingOtp')}
             </>
           ) : (
-            'Gửi mã xác minh'
+            t('auth.sendOtp')
           )}
         </Button>
       </form>

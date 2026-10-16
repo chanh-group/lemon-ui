@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Loader2Icon } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import {
   Form,
@@ -40,6 +41,7 @@ export function OtpStep({
   onResend,
   onChangeEmail,
 }: OtpStepProps) {
+  const { t } = useTranslation()
   const [otpDigits, setOtpDigits] = useState<string[]>(() => Array.from({ length: 6 }, () => ''))
 
   const form = useForm<VerifyOtpInput>({
@@ -62,7 +64,7 @@ export function OtpStep({
   const handleSubmit = () => {
     const otp = otpDigits.join('')
     if (otp.length !== 6) {
-      form.setError('otp', { message: 'Mã OTP phải có đúng 6 chữ số' })
+      form.setError('otp', { message: t('auth.errorOtpLength') })
       return
     }
     onVerify(otp)
@@ -72,14 +74,13 @@ export function OtpStep({
     <Form {...form}>
       <form noValidate onSubmit={(e) => { e.preventDefault(); handleSubmit() }} className="flex w-full flex-col gap-3">
         <p className="text-sm text-muted-foreground">
-          Đã gửi đến{' '}
-          <span className="font-medium text-foreground">{email}</span>{' '}
+          {t('auth.otpSentTo', { email })}{' '}
           <button
             type="button"
             onClick={onChangeEmail}
             className="cursor-pointer text-primary underline-offset-4 hover:underline"
           >
-            Thay đổi
+            {t('auth.changeEmail')}
           </button>
         </p>
 
@@ -88,7 +89,7 @@ export function OtpStep({
           name="otp"
           render={() => (
             <FormItem>
-              <FormLabel>Nhập mã xác minh</FormLabel>
+              <FormLabel>{t('auth.enterOtp')}</FormLabel>
               <FormControl>
                 <Controller
                   control={form.control}
@@ -112,17 +113,14 @@ export function OtpStep({
         />
 
         {validitySecondsLeft > 0 && (
-          <p className="text-sm text-muted-foreground">
-            Mã có hiệu lực trong{' '}
-            <span className="font-medium tabular-nums text-foreground">
-              {formatCountdown(validitySecondsLeft)}
-            </span>
+          <p className="text-sm tabular-nums text-muted-foreground">
+            {t('auth.otpValidFor', { time: formatCountdown(validitySecondsLeft) })}
           </p>
         )}
 
         {attemptsLeft <= 3 && attemptsLeft > 0 && (
           <p role="status" className="text-sm font-medium text-destructive">
-            Còn {attemptsLeft} lượt thử
+            {t('auth.attemptsLeft', { count: attemptsLeft })}
           </p>
         )}
 
@@ -130,10 +128,10 @@ export function OtpStep({
           {isVerifying ? (
             <>
               <Loader2Icon className="size-4 animate-spin" aria-hidden="true" />
-              Đang xác minh...
+              {t('auth.verifying')}
             </>
           ) : (
-            'Xác minh'
+            t('auth.verifyOtp')
           )}
         </Button>
 
@@ -144,7 +142,7 @@ export function OtpStep({
           disabled={!canResend || isResending}
           onClick={onResend}
         >
-          {canResend ? 'Gửi lại mã' : `Gửi lại sau ${formatCountdown(resendSecondsLeft)}`}
+          {canResend ? t('auth.resendOtp') : t('auth.resendIn', { time: formatCountdown(resendSecondsLeft) })}
         </Button>
       </form>
     </Form>

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { EyeIcon, EyeOffIcon, Loader2Icon } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -21,6 +22,7 @@ type InfoStepProps = {
 }
 
 export function InfoStep({ isPending, attemptsLeft, onSubmit }: InfoStepProps) {
+  const { t } = useTranslation()
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
 
@@ -43,11 +45,11 @@ export function InfoStep({ isPending, attemptsLeft, onSubmit }: InfoStepProps) {
           name="fullName"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Họ và tên</FormLabel>
+              <FormLabel>{t('auth.fullName')}</FormLabel>
               <FormControl>
                 <Input
                   autoComplete="name"
-                  placeholder="Nhập họ và tên"
+                  placeholder={t('auth.fullNamePlaceholder')}
                   aria-invalid={!!form.formState.errors.fullName}
                   {...field}
                 />
@@ -62,13 +64,13 @@ export function InfoStep({ isPending, attemptsLeft, onSubmit }: InfoStepProps) {
           name="password"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Mật khẩu</FormLabel>
+              <FormLabel>{t('auth.password')}</FormLabel>
               <FormControl>
                 <div className="relative">
                   <Input
                     type={showPassword ? 'text' : 'password'}
                     autoComplete="new-password"
-                    placeholder="Tối thiểu 8 ký tự"
+                    placeholder={t('auth.passwordHint')}
                     className="pr-12"
                     aria-invalid={!!form.formState.errors.password}
                     {...field}
@@ -98,13 +100,13 @@ export function InfoStep({ isPending, attemptsLeft, onSubmit }: InfoStepProps) {
           name="confirmPassword"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Xác nhận mật khẩu</FormLabel>
+              <FormLabel>{t('auth.confirmPassword')}</FormLabel>
               <FormControl>
                 <div className="relative">
                   <Input
                     type={showConfirm ? 'text' : 'password'}
                     autoComplete="new-password"
-                    placeholder="Nhập lại mật khẩu"
+                    placeholder={t('auth.confirmPasswordPlaceholder')}
                     className="pr-12"
                     aria-invalid={!!form.formState.errors.confirmPassword}
                     {...field}
@@ -131,7 +133,7 @@ export function InfoStep({ isPending, attemptsLeft, onSubmit }: InfoStepProps) {
 
         {attemptsLeft <= 3 && attemptsLeft > 0 && (
           <p role="status" className="text-sm font-medium text-destructive">
-            Còn {attemptsLeft} lượt thử OTP
+            {t('auth.attemptsLeftOtp', { count: attemptsLeft })}
           </p>
         )}
 
@@ -139,10 +141,10 @@ export function InfoStep({ isPending, attemptsLeft, onSubmit }: InfoStepProps) {
           {isPending ? (
             <>
               <Loader2Icon className="size-4 animate-spin" aria-hidden="true" />
-              Đang tạo tài khoản...
+              {t('auth.creatingAccount')}
             </>
           ) : (
-            'Tạo tài khoản'
+            t('auth.createAccount')
           )}
         </Button>
       </form>

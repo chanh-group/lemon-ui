@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import {
   MAX_OTP_ATTEMPTS,
@@ -14,16 +15,12 @@ import {
 } from '@/features/auth/hooks/useAuth'
 import { useOtpCountdown } from '@/features/auth/helpers'
 import { EmailStep } from './EmailStep'
+import { GoogleButton } from '@/features/auth/components/GoogleButton'
 import { OtpStep } from './OtpStep'
 import { InfoStep } from './InfoStep'
 
-const stepLabels: Record<SignupStep, string> = {
-  email: 'Bước 1/3 — Email',
-  otp: 'Bước 2/3 — Xác minh OTP',
-  info: 'Bước 3/3 — Thông tin tài khoản',
-}
-
 export function SignupWizard() {
+  const { t } = useTranslation()
   const [step, setStep] = useState<SignupStep>('email')
   const [email, setEmail] = useState('')
   const [otp, setOtp] = useState('')
@@ -39,19 +36,25 @@ export function SignupWizard() {
 
   const attemptsLeft = MAX_OTP_ATTEMPTS - attempts
 
+  const stepLabels: Record<SignupStep, string> = {
+    email: `${t('auth.signupStep', { current: 1 })} — ${t('auth.email')}`,
+    otp: `${t('auth.signupStep', { current: 2 })} — ${t('auth.otpStepName')}`,
+    info: `${t('auth.signupStep', { current: 3 })} — ${t('auth.infoStepName')}`,
+  }
+
   const resetOtpState = () => {
     setAttempts(0)
     setOtp('')
   }
 
   const handleDestroyed = () => {
-    toast.error('Mã OTP đã bị hủy do nhập sai quá nhiều lần.')
+    toast.error(t('auth.otpDestroyed'))
     resetOtpState()
     setStep('email')
   }
 
   const handleExpired = () => {
-    toast.error('Mã OTP đã hết hạn. Vui lòng yêu cầu mã mới.')
+    toast.error(t('auth.otpExpired'))
     resetOtpState()
     setStep('email')
   }
@@ -82,10 +85,10 @@ export function SignupWizard() {
           resend.start()
           validity.start()
           setStep('otp')
-          toast.success('Mã xác minh đã được gửi đến email của bạn.')
+          toast.success(t('auth.otpSent'))
         },
         onError: (error: Error) => {
-          toast.error(error.message || 'Không thể gửi mã xác minh')
+          toast.error(error.message || t('auth.errorSendOtp'))
         },
       },
     )
@@ -103,15 +106,15 @@ export function SignupWizard() {
           const msg = error.message.toLowerCase()
           if (msg.includes('invalid') || msg.includes('sai')) {
             if (!handleInvalidOtp()) {
-              toast.error('Mã xác minh không đúng.')
+              toast.error(t('auth.errorIncorrectOtp'))
             }
           } else if (msg.includes('expired') || msg.includes('hết hạn')) {
             handleExpired()
           } else if (msg.includes('already') || msg.includes('tồn tại')) {
-            toast.error('Email đã có tài khoản. Vui lòng đăng nhập.')
+            toast.error(t('auth.errorEmailExists'))
             setStep('email')
           } else {
-            toast.error(error.message || 'Không thể xác minh mã OTP')
+            toast.error(error.message || t('auth.errorVerifyOtp'))
           }
         },
       },
@@ -133,15 +136,15 @@ export function SignupWizard() {
       onError: (error: Error) => {
         const msg = error.message.toLowerCase()
         if (msg.includes('already') || msg.includes('tồn tại')) {
-          toast.error('Email đã có tài khoản. Vui lòng đăng nhập.')
+          toast.error(t('auth.errorEmailExists'))
           setStep('email')
           resetOtpState()
         } else if (msg.includes('invalid') || msg.includes('sai')) {
           if (!handleInvalidOtp()) {
-            toast.error('Mã OTP không hợp lệ.')
+            toast.error(t('auth.errorInvalidOtp'))
           }
         } else {
-          toast.error(error.message || 'Không thể tạo tài khoản')
+          toast.error(error.message || t('auth.errorSignup'))
         }
       },
     })
@@ -159,11 +162,14 @@ export function SignupWizard() {
       <p className="text-sm text-muted-foreground">{stepLabels[step]}</p>
 
       {step === 'email' && (
-        <EmailStep
-          defaultEmail={email}
-          isPending={requestOtp.isPending}
-          onSubmit={sendOtp}
-        />
+        <>
+          <EmailStep
+            defaultEmail={email}
+            isPending={requestOtp.isPending}
+            onSubmit={sendOtp}
+          />
+          <GoogleButton />
+        </>
       )}
 
       {step === 'otp' && (

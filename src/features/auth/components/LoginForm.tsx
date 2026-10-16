@@ -2,10 +2,9 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { EyeIcon, EyeOffIcon, Loader2Icon } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Link, useNavigate } from 'react-router-dom'
-import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { Separator } from '@/components/ui/separator'
 import {
   Form,
   FormControl,
@@ -17,90 +16,27 @@ import {
 import { Input } from '@/components/ui/input'
 import { ROUTES } from '@/config/constants'
 import { loginSchema, type LoginInput } from '@/features/auth/schemas/auth.schema'
-import { useForgotPassword, useLogin } from '@/features/auth/hooks/useAuth'
-
-function GoogleIcon(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" {...props}>
-      <path
-        fill="#4285F4"
-        d="M23.49 12.27c0-.79-.07-1.54-.19-2.27H12v4.51h6.47a5.54 5.54 0 0 1-2.4 3.64v3.02h3.88c2.27-2.09 3.54-5.17 3.54-8.9z"
-      />
-      <path
-        fill="#34A853"
-        d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.01c-1.08.72-2.45 1.16-4.05 1.16-3.13 0-5.78-2.11-6.73-4.96H1.28v3.09A11.99 11.99 0 0 0 12 24z"
-      />
-      <path
-        fill="#FBBC05"
-        d="M5.27 14.28a7.2 7.2 0 0 1 0-4.56V6.63H1.28a12 12 0 0 0 0 10.74l3.99-3.09z"
-      />
-      <path
-        fill="#EA4335"
-        d="M12 4.74c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0A11.99 11.99 0 0 0 1.28 6.63l3.99 3.09C6.22 6.87 8.87 4.74 12 4.74z"
-      />
-    </svg>
-  )
-}
+import { useLogin } from '@/features/auth/hooks/useAuth'
+import { GoogleButton } from './GoogleButton'
 
 export function LoginForm() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [showPassword, setShowPassword] = useState(false)
   const login = useLogin()
-  const forgotPassword = useForgotPassword()
 
   const form = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
-    defaultValues: {
-      email: '',
-      password: '',
-    },
+    defaultValues: { email: '', password: '' },
     mode: 'onBlur',
     reValidateMode: 'onChange',
   })
-
-  const onSubmit = (values: LoginInput) => {
-    login.mutate(values)
-  }
-
-  const handleForgotPassword = async () => {
-    const emailValue = form.getValues('email').trim()
-
-    if (!emailValue) {
-      form.setError('email', {
-        type: 'manual',
-        message: 'Vui lòng nhập email để đặt lại mật khẩu.',
-      })
-      form.setFocus('email')
-      return
-    }
-
-    const emailCheck = loginSchema.shape.email.safeParse(emailValue)
-    if (!emailCheck.success) {
-      form.setError('email', {
-        type: 'manual',
-        message: 'Vui lòng nhập email hợp lệ.',
-      })
-      form.setFocus('email')
-      return
-    }
-
-    forgotPassword.mutate(
-      { email: emailValue },
-      {
-        onSuccess: () => {
-          navigate(ROUTES.otp, {
-            state: { email: emailValue, flow: 'forgot-password' },
-          })
-        },
-      },
-    )
-  }
 
   return (
     <Form {...form}>
       <form
         noValidate
-        onSubmit={form.handleSubmit(onSubmit)}
+        onSubmit={form.handleSubmit((values) => login.mutate(values))}
         className="flex w-full flex-col gap-3"
       >
         <FormField
@@ -108,16 +44,9 @@ export function LoginForm() {
           name="email"
           render={({ field }) => (
             <FormItem>
-              <FormLabel className="sr-only">Email</FormLabel>
+              <FormLabel className="sr-only">{t('auth.email')}</FormLabel>
               <FormControl>
-                <Input
-                  type="email"
-                  autoComplete="email"
-                  inputMode="email"
-                  placeholder="Email"
-                  aria-invalid={!!form.formState.errors.email}
-                  {...field}
-                />
+                <Input type="email" autoComplete="email" inputMode="email" placeholder={t('auth.email')} aria-invalid={!!form.formState.errors.email} {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -129,29 +58,18 @@ export function LoginForm() {
           name="password"
           render={({ field }) => (
             <FormItem>
-              <FormLabel className="sr-only">Mật khẩu</FormLabel>
+              <FormLabel className="sr-only">{t('auth.password')}</FormLabel>
               <FormControl>
                 <div className="relative">
-                  <Input
-                    type={showPassword ? 'text' : 'password'}
-                    autoComplete="current-password"
-                    placeholder="Mật khẩu"
-                    className="pr-12"
-                    aria-invalid={!!form.formState.errors.password}
-                    {...field}
-                  />
+                  <Input type={showPassword ? 'text' : 'password'} autoComplete="current-password" placeholder={t('auth.password')} className="pr-12" aria-invalid={!!form.formState.errors.password} {...field} />
                   <button
                     type="button"
-                    onClick={() => setShowPassword((prev) => !prev)}
+                    onClick={() => setShowPassword((p) => !p)}
                     aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
                     aria-pressed={showPassword}
                     className="absolute inset-y-0 right-0 flex w-12 cursor-pointer items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
                   >
-                    {showPassword ? (
-                      <EyeOffIcon className="size-4" aria-hidden="true" />
-                    ) : (
-                      <EyeIcon className="size-4" aria-hidden="true" />
-                    )}
+                    {showPassword ? <EyeOffIcon className="size-4" /> : <EyeIcon className="size-4" />}
                   </button>
                 </div>
               </FormControl>
@@ -160,59 +78,31 @@ export function LoginForm() {
           )}
         />
 
-        <Button
-          type="submit"
-          size="lg"
-          className="w-full cursor-pointer"
-          disabled={login.isPending}
-        >
+        <Button type="submit" size="lg" className="w-full cursor-pointer" disabled={login.isPending}>
           {login.isPending ? (
             <>
               <Loader2Icon className="size-4 animate-spin" aria-hidden="true" />
-              Đang đăng nhập...
+              {t('auth.loggingIn')}
             </>
           ) : (
-            'Tiếp tục'
+            t('auth.continue')
           )}
         </Button>
 
-        <div className="mt-2 flex items-center gap-3">
-          <Separator className="flex-1" />
-          <span className="text-xs text-muted-foreground">hoặc</span>
-          <Separator className="flex-1" />
-        </div>
-
-        <Button
-          type="button"
-          variant="outline"
-          size="lg"
-          className="w-full cursor-pointer"
-          onClick={() =>
-            toast.info('Chức năng sắp có', {
-              description: 'Đăng nhập bằng Google sẽ sớm được hỗ trợ.',
-            })
-          }
-        >
-          <GoogleIcon className="size-4" />
-          Tiếp tục với Google
-        </Button>
+        <GoogleButton />
 
         <div className="mt-2 flex items-center justify-between gap-2 text-sm">
           <button
             type="button"
-            onClick={handleForgotPassword}
-            disabled={forgotPassword.isPending}
-            className="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline disabled:opacity-50"
+            onClick={() => navigate(ROUTES.forgotPassword)}
+            className="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
           >
-            {forgotPassword.isPending ? 'Đang gửi...' : 'Quên mật khẩu?'}
+            {t('auth.forgotPassword')}
           </button>
           <p className="text-muted-foreground">
-            Chưa có tài khoản?{' '}
-            <Link
-              to={ROUTES.register}
-              className="font-semibold text-brand-ink underline-offset-4 hover:underline"
-            >
-              Đăng ký
+            {t('auth.noAccount')}{' '}
+            <Link to={ROUTES.register} className="font-semibold text-brand-ink underline-offset-4 hover:underline">
+              {t('auth.register')}
             </Link>
           </p>
         </div>
