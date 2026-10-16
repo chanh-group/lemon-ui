@@ -71,5 +71,16 @@
     "brandTagline": "Nhắn tin dễ dàng, trò chuyện vui vẻ mỗi ngày.",
     "footer": "{appName} — {tagline}",
     "backToLogin": "Về trang đăng nhập"
+  },
+  "errors": {
+    "required": "Vui lòng không để trống",
+    "emailInvalid": "Email không hợp lệ",
+    "passwordMinLength": "Mật khẩu phải có ít nhất 8 ký tự",
+    "passwordLetter": "Mật khẩu phải chứa ít nhất một chữ cái",
+    "passwordDigit": "Mật khẩu phải chứa ít nhất một chữ số",
+    "passwordMismatch": "Mật khẩu xác nhận không khớp",
+    "otpInvalid": "Mã OTP phải có đúng 6 chữ số",
+    "fullNameMinLength": "Họ và tên phải có ít nhất 2 ký tự",
+    "fullNameMaxLength": "Họ và tên tối đa 60 ký tự"
   }
 }

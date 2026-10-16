@@ -71,5 +71,16 @@
     "brandTagline": "Easy messaging, fun chats every day.",
     "footer": "{appName} — {tagline}",
     "backToLogin": "Back to login page"
+  },
+  "errors": {
+    "required": "This field is required",
+    "emailInvalid": "Invalid email address",
+    "passwordMinLength": "Password must be at least 8 characters",
+    "passwordLetter": "Password must contain at least one letter",
+    "passwordDigit": "Password must contain at least one digit",
+    "passwordMismatch": "Passwords do not match",
+    "otpInvalid": "OTP must be exactly 6 digits",
+    "fullNameMinLength": "Full name must be at least 2 characters",
+    "fullNameMaxLength": "Full name must be at most 60 characters"
   }
 }

@@ -4,23 +4,23 @@ import { PASSWORD_MIN_LENGTH } from '@/config/constants'
 const emailSchema = z
   .string()
   .trim()
-  .min(1, 'Vui lòng nhập email')
-  .email('Email không hợp lệ')
+  .min(1, 'errors.required')
+  .email('errors.emailInvalid')
 
 const passwordSchema = z
   .string()
-  .min(1, 'Vui lòng nhập mật khẩu')
-  .min(PASSWORD_MIN_LENGTH, `Mật khẩu phải có ít nhất ${PASSWORD_MIN_LENGTH} ký tự`)
+  .min(1, 'errors.required')
+  .min(PASSWORD_MIN_LENGTH, 'errors.passwordMinLength')
 
 const otpCodeSchema = z
   .string()
-  .regex(/^\d{6}$/, 'Mã OTP phải có đúng 6 chữ số')
+  .regex(/^\d{6}$/, 'errors.otpInvalid')
 
 /* ---- Login ---- */
 
 export const loginSchema = z.object({
   email: emailSchema,
-  password: z.string().min(1, 'Vui lòng nhập mật khẩu'),
+  password: z.string().min(1, 'errors.required'),
 })
 export type LoginInput = z.infer<typeof loginSchema>
 
@@ -43,26 +43,26 @@ export const signupInfoSchema = z
     fullName: z
       .string()
       .trim()
-      .min(1, 'Vui lòng nhập họ và tên')
-      .min(2, 'Họ và tên phải có ít nhất 2 ký tự')
-      .max(60, 'Họ và tên tối đa 60 ký tự'),
+      .min(1, 'errors.required')
+      .min(2, 'errors.fullNameMinLength')
+      .max(60, 'errors.fullNameMaxLength'),
     password: z
       .string()
-      .min(1, 'Vui lòng nhập mật khẩu')
-      .min(PASSWORD_MIN_LENGTH, `Mật khẩu phải có ít nhất ${PASSWORD_MIN_LENGTH} ký tự`)
-      .regex(/[A-Za-z]/, 'Mật khẩu phải chứa ít nhất một chữ cái')
-      .regex(/[0-9]/, 'Mật khẩu phải chứa ít nhất một chữ số'),
-    confirmPassword: z.string().min(1, 'Vui lòng xác nhận mật khẩu'),
+      .min(1, 'errors.required')
+      .min(PASSWORD_MIN_LENGTH, 'errors.passwordMinLength')
+      .regex(/[A-Za-z]/, 'errors.passwordLetter')
+      .regex(/[0-9]/, 'errors.passwordDigit'),
+    confirmPassword: z.string().min(1, 'errors.required'),
   })
   .refine((data) => data.password === data.confirmPassword, {
-    message: 'Mật khẩu xác nhận không khớp',
+    message: 'errors.passwordMismatch',
     path: ['confirmPassword'],
   })
 export type SignupInfoInput = z.infer<typeof signupInfoSchema>
 
 export const signupSchema = z.object({
   email: emailSchema,
-  fullName: z.string().min(1).max(255),
+  fullName: z.string().min(1, 'errors.required').max(255, 'errors.fullNameMaxLength'),
   password: passwordSchema,
   otp: otpCodeSchema,
 })
@@ -75,14 +75,14 @@ export const resetPasswordSchema = z
     otp: otpCodeSchema,
     newPassword: z
       .string()
-      .min(1, 'Vui lòng nhập mật khẩu mới')
-      .min(PASSWORD_MIN_LENGTH, `Mật khẩu phải có ít nhất ${PASSWORD_MIN_LENGTH} ký tự`)
-      .regex(/[A-Za-z]/, 'Mật khẩu phải chứa ít nhất một chữ cái')
-      .regex(/[0-9]/, 'Mật khẩu phải chứa ít nhất một chữ số'),
-    confirmPassword: z.string().min(1, 'Vui lòng xác nhận mật khẩu'),
+      .min(1, 'errors.required')
+      .min(PASSWORD_MIN_LENGTH, 'errors.passwordMinLength')
+      .regex(/[A-Za-z]/, 'errors.passwordLetter')
+      .regex(/[0-9]/, 'errors.passwordDigit'),
+    confirmPassword: z.string().min(1, 'errors.required'),
   })
   .refine((data) => data.newPassword === data.confirmPassword, {
-    message: 'Mật khẩu xác nhận không khớp',
+    message: 'errors.passwordMismatch',
     path: ['confirmPassword'],
   })
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>

@@ -15,6 +15,7 @@ import {
 } from "react-hook-form"
 
 import { Label } from "@/components/ui/label"
+import { useTranslation } from "react-i18next"
 
 const Form = FormProvider
 
@@ -137,7 +138,9 @@ function FormDescription({ className, ...props }: React.ComponentProps<"p">) {
 
 function FormMessage({ className, ...props }: React.ComponentProps<"p">) {
   const { error, formMessageId } = useFormField()
-  const body = error ? String(error?.message ?? "") : props.children
+  const { t } = useTranslation()
+  const raw = error ? String(error?.message ?? "") : props.children
+  const body = typeof raw === 'string' && raw.includes('.') ? t(raw) : raw
 
   if (!body) {
     return null
