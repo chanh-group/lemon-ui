@@ -1,6 +1,8 @@
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Loader2Icon } from 'lucide-react'
+import { LoaderCircleIcon as Loader2IconData } from '@hugeicons/core-free-icons'
+import { createIcon } from '@/components/icons/hugeIcon'
+const Loader2Icon = createIcon(Loader2IconData)
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'

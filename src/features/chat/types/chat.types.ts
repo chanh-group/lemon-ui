@@ -1,5 +1,21 @@
 export type ChatTab = 'messages' | 'calls' | 'stories'
 
+/** Người dùng trong mạng lưới (bạn bè hoặc người lạ tìm được). */
+export interface ChatUser {
+  id: string
+  name: string
+  username: string
+  email: string
+}
+
+/** Lời mời kết bạn — direction: 'incoming' (chờ mình chấp nhận) | 'outgoing' (chờ đối phương chấp nhận). */
+export interface FriendRequest {
+  id: string
+  user: ChatUser
+  direction: 'incoming' | 'outgoing'
+  createdAt: number
+}
+
 export interface Conversation {
   id: string
   name: string
@@ -44,5 +60,7 @@ export interface StoryEntry {
   name: string
   time: string
   viewed: boolean
+  /** Tin của chính ta — dành riêng cho hàng "Tin của bạn". */
+  mine?: boolean
   online: boolean
 }

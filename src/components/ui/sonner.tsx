@@ -1,10 +1,10 @@
-import {
-  CircleCheckIcon,
-  InfoIcon,
-  Loader2Icon,
-  OctagonXIcon,
-  TriangleAlertIcon,
-} from 'lucide-react'
+import { CircleCheckIcon as CircleCheckIconData, InformationCircleIcon as InfoIconData, LoaderCircleIcon as Loader2IconData, CancelCircleIcon as OctagonXIconData, TriangleAlertIcon as TriangleAlertIconData } from '@hugeicons/core-free-icons'
+import { createIcon } from '@/components/icons/hugeIcon'
+const CircleCheckIcon = createIcon(CircleCheckIconData)
+const InfoIcon = createIcon(InfoIconData)
+const Loader2Icon = createIcon(Loader2IconData)
+const OctagonXIcon = createIcon(OctagonXIconData)
+const TriangleAlertIcon = createIcon(TriangleAlertIconData)
 import { Toaster as Sonner, type ToasterProps } from 'sonner'
 
 const Toaster = ({ ...props }: ToasterProps) => {

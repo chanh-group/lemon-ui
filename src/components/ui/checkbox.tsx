@@ -2,7 +2,9 @@
 
 import * as React from "react"
 import { cn } from "@/lib/utils"
-import { CheckIcon } from "lucide-react"
+import { CheckIcon as CheckIconData } from '@hugeicons/core-free-icons'
+import { createIcon } from '@/components/icons/hugeIcon'
+const CheckIcon = createIcon(CheckIconData)
 import { Checkbox as CheckboxPrimitive } from "radix-ui"
 
 function Checkbox({

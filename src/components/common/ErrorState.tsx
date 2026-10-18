@@ -1,4 +1,6 @@
-import { AlertTriangleIcon } from 'lucide-react'
+import { TriangleAlertIcon as AlertTriangleIconData } from '@hugeicons/core-free-icons'
+import { createIcon } from '@/components/icons/hugeIcon'
+const AlertTriangleIcon = createIcon(AlertTriangleIconData)
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 

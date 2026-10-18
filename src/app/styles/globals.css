@@ -3,7 +3,7 @@
 /* ============================================================
    LemonChat — Design tokens
    Brand: lemon green + white (dark mode support)
-   Font: IBM Plex Sans — kiểu chữ công nghiệp ấm, không "AI"
+   Font: Inter — font chuẩn của Signal, namespace hinting sạch, familiar như Messenger
    Radius: minimal (không bo tròn quá)
    ============================================================ */
 
@@ -65,46 +65,47 @@
 .dark {
   color-scheme: dark;
 
-  --green-50: #0a2e14;
-  --green-100: #0d3b1a;
-  --green-200: #14532d;
-  --green-300: #166534;
-  --green-400: #15803d;
-  --green-500: #22c55e;
+  /* Signal-style: đen sâu */
+  --green-50: #0d1512;
+  --green-100: #122019;
+  --green-200: #1a2e23;
+  --green-300: #23402f;
+  --green-400: #2f6b45;
+  --green-500: #3d9959;
   --green-600: #4ade80;
   --green-700: #86efac;
   --green-800: #bbf7d0;
 
-  --background: #0a0f0a;
-  --foreground: #e8eee8;
+  --background: #0b0e0c;
+  --foreground: #e9eeea;
 
-  --card: #111a11;
-  --card-foreground: #e8eee8;
+  --card: #111413;
+  --card-foreground: #e9eeea;
 
-  --popover: #111a11;
-  --popover-foreground: #e8eee8;
+  --popover: #161a18;
+  --popover-foreground: #e9eeea;
 
   --primary: #00e676;
   --primary-foreground: #052e16;
 
-  --secondary: #14532d;
-  --secondary-foreground: #dcfce7;
+  --secondary: #1a2420;
+  --secondary-foreground: #bbf7d0;
 
-  --muted: #1a2a1a;
-  --muted-foreground: #9ca89c;
+  --muted: #171c1a;
+  --muted-foreground: #9aa5a0;
 
-  --accent: #14532d;
-  --accent-foreground: #dcfce7;
+  --accent: #1a2420;
+  --accent-foreground: #bbf7d0;
 
   --destructive: #f87171;
   --destructive-foreground: #450a0a;
 
-  --border: #1e3a1e;
-  --input: #2a4a2a;
+  --border: #232927;
+  --input: #2b332f;
   --ring: #00e676;
 
-  --brand-ink: #86efac;
-  --success: #69f0ae;
+  --brand-ink: #4ade80;
+  --success: #4ade80;
 
   --chart-1: #00e676;
   --chart-2: #00c853;
@@ -114,8 +115,8 @@
 }
 
 @theme inline {
-  --font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
-  --font-heading: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-heading: 'Inter', ui-sans-serif, system-ui, sans-serif;
 
   /* Bo tròn Apple-style — mềm mại nhưng vẫn gọn */
   --radius-xs: 0.5rem;

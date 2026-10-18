@@ -16,12 +16,13 @@ import type {
 /* Dev bypass (VITE_APP_ENV=dev)                                       */
 /* ------------------------------------------------------------------ */
 
-function createDevSession(payload: { email: string; fullName?: string }): AuthSession {
+function createDevSession(payload: { email: string; fullName?: string; username?: string }): AuthSession {
   return {
     accessToken: 'dev.access.token',
     user: {
       id: 'dev-user',
-      fullName: payload.fullName ?? payload.email.split('@')[0] ?? 'Người dùng dev',
+      fullName: payload.fullName ?? payload.email.split('@')[0] ?? 'Dev User',
+      username: payload.username ?? undefined,
       email: payload.email,
       createdAt: new Date().toISOString(),
     },

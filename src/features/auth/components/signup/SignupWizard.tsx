@@ -13,7 +13,7 @@ import {
   useSignup,
   useVerifyOtpEarly,
 } from '@/features/auth/hooks/useAuth'
-import { useOtpCountdown } from '@/features/auth/helpers'
+import { useOtpCountdown } from '@/features/auth/hooks/useOtpCountdown'
 import { EmailStep } from './EmailStep'
 import { GoogleButton } from '@/features/auth/components/GoogleButton'
 import { OtpStep } from './OtpStep'
@@ -125,6 +125,7 @@ export function SignupWizard() {
     const payload: SignupPayload = {
       email,
       fullName: values.fullName,
+      username: values.username,
       password: values.password,
       otp,
     }
@@ -189,6 +190,7 @@ export function SignupWizard() {
 
       {step === 'info' && (
         <InfoStep
+          email={email}
           isPending={signup.isPending || autoSignin.isPending}
           attemptsLeft={attemptsLeft}
           onSubmit={handleSignup}

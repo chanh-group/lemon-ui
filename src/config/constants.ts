@@ -6,6 +6,10 @@ export const ROUTES = {
   register: '/signup',
   forgotPassword: '/forgot-password',
   messages: '/messages',
+  calls: '/calls',
+  newChat: '/new-chat',
+  storiesCreate: '/stories/create',
+  settings: '/settings',
 } as const
 
 export const PASSWORD_MIN_LENGTH = 8

@@ -9,7 +9,7 @@ i18n.use(initReactI18next).init({
   resources: { vi: { translation: vi }, en: { translation: en } },
   lng: savedLang,
   fallbackLng: 'vi',
-  interpolation: { escapeValue: false, prefix: '{', suffix: '}' },
+  interpolation: { escapeValue: false },
 })
 
 export default i18n

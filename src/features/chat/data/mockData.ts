@@ -1,4 +1,4 @@
-import type { CallEntry, Conversation, DayGroup, StoryEntry } from '../types'
+import type { CallEntry, Conversation, DayGroup, StoryEntry } from '../types/chat.types'
 
 /**
  * Mock data dựng UI khi backend chat chưa sẵn sàng.
@@ -202,6 +202,27 @@ export const MOCK_STORIES: StoryEntry[] = [
   { id: 's5', name: 'Đức Minh', time: 'Hôm qua', viewed: true, online: false },
   { id: 's6', name: 'CLB Chạy bộ', time: 'Hôm qua', viewed: true, online: false },
 ]
+
+/** Danh bạ đã kết nối — dữ liệu mẫu cho màn "New chat". */
+export interface MockFriend {
+  id: string
+  name: string
+  username: string
+  email: string
+}
+
+export const MOCK_FRIENDS: MockFriend[] = [
+  { id: 'f-mai-anh', name: 'Mai Anh', username: 'maianh', email: 'maianh@lemon.dev' },
+  { id: 'f-anh-khoa', name: 'Anh Khoa', username: 'khoaphaodo', email: 'khoaphaodo@lemon.dev' },
+  { id: 'f-thu-phuong', name: 'Thu Phương', username: 'thuphung', email: 'thuphung@lemon.dev' },
+  { id: 'f-duc-minh', name: 'Đức Minh', username: 'ducminh96', email: 'ducminh96@lemon.dev' },
+  { id: 'f-chi-linh', name: 'Chị Linh', username: 'linhne', email: 'linhne@lemon.dev' },
+  { id: 'f-minh-quan', name: 'Minh Quân', username: 'quanjiro', email: 'quanjiro@lemon.dev' },
+  { id: 'f-hoai-nam', name: 'Hoài Nam', username: 'namcr7', email: 'namcr7@lemon.dev' },
+  { id: 'f-quynh-anh', name: 'Quỳnh Anh', username: 'qa.2209', email: 'qa.2209@lemon.dev' },
+  { id: 'f-thanh-trung', name: 'Thành Trung', username: 'thanhtrung', email: 'thanhtrung@lemon.dev' },
+]
+
 
 /** Màu nền avatar suy ra từ tên — giữ trong tông chanh / trung tính, không neon. */
 const AVATAR_BG = ['#F1E9A8', '#DDF4A7', '#EFEAD6', '#F6DFA8', '#E4EED2', '#FBF3C4']

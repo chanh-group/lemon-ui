@@ -1,4 +1,5 @@
 import { useRef, type ClipboardEvent, type KeyboardEvent } from 'react'
+import { useTranslation } from 'react-i18next'
 
 const OTP_LENGTH = 6
 
@@ -15,6 +16,7 @@ export function OtpInputGroup({
   invalid = false,
   disabled = false,
 }: OtpInputGroupProps) {
+  const { t } = useTranslation()
   const inputs = useRef<(HTMLInputElement | null)[]>([])
 
   const focusAt = (index: number) => {
@@ -64,7 +66,7 @@ export function OtpInputGroup({
       className="flex gap-3"
       onPaste={handlePaste}
       role="group"
-      aria-label="Mã xác minh gồm 6 chữ số"
+      aria-label={t('auth.otpA11y')}
     >
       {Array.from({ length: OTP_LENGTH }, (_, index) => {
         const digit = value[index] ?? ''

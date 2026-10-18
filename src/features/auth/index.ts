@@ -26,7 +26,7 @@ export {
   useResendOtp,
   useLogout,
 } from './hooks/useAuth'
-export { useOtpCountdown, formatCountdown } from './helpers'
+export { useOtpCountdown, formatCountdown } from './hooks/useOtpCountdown'
 export { LoginForm } from './components/LoginForm'
 export { SignupWizard, EmailStep, OtpStep, InfoStep } from './components/signup'
 export { ForgotPasswordWizard, ResetPasswordStep } from './components/forgot'

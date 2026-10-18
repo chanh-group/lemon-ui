@@ -1,6 +1,10 @@
 import * as React from "react"
 import { cn } from "@/lib/utils"
-import { CheckIcon, ChevronRightIcon, CircleIcon } from "lucide-react"
+import { CheckIcon as CheckIconData, ChevronRightIcon as ChevronRightIconData, CircleIcon as CircleIconData } from '@hugeicons/core-free-icons'
+import { createIcon } from '@/components/icons/hugeIcon'
+const CheckIcon = createIcon(CheckIconData)
+const ChevronRightIcon = createIcon(ChevronRightIconData)
+const CircleIcon = createIcon(CircleIconData)
 import { DropdownMenu as DropdownMenuPrimitive } from "radix-ui"
 
 function DropdownMenu({

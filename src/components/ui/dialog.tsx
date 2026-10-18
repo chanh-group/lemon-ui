@@ -2,7 +2,9 @@
 
 import * as React from "react"
 import { cn } from "@/lib/utils"
-import { XIcon } from "lucide-react"
+import { MultiplicationSignIcon as XIconData } from '@hugeicons/core-free-icons'
+import { createIcon } from '@/components/icons/hugeIcon'
+const XIcon = createIcon(XIconData)
 import { Dialog as DialogPrimitive } from "radix-ui"
 
 import { Button } from "@/components/ui/button"

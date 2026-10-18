@@ -1,6 +1,7 @@
 export interface User {
   id: string
   fullName: string
+  username?: string
   email: string
   avatarUrl?: string
   createdAt: string
@@ -41,6 +42,7 @@ export interface VerifyOtpEarlyPayload {
 export interface SignupPayload {
   email: string
   fullName: string
+  username: string
   password: string
   otp: string
 }

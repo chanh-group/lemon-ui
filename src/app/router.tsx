@@ -6,6 +6,10 @@ import { LoginPage } from '@/pages/LoginPage'
 import { RegisterPage } from '@/pages/RegisterPage'
 import { ForgotPasswordPage } from '@/pages/ForgotPasswordPage'
 import { DashboardPage } from '@/pages/DashboardPage'
+import { CallsPage } from '@/pages/CallsPage'
+import { NewChatPage } from '@/pages/NewChatPage'
+import { SettingsPage } from '@/pages/SettingsPage'
+import { StoriesCreatePage } from '@/pages/StoriesCreatePage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
 
 function RequireAuth({ children }: { children: ReactNode }) {
@@ -70,6 +74,43 @@ export const router = createBrowserRouter(
           <DashboardPage />
         </RequireAuth>
       ),
+    },
+    {
+      path: ROUTES.calls,
+      element: (
+        <RequireAuth>
+          <CallsPage />
+        </RequireAuth>
+      ),
+    },
+    {
+      path: ROUTES.newChat,
+      element: (
+        <RequireAuth>
+          <NewChatPage />
+        </RequireAuth>
+      ),
+    },
+    {
+      path: ROUTES.storiesCreate,
+      element: (
+        <RequireAuth>
+          <StoriesCreatePage />
+        </RequireAuth>
+      ),
+    },
+    {
+      path: ROUTES.settings,
+      element: (
+        <RequireAuth>
+          <SettingsPage />
+        </RequireAuth>
+      ),
+    },
+    // Alias /setting -> /settings
+    {
+      path: '/setting',
+      element: <Navigate to={ROUTES.settings} replace />,
     },
     {
       path: '*',

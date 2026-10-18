@@ -1,4 +1,6 @@
-import { InboxIcon } from 'lucide-react'
+import { InboxIcon as InboxIconData } from '@hugeicons/core-free-icons'
+import { createIcon } from '@/components/icons/hugeIcon'
+const InboxIcon = createIcon(InboxIconData)
 import { useTranslation } from 'react-i18next'
 
 interface EmptyStateProps {

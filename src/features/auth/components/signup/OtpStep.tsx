@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Loader2Icon } from 'lucide-react'
+import { LoaderCircleIcon as Loader2IconData } from '@hugeicons/core-free-icons'
+import { createIcon } from '@/components/icons/hugeIcon'
+const Loader2Icon = createIcon(Loader2IconData)
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import {
@@ -14,7 +16,7 @@ import {
 } from '@/components/ui/form'
 import { OtpInputGroup } from '@/features/auth/components/otp'
 import { verifyOtpSchema, type VerifyOtpInput } from '@/features/auth/schemas/auth.schema'
-import { formatCountdown } from '@/features/auth/helpers'
+import { formatCountdown } from '@/features/auth/hooks/useOtpCountdown'
 
 type OtpStepProps = {
   email: string

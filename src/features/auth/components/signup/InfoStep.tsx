@@ -1,7 +1,11 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { EyeIcon, EyeOffIcon, Loader2Icon } from 'lucide-react'
+import { EyeIcon as EyeIconData, EyeOffIcon as EyeOffIconData, LoaderCircleIcon as Loader2IconData } from '@hugeicons/core-free-icons'
+import { createIcon } from '@/components/icons/hugeIcon'
+const EyeIcon = createIcon(EyeIconData)
+const EyeOffIcon = createIcon(EyeOffIconData)
+const Loader2Icon = createIcon(Loader2IconData)
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -14,21 +18,23 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { signupInfoSchema, type SignupInfoInput } from '@/features/auth/schemas/auth.schema'
+import { usernameFromEmail } from '../../utils/username'
 
 type InfoStepProps = {
+  email: string
   isPending: boolean
   attemptsLeft: number
   onSubmit: (values: SignupInfoInput) => void
 }
 
-export function InfoStep({ isPending, attemptsLeft, onSubmit }: InfoStepProps) {
+export function InfoStep({ email, isPending, attemptsLeft, onSubmit }: InfoStepProps) {
   const { t } = useTranslation()
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
 
   const form = useForm<SignupInfoInput>({
     resolver: zodResolver(signupInfoSchema),
-    defaultValues: { fullName: '', password: '', confirmPassword: '' },
+    defaultValues: { fullName: '', username: usernameFromEmail(email), password: '', confirmPassword: '' },
     mode: 'onBlur',
     reValidateMode: 'onChange',
   })
@@ -55,6 +61,37 @@ export function InfoStep({ isPending, attemptsLeft, onSubmit }: InfoStepProps) {
                 />
               </FormControl>
               <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="username"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>{t('auth.username')}</FormLabel>
+              <FormControl>
+                <div className="relative">
+                  <span
+                    className="pointer-events-none absolute inset-y-0 left-0 flex w-10 items-center justify-start pl-3 text-sm text-muted-foreground"
+                    aria-hidden="true"
+                  >
+                    @
+                  </span>
+                  <Input
+                    type="text"
+                    autoComplete="username"
+                    spellCheck={false}
+                    placeholder={t('auth.usernamePlaceholder')}
+                    className="pl-10"
+                    aria-invalid={!!form.formState.errors.username}
+                    {...field}
+                  />
+                </div>
+              </FormControl>
+              <FormMessage />
+              <p className="text-xs text-muted-foreground">{t('auth.usernameHint')}</p>
             </FormItem>
           )}
         />
