@@ -39,11 +39,14 @@ function applySession(session: AuthSession): AuthSession {
 /* ------------------------------------------------------------------ */
 
 export async function login(payload: LoginPayload): Promise<AuthSession> {
-  if (isAuthBypass()) return applySession(createDevSession(payload))
+  if (isAuthBypass()) return applySession(createDevSession({ email: payload.identifier ?? payload.email ?? '' }))
 
   const session = await request<AuthSession>('/auth/login', {
     method: 'POST',
-    body: payload,
+    body: {
+      identifier: payload.identifier ?? payload.email,
+      password: payload.password,
+    },
   })
   return applySession(session)
 }

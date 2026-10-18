@@ -63,7 +63,8 @@ export function refreshAccessToken(): Promise<string | null> {
         return null
       }
 
-      const data = (await response.json()) as RefreshResponse
+      const res = await response.json()
+      const data = (res && typeof res === 'object' && 'data' in res ? (res as { data: RefreshResponse }).data : res) as RefreshResponse
       setAccessToken(data.accessToken)
       return data.accessToken
     } catch {
@@ -136,5 +137,10 @@ export async function request<T>(
     return undefined as T
   }
 
-  return (await response.json()) as T
+  const json = await response.json()
+  if (json && typeof json === 'object' && 'data' in json && 'success' in json) {
+    return (json as { data: T }).data
+  }
+
+  return json as T
 }
