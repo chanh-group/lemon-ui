@@ -35,7 +35,25 @@ export async function listStories(): Promise<StoryEntry[]> {
     await delay(200)
     return storyStore.map((s) => ({ ...s }))
   }
-  return request<StoryEntry[]>('/stories')
+  try {
+    const raw = await request<Array<{
+      id: string
+      caption?: string | null
+      createdAt?: string | Date
+      user?: { fullName?: string; username?: string }
+      isOnline?: boolean
+      hasViewed?: boolean
+    }>>('/stories/feed')
+    return (raw || []).map((s) => ({
+      id: s.id,
+      name: s.caption || s.user?.fullName || s.user?.username || 'Story',
+      time: s.createdAt ? String(s.createdAt) : '',
+      viewed: Boolean(s.hasViewed),
+      online: Boolean(s.isOnline),
+    }))
+  } catch {
+    return []
+  }
 }
 
 /** Đăng tin dạng văn bản — nền cố định, không chủ đề/không tùy chọn kiểu chữ. */

@@ -6,6 +6,7 @@ export interface ChatUser {
   name: string
   username: string
   email: string
+  avatarUrl?: string | null
 }
 
 /** Lời mời kết bạn — direction: 'incoming' (chờ mình chấp nhận) | 'outgoing' (chờ đối phương chấp nhận). */
@@ -27,6 +28,8 @@ export interface Conversation {
   isGroup: boolean
   members?: string
   lastActive?: string
+  partnerId?: string
+  partnerAvatar?: string | null
 }
 
 export interface ChatMessage {
@@ -39,6 +42,9 @@ export interface ChatMessage {
   time: string
   status?: 'sent' | 'read'
   reactions?: string[]
+  createdAt?: string
+  editedAt?: string | null
+  deletedAt?: string | null
 }
 
 export interface DayGroup {
@@ -63,4 +69,71 @@ export interface StoryEntry {
   /** Tin của chính ta — dành riêng cho hàng "Tin của bạn". */
   mine?: boolean
   online: boolean
+}
+
+/* ------------------------------------------------------------------ */
+/* Backend DTOs & Realtime Payloads (API_CHAT_1_1.md)                */
+/* ------------------------------------------------------------------ */
+
+export interface ConversationPartnerResponse {
+  id: string
+  username: string
+  fullName: string
+  avatarUrl: string | null
+  isOnline: boolean
+}
+
+export interface ConversationResponse {
+  id: string
+  kind: 'DIRECT' | 'GROUP'
+  partner?: ConversationPartnerResponse
+  lastMessagePreview: string | null
+  lastMessageAt: string | null
+  unreadCount: number
+  createdAt: string
+}
+
+export interface MessageResponse {
+  id: string
+  conversationId: string
+  senderId: string
+  kind: 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE' | 'SYSTEM'
+  body: string | null
+  replyToId: string | null
+  clientMsgId?: string | null
+  createdAt: string
+  editedAt: string | null
+  deletedAt: string | null
+}
+
+export interface MessageTimelineResponse {
+  items: MessageResponse[]
+  nextCursor?: string
+  hasMore: boolean
+}
+
+export interface SendMessageDto {
+  body: string
+  clientMsgId: string
+  replyToId?: string | null
+  kind?: 'TEXT'
+}
+
+export interface TypingEventPayload {
+  conversationId: string
+  userId: string
+  isTyping: boolean
+}
+
+export interface ReadUpdatedPayload {
+  conversationId: string
+  userId: string
+  lastReadMessageId: string
+  readAt: string
+}
+
+export interface MessageRevokedPayload {
+  id: string
+  conversationId: string
+  deletedAt: string
 }

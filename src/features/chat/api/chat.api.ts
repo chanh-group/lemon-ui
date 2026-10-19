@@ -1,6 +1,13 @@
 import { isAuthBypass } from '@/config/env'
 import { request } from '@/lib/api'
-import type { ChatUser, FriendRequest } from '../types/chat.types'
+import type {
+  ChatUser,
+  ConversationResponse,
+  FriendRequest,
+  MessageResponse,
+  MessageTimelineResponse,
+  SendMessageDto,
+} from '../types/chat.types'
 
 /* ------------------------------------------------------------------ */
 /* Mock directory — backend thật chưa có, dữ liệu chỉ nằm trong session */
@@ -42,12 +49,28 @@ const delay = (ms = 350) => new Promise<void>((r) => setTimeout(r, ms))
 
 /** Tìm user theo username (chính xác, không phân biệt hoa thường). */
 export async function findUserByUsername(username: string): Promise<ChatUser | null> {
+  const clean = username.trim().toLowerCase().replace(/^@/, '')
   if (isAuthBypass()) {
     await delay()
-    const hit = DIRECTORY.find((u) => u.username.toLowerCase() === username.trim().toLowerCase().replace(/^@/, ''))
+    const hit = DIRECTORY.find((u) => u.username.toLowerCase() === clean)
     return hit ? { ...hit } : null
   }
-  return request<ChatUser | null>(`/users/by-username/${encodeURIComponent(username)}`)
+  const raw = await request<{
+    id: string
+    username: string
+    email: string
+    fullName?: string
+    name?: string
+    avatarUrl?: string | null
+  } | null>(`/users/by-username/${encodeURIComponent(clean)}`)
+  if (!raw) return null
+  return {
+    id: raw.id,
+    name: raw.fullName || raw.name || raw.username,
+    username: raw.username,
+    email: raw.email,
+    avatarUrl: raw.avatarUrl,
+  }
 }
 
 /** Tìm user theo email (chính xác, không phân biệt hoa thường). */
@@ -58,7 +81,22 @@ export async function findUserByEmail(email: string): Promise<ChatUser | null> {
     const hit = DIRECTORY.find((u) => u.email.toLowerCase() === normalized)
     return hit ? { ...hit } : null
   }
-  return request<ChatUser | null>(`/users/by-email/${encodeURIComponent(normalized)}`)
+  const raw = await request<{
+    id: string
+    username: string
+    email: string
+    fullName?: string
+    name?: string
+    avatarUrl?: string | null
+  } | null>(`/users/by-email/${encodeURIComponent(normalized)}`)
+  if (!raw) return null
+  return {
+    id: raw.id,
+    name: raw.fullName || raw.name || raw.username,
+    username: raw.username,
+    email: raw.email,
+    avatarUrl: raw.avatarUrl,
+  }
 }
 
 /** Gửi lời mời kết bạn. */
@@ -81,7 +119,12 @@ export async function getFriendRequests(): Promise<{ incoming: FriendRequest[]; 
       outgoing: pendingRequests.filter((r) => r.direction === 'outgoing').map((r) => ({ ...r })),
     }
   }
-  return request<{ incoming: FriendRequest[]; outgoing: FriendRequest[] }>('/friends/requests')
+  try {
+    return await request<{ incoming: FriendRequest[]; outgoing: FriendRequest[] }>('/friends/requests')
+  } catch {
+    // Backend chưa triển khai Friends module -> trả về rỗng không báo lỗi
+    return { incoming: [], outgoing: [] }
+  }
 }
 
 /** Chấp nhận lời mời kết bạn. */
@@ -143,3 +186,75 @@ export async function createGroup(payload: { name: string; memberIds: string[] }
   }
   return request<{ id: string; name: string }>('/groups', { method: 'POST', body: payload })
 }
+
+/* ------------------------------------------------------------------ */
+/* Direct 1-1 Conversation & Messages (docs/API_CHAT_1_1.md)         */
+/* ------------------------------------------------------------------ */
+
+/** Lấy danh sách hội thoại Inbox. */
+export async function getConversations(limit = 20): Promise<ConversationResponse[]> {
+  return request<ConversationResponse[]>(`/conversations?limit=${limit}`)
+}
+
+/** Lấy thông tin chi tiết một cuộc hội thoại. */
+export async function getConversationById(id: string): Promise<ConversationResponse> {
+  return request<ConversationResponse>(`/conversations/${id}`)
+}
+
+/** Tạo hoặc lấy cuộc hội thoại 1-1 với một user. */
+export async function getOrCreateDirectConversation(targetUserId: string): Promise<ConversationResponse> {
+  return request<ConversationResponse>('/conversations/direct', {
+    method: 'POST',
+    body: { targetUserId },
+  })
+}
+
+/** Lấy lịch sử tin nhắn trong cuộc hội thoại (phân trang con trỏ). */
+export async function getConversationMessages(
+  conversationId: string,
+  cursor?: string,
+  limit = 30,
+): Promise<MessageTimelineResponse> {
+  const query = new URLSearchParams()
+  query.set('limit', String(limit))
+  if (cursor) query.set('cursor', cursor)
+  return request<MessageTimelineResponse>(`/conversations/${conversationId}/messages?${query.toString()}`)
+}
+
+/** Gửi tin nhắn mới vào cuộc hội thoại. */
+export async function sendMessage(
+  conversationId: string,
+  payload: SendMessageDto,
+): Promise<MessageResponse> {
+  return request<MessageResponse>(`/conversations/${conversationId}/messages`, {
+    method: 'POST',
+    body: payload,
+  })
+}
+
+/** Đánh dấu cuộc hội thoại đã đọc đến tin nhắn cụ thể. */
+export async function markConversationRead(
+  conversationId: string,
+  lastReadMessageId: string,
+): Promise<void> {
+  await request<void>(`/conversations/${conversationId}/read`, {
+    method: 'POST',
+    body: { lastReadMessageId },
+  })
+}
+
+/** Chỉnh sửa nội dung tin nhắn. */
+export async function editMessage(messageId: string, body: string): Promise<MessageResponse> {
+  return request<MessageResponse>(`/messages/${messageId}`, {
+    method: 'PATCH',
+    body: { body },
+  })
+}
+
+/** Thu hồi tin nhắn (soft delete). */
+export async function revokeMessage(messageId: string): Promise<MessageResponse> {
+  return request<MessageResponse>(`/messages/${messageId}`, {
+    method: 'DELETE',
+  })
+}
+

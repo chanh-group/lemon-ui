@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { PaperclipIcon as PaperclipData, SentIcon as SendData } from '@hugeicons/core-free-icons'
 import { createIcon } from '@/components/icons/hugeIcon'
@@ -8,10 +9,49 @@ interface MessageComposerProps {
   draft: string
   onDraftChange: (v: string) => void
   onSubmit: () => void
+  onTypingStart?: () => void
+  onTypingStop?: () => void
 }
 
-export function MessageComposer({ draft, onDraftChange, onSubmit }: MessageComposerProps) {
+export function MessageComposer({
+  draft,
+  onDraftChange,
+  onSubmit,
+  onTypingStart,
+  onTypingStop,
+}: MessageComposerProps) {
   const { t } = useTranslation()
+  const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (typingTimer.current) clearTimeout(typingTimer.current)
+    }
+  }, [])
+
+  const handleChange = (val: string) => {
+    onDraftChange(val)
+    if (val.trim()) {
+      onTypingStart?.()
+      if (typingTimer.current) clearTimeout(typingTimer.current)
+      typingTimer.current = setTimeout(() => {
+        onTypingStop?.()
+        typingTimer.current = null
+      }, 1500)
+    } else {
+      if (typingTimer.current) clearTimeout(typingTimer.current)
+      onTypingStop?.()
+    }
+  }
+
+  const handleSubmit = () => {
+    if (typingTimer.current) {
+      clearTimeout(typingTimer.current)
+      typingTimer.current = null
+    }
+    onTypingStop?.()
+    onSubmit()
+  }
   return (
     <footer className="shrink-0 border-t border-border bg-card px-3 py-2.5 sm:px-5">
       <div className="flex w-full items-center gap-1.5">
@@ -19,11 +59,11 @@ export function MessageComposer({ draft, onDraftChange, onSubmit }: MessageCompo
           <span className="sr-only">{t('chat.sendMessage')}</span>
           <input
             value={draft}
-            onChange={(e) => onDraftChange(e.target.value)}
+            onChange={(e) => handleChange(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault()
-                onSubmit()
+                handleSubmit()
               }
             }}
             placeholder={t('chat.composeHint')}
@@ -41,7 +81,7 @@ export function MessageComposer({ draft, onDraftChange, onSubmit }: MessageCompo
         </label>
         <button
           type="button"
-          onClick={onSubmit}
+          onClick={handleSubmit}
           disabled={!draft.trim()}
           aria-label={t('chat.sendMessage')}
           title={t('chat.sendMessage')}

@@ -39,14 +39,11 @@ function applySession(session: AuthSession): AuthSession {
 /* ------------------------------------------------------------------ */
 
 export async function login(payload: LoginPayload): Promise<AuthSession> {
-  if (isAuthBypass()) return applySession(createDevSession({ email: payload.identifier ?? payload.email ?? '' }))
+  if (isAuthBypass()) return applySession(createDevSession({ email: payload.identifier }))
 
   const session = await request<AuthSession>('/auth/login', {
     method: 'POST',
-    body: {
-      identifier: payload.identifier ?? payload.email,
-      password: payload.password,
-    },
+    body: payload,
   })
   return applySession(session)
 }
@@ -72,13 +69,13 @@ export async function signup(payload: SignupPayload): Promise<User> {
 /** Gửi OTP quên mật khẩu. Luôn OK — chống enumerate email. */
 export async function forgotPassword(payload: { email: string }): Promise<void> {
   if (isAuthBypass()) return
-  await request<void>('/auth/forgot-password', { method: 'POST', body: payload })
+  await request<void>('/auth/forgot-password/otp', { method: 'POST', body: payload })
 }
 
 /** Đặt lại mật khẩu — tiêu thụ OTP + thu hồi toàn bộ session. */
 export async function resetPassword(payload: ResetPasswordPayload): Promise<void> {
   if (isAuthBypass()) return
-  await request<void>('/auth/reset-password', { method: 'POST', body: payload })
+  await request<void>('/auth/forgot-password/reset', { method: 'POST', body: payload })
 }
 
 export async function resendOtp(payload: ResendOtpPayload): Promise<void> {

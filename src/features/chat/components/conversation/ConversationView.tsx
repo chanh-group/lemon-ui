@@ -14,9 +14,21 @@ interface ConversationViewProps {
   onSend: (text: string) => void
   onBack?: () => void
   showBack: boolean
+  isTyping?: boolean
+  onTypingStart?: () => void
+  onTypingStop?: () => void
 }
 
-export function ConversationView({ conversation, groups, onSend, onBack, showBack }: ConversationViewProps) {
+export function ConversationView({
+  conversation,
+  groups,
+  onSend,
+  onBack,
+  showBack,
+  isTyping,
+  onTypingStart,
+  onTypingStop,
+}: ConversationViewProps) {
   const { t } = useTranslation()
   const [draft, setDraft] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -58,7 +70,12 @@ export function ConversationView({ conversation, groups, onSend, onBack, showBac
 
   return (
     <section aria-label={t('chat.conversationWith', { name: conversation.name })} className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col bg-background">
-      <ConversationHeader conversation={conversation} showBack={showBack} onBack={onBack} />
+      <ConversationHeader
+        conversation={conversation}
+        showBack={showBack}
+        onBack={onBack}
+        isTyping={isTyping}
+      />
 
       {/* Nội dung hội thoại */}
       <div ref={scrollRef} onScroll={handleScroll} className="relative min-h-0 flex-1 overflow-y-auto px-3 py-4 sm:px-6">
@@ -77,7 +94,13 @@ export function ConversationView({ conversation, groups, onSend, onBack, showBac
         )}
       </div>
 
-      <MessageComposer draft={draft} onDraftChange={setDraft} onSubmit={submit} />
+      <MessageComposer
+        draft={draft}
+        onDraftChange={setDraft}
+        onSubmit={submit}
+        onTypingStart={onTypingStart}
+        onTypingStop={onTypingStop}
+      />
     </section>
   )
 }

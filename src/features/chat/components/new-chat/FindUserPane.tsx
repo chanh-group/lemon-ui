@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 import { useFindUserByEmail, useFindUserByUsername } from '../../hooks/useFriends'
+import { useCreateDirectChatMutation } from '../../hooks/useChatQueries'
 import { ROUTES } from '@/config/constants'
 import { PaneHeader } from './kit'
 import { SearchResultCard } from './SearchResultCard'
@@ -33,7 +35,18 @@ export function FindUserPane({
     else byEmail.mutate(v)
   }
 
-  const openMessages = () => navigate(ROUTES.messages)
+  const createDirectChat = useCreateDirectChatMutation()
+
+  const handleStartChat = async (targetUser: typeof user) => {
+    if (!targetUser) return
+    try {
+      const conv = await createDirectChat.mutateAsync(targetUser.id)
+      navigate(ROUTES.messages, { state: { select: conv.id } })
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : t('common.error')
+      toast.error(msg)
+    }
+  }
 
   return (
     <>
@@ -57,7 +70,7 @@ export function FindUserPane({
 
       <div className="min-h-0 flex-1 overflow-y-auto pb-3">
         {user ? (
-          <SearchResultCard user={user} onMessage={openMessages} />
+          <SearchResultCard user={user} onMessage={() => handleStartChat(user)} />
         ) : submitted && !finder.isPending ? (
           <p className="px-5 pt-4 text-sm text-muted-foreground">{t('chat.userNotFound')}</p>
         ) : null}

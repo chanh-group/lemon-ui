@@ -31,7 +31,7 @@ export function LoginForm() {
 
   const form = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { email: '', password: '' },
+    defaultValues: { identifier: '', password: '' },
     mode: 'onBlur',
     reValidateMode: 'onChange',
   })
@@ -45,12 +45,18 @@ export function LoginForm() {
       >
         <FormField
           control={form.control}
-          name="email"
+          name="identifier"
           render={({ field }) => (
             <FormItem>
-              <FormLabel className="sr-only">{t('auth.email')}</FormLabel>
+              <FormLabel className="sr-only">{t('auth.identifier')}</FormLabel>
               <FormControl>
-                <Input type="email" autoComplete="email" inputMode="email" placeholder={t('auth.email')} aria-invalid={!!form.formState.errors.email} {...field} />
+                <Input
+                  type="text"
+                  autoComplete="username"
+                  placeholder={t('auth.identifierPlaceholder')}
+                  aria-invalid={!!form.formState.errors.identifier}
+                  {...field}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>

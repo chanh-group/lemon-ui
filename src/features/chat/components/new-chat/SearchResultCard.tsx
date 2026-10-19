@@ -16,11 +16,13 @@ export function SearchResultCard({ user, onMessage }: { user: ChatUser; onMessag
   const isPending =
     data?.outgoing.some((r) => r.user.id === user.id) || data?.incoming.some((r) => r.user.id === user.id) || false
 
+  const displayName = user.name || (user as { fullName?: string }).fullName || user.username
+
   return (
     <div className="mx-2 flex items-center gap-3 rounded-2xl border border-border bg-card p-3 shadow-sm">
-      <Avatar name={user.name} />
+      <Avatar name={displayName} />
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold text-foreground">{user.name}</p>
+        <p className="truncate text-sm font-semibold text-foreground">{displayName}</p>
         <p className="truncate text-xs text-muted-foreground">@{user.username}</p>
       </div>
       {isPending ? (

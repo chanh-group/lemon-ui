@@ -5,10 +5,18 @@ import { BrandMark } from '@/components/common/BrandMark'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { cn } from '@/lib/utils'
 import { ROUTES } from '@/config/constants'
-import { MOCK_CALLS, MOCK_CONVERSATIONS } from '../data/mockData'
-import type { ChatTab, DayGroup, StoryEntry } from '../types/chat.types'
-import { useChatThreads } from '../hooks/useChatThreads'
+import { emitTypingStart, emitTypingStop } from '@/lib/socket'
+import { MOCK_CALLS } from '../data/mockData'
+import type { ChatTab, StoryEntry } from '../types/chat.types'
+import {
+  useConversationsQuery,
+  useConversationMessagesQuery,
+  useMarkReadMutation,
+  useSendMessageMutation,
+} from '../hooks/useChatQueries'
+import { useChatRealtime } from '../hooks/useChatRealtime'
 import { useStoriesList } from '../hooks/useStories'
+import { buildDayGroupsFromMessages, mapMessageResponse } from '../utils/chat.mapper'
 import { SideNav } from './SideNav'
 import { MiddlePanel } from './MiddlePanel'
 import { ConversationView } from './conversation'
@@ -26,47 +34,97 @@ export function ChatShell() {
   const isMdDown = useMediaQuery('(max-width: 48rem)') // Breakpoint md của Tailwind (768px)
   const [tab, setTab] = useState<ChatTab>(initialTab)
   const [query, setQuery] = useState('')
-  // Mặc định KHÔNG mở hội thoại nào — chỉ chọn khi người dùng bấm vào 1 row
+  // Mặc định chọn theo location.state nếu có
   const [selectedId, setSelectedId] = useState<string | null>(initialSelect)
-  const [readIds, setReadIds] = useState<string[]>([])
   const [viewingStory, setViewingStory] = useState<StoryEntry | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const todayLabel = t('chat.today')
 
-  const { threads, send } = useChatThreads({ todayLabel })
+  // Realtime Socket.IO sync
+  const { isPartnerTyping } = useChatRealtime(selectedId)
+
+  // API Queries & Mutations
+  const conversationsQuery = useConversationsQuery()
+  const messagesQuery = useConversationMessagesQuery(selectedId)
+  const sendMessageMutation = useSendMessageMutation(selectedId)
+  const markReadMutation = useMarkReadMutation()
+
+  const [prevInitialSelect, setPrevInitialSelect] = useState(initialSelect)
+  if (initialSelect !== prevInitialSelect) {
+    setPrevInitialSelect(initialSelect)
+    setSelectedId(initialSelect)
+    if (initialSelect) setTab('messages')
+  }
+
+  const rawConversations = useMemo(
+    () => conversationsQuery.data ?? [],
+    [conversationsQuery.data],
+  )
 
   const q = query.trim().toLowerCase()
   const conversations = useMemo(
     () =>
-      MOCK_CONVERSATIONS.map((c) => (readIds.includes(c.id) ? { ...c, unread: 0 } : c)).filter(
+      rawConversations.filter(
         (c) => !q || c.name.toLowerCase().includes(q) || c.preview.toLowerCase().includes(q),
       ),
-    [q, readIds],
+    [rawConversations, q],
   )
+
   const calls = useMemo(
     () => MOCK_CALLS.filter((c) => !q || c.name.toLowerCase().includes(q)),
     [q],
   )
+
   const storiesQuery = useStoriesList()
   const stories = useMemo(
     () => (storiesQuery.data ?? []).filter((s) => !q || s.name.toLowerCase().includes(q)),
     [storiesQuery.data, q],
   )
+
   const totalUnread = useMemo(
-    () => MOCK_CONVERSATIONS.reduce((n, c) => n + (readIds.includes(c.id) ? 0 : c.unread), 0),
-    [readIds],
+    () => rawConversations.reduce((n, c) => n + (c.unread || 0), 0),
+    [rawConversations],
   )
 
-  const selected = MOCK_CONVERSATIONS.find((c) => c.id === selectedId) ?? null
-  const groups: DayGroup[] = selected ? (threads[selected.id] ?? []) : []
+  const selected = rawConversations.find((c) => c.id === selectedId) ?? null
+
+  const messageItems = messagesQuery.data?.items
+  // Chuyển đổi MessageResponse[] -> ChatMessage[] -> DayGroup[]
+  const groups = useMemo(() => {
+    if (!selected || !messageItems) return []
+    const chatMsgs = messageItems.map((m) => mapMessageResponse(m, user?.id))
+    return buildDayGroupsFromMessages(chatMsgs, todayLabel)
+  }, [selected, messageItems, user?.id, todayLabel])
 
   const handleSelect = (id: string) => {
     setSelectedId(id)
     setTab('messages')
-    setReadIds((prev) => (prev.includes(id) ? prev : [...prev, id]))
+
+    // Đánh dấu đã đọc nếu hội thoại có tin chưa đọc
+    const target = rawConversations.find((c) => c.id === id)
+    if (target && target.unread > 0) {
+      const msgs = messagesQuery.data?.items ?? []
+      const lastMsg = msgs[msgs.length - 1]
+      if (lastMsg) {
+        markReadMutation.mutate({ conversationId: id, lastReadMessageId: lastMsg.id })
+      }
+    }
   }
 
-  const userName = user?.fullName ?? 'Minh Anh'
+  const handleSend = (text: string) => {
+    if (!selectedId) return
+    sendMessageMutation.mutate(text)
+  }
+
+  const handleTypingStart = () => {
+    if (selectedId) emitTypingStart(selectedId)
+  }
+
+  const handleTypingStop = () => {
+    if (selectedId) emitTypingStop(selectedId)
+  }
+
+  const userName = user?.fullName ?? 'Lemon User'
 
   return (
     <main
@@ -91,7 +149,7 @@ export function ChatShell() {
         mobileBarVisible={!selectedId}
       />
 
-      {/* Panel B — ẩn trên mobile khi đang xem hội thoại; ẩn luôn khi sidebar thu gọn */}
+      {/* Panel B — danh sách hội thoại */}
       <div
         className={cn(
           selectedId ? 'hidden h-full min-h-0 md:flex md:h-full md:min-w-0' : 'flex h-full min-h-0 min-w-0 flex-1 md:flex-none',
@@ -119,9 +177,12 @@ export function ChatShell() {
           <ConversationView
             conversation={selected}
             groups={groups}
-            onSend={(text) => send(selected.id, text, t('chat.mockReply'), selected.name, selected.isGroup)}
+            onSend={handleSend}
             showBack
             onBack={() => setSelectedId(null)}
+            isTyping={isPartnerTyping}
+            onTypingStart={handleTypingStart}
+            onTypingStop={handleTypingStop}
           />
         ) : (
           <section className="hidden h-full min-h-0 w-full min-w-0 flex-1 flex-col items-center justify-center gap-4 bg-background p-8 text-center md:flex" aria-label={t('chat.noConversationSelected')}>

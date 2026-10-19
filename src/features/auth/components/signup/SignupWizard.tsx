@@ -132,7 +132,7 @@ export function SignupWizard() {
 
     signup.mutate(payload, {
       onSuccess: () => {
-        autoSignin.mutate({ email, password: values.password })
+        autoSignin.mutate({ identifier: email, password: values.password })
       },
       onError: (error: Error) => {
         const code = (error as { code?: string }).code

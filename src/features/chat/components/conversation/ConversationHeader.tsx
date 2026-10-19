@@ -13,9 +13,10 @@ interface ConversationHeaderProps {
   conversation: Conversation
   showBack: boolean
   onBack?: () => void
+  isTyping?: boolean
 }
 
-export function ConversationHeader({ conversation, showBack, onBack }: ConversationHeaderProps) {
+export function ConversationHeader({ conversation, showBack, onBack, isTyping }: ConversationHeaderProps) {
   const { t } = useTranslation()
   const headerActions = [
     { label: t('chat.voiceCall'), icon: Phone },
@@ -49,8 +50,14 @@ export function ConversationHeader({ conversation, showBack, onBack }: Conversat
       </span>
       <div className="min-w-0 flex-1">
         <h2 className="truncate text-[15px] font-bold text-foreground">{conversation.name}</h2>
-        <p className="truncate text-xs text-muted-foreground">
-          {conversation.isGroup ? conversation.members : (conversation.lastActive ?? t('chat.offline'))}
+        <p className={cn('truncate text-xs', isTyping ? 'font-medium text-primary animate-pulse' : 'text-muted-foreground')}>
+          {isTyping
+            ? t('chat.typing')
+            : conversation.isGroup
+              ? conversation.members
+              : conversation.online
+                ? t('chat.online')
+                : (conversation.lastActive ?? t('chat.offline'))}
         </p>
       </div>
       <div className="flex shrink-0 items-center gap-0.5">
