@@ -122,7 +122,7 @@ export function MiddlePanel({
       toast.error(requestsQuery.error instanceof Error ? requestsQuery.error.message : t('chat.friendRequestsLoadError'))
     }
   }, [requestsQuery.isError, requestsQuery.error, t])
-  const incomingRequests = requests?.incoming.length ?? 0
+  const incomingRequests = requests?.incoming?.length ?? 0
   // Story theo tên người gửi — 1-1 mới bọc ring/bubble (Messenger không cho group)
   const storyByName = useMemo(() => new Map(stories.map((s) => [s.name, s])), [stories])
 

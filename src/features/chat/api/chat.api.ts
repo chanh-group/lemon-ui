@@ -42,7 +42,10 @@ export async function sendFriendRequest(userId: string): Promise<void> {
 /** Danh sách lời mời:incoming chờ mình xử lý + outgoing chờ đối phương. */
 export async function getFriendRequests(): Promise<{ incoming: FriendRequest[]; outgoing: FriendRequest[] }> {
   const res = await api.get<{ incoming: FriendRequest[]; outgoing: FriendRequest[] }>('/friends/requests')
-  return res.data
+  return {
+    incoming: res.data?.incoming ?? [],
+    outgoing: res.data?.outgoing ?? [],
+  }
 }
 
 /** Danh sách bạn bè đã chấp nhận lời mời. */
