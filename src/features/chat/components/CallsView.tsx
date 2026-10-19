@@ -13,7 +13,8 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { ROUTES } from '@/config/constants'
 import { cn } from '@/lib/utils'
-import { avatarColor, initials, MOCK_CALLS, MOCK_CONVERSATIONS } from '../data/mockData'
+import { avatarColor, initials, MOCK_CALLS } from '../data/mockData'
+import { useConversationsQuery } from '../hooks/useChatQueries'
 import type { CallEntry } from '../types/chat.types'
 import { SideNav } from './SideNav'
 
@@ -61,7 +62,8 @@ export function CallsView() {
   const navigate = useNavigate()
   const [query, setQuery] = useState('')
 
-  const totalUnread = useMemo(() => MOCK_CONVERSATIONS.reduce((n, c) => n + c.unread, 0), [])
+  const conversationsQuery = useConversationsQuery()
+  const totalUnread = (conversationsQuery.data ?? []).reduce((n, conversation) => n + conversation.unread, 0)
 
   const calls = useMemo(() => {
     const q = query.trim().toLowerCase()

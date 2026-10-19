@@ -1,19 +1,30 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 import { BrandMark } from '@/components/common/BrandMark'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { cn } from '@/lib/utils'
 import { ROUTES } from '@/config/constants'
-import { MOCK_CALLS, MOCK_CONVERSATIONS } from '../data/mockData'
-import type { ChatTab, DayGroup, StoryEntry } from '../types/chat.types'
-import { useChatThreads } from '../hooks/useChatThreads'
+import { emitTypingStart, emitTypingStop } from '@/lib/socket'
+import { MOCK_CALLS } from '../data/mockData'
+import type { ChatTab, StoryEntry } from '../types/chat.types'
+import {
+  useConversationsQuery,
+  useConversationMessagesQuery,
+  useMarkReadMutation,
+  useSendMessageMutation,
+} from '../hooks/useChatQueries'
+import { useChatRealtime } from '../hooks/useChatRealtime'
 import { useStoriesList } from '../hooks/useStories'
+import { buildDayGroupsFromMessages, mapMessageResponse } from '../utils/chat.mapper'
 import { SideNav } from './SideNav'
 import { MiddlePanel } from './MiddlePanel'
 import { ConversationView } from './conversation'
 import { StoryViewer } from './StoryViewer'
 import { useAuth } from '@/features/auth/api'
+
+const TYPING_HEARTBEAT_MS = 1_500
 
 export function ChatShell() {
   const { t } = useTranslation()
@@ -26,47 +37,136 @@ export function ChatShell() {
   const isMdDown = useMediaQuery('(max-width: 48rem)') // Breakpoint md của Tailwind (768px)
   const [tab, setTab] = useState<ChatTab>(initialTab)
   const [query, setQuery] = useState('')
-  // Mặc định KHÔNG mở hội thoại nào — chỉ chọn khi người dùng bấm vào 1 row
+  // Mặc định chọn theo location.state nếu có
   const [selectedId, setSelectedId] = useState<string | null>(initialSelect)
-  const [readIds, setReadIds] = useState<string[]>([])
   const [viewingStory, setViewingStory] = useState<StoryEntry | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const todayLabel = t('chat.today')
 
-  const { threads, send } = useChatThreads({ todayLabel })
+  // Realtime Socket.IO sync
+  const { isPartnerTyping, connectionStatus } = useChatRealtime(selectedId)
+
+  // API Queries & Mutations
+  const conversationsQuery = useConversationsQuery()
+  const messagesQuery = useConversationMessagesQuery(selectedId)
+  const sendMessageMutation = useSendMessageMutation(selectedId)
+  const markReadMutation = useMarkReadMutation()
+  const lastTypingSentAt = useRef(0)
+  const lastReadAttempt = useRef<string | null>(null)
+
+  const [prevInitialSelect, setPrevInitialSelect] = useState(initialSelect)
+  if (initialSelect !== prevInitialSelect) {
+    setPrevInitialSelect(initialSelect)
+    setSelectedId(initialSelect)
+    if (initialSelect) setTab('messages')
+  }
+
+  const rawConversations = useMemo(
+    () => conversationsQuery.data ?? [],
+    [conversationsQuery.data],
+  )
 
   const q = query.trim().toLowerCase()
   const conversations = useMemo(
     () =>
-      MOCK_CONVERSATIONS.map((c) => (readIds.includes(c.id) ? { ...c, unread: 0 } : c)).filter(
+      rawConversations.filter(
         (c) => !q || c.name.toLowerCase().includes(q) || c.preview.toLowerCase().includes(q),
       ),
-    [q, readIds],
+    [rawConversations, q],
   )
+
   const calls = useMemo(
     () => MOCK_CALLS.filter((c) => !q || c.name.toLowerCase().includes(q)),
     [q],
   )
+
   const storiesQuery = useStoriesList()
+  useEffect(() => {
+    if (storiesQuery.isError) {
+      toast.error(storiesQuery.error instanceof Error ? storiesQuery.error.message : t('chat.storiesLoadError'))
+    }
+  }, [storiesQuery.isError, storiesQuery.error, t])
   const stories = useMemo(
     () => (storiesQuery.data ?? []).filter((s) => !q || s.name.toLowerCase().includes(q)),
     [storiesQuery.data, q],
   )
+
   const totalUnread = useMemo(
-    () => MOCK_CONVERSATIONS.reduce((n, c) => n + (readIds.includes(c.id) ? 0 : c.unread), 0),
-    [readIds],
+    () => rawConversations.reduce((n, c) => n + (c.unread || 0), 0),
+    [rawConversations],
   )
 
-  const selected = MOCK_CONVERSATIONS.find((c) => c.id === selectedId) ?? null
-  const groups: DayGroup[] = selected ? (threads[selected.id] ?? []) : []
+  const selected = rawConversations.find((c) => c.id === selectedId) ?? null
+
+  const messageItems = useMemo(() => {
+    const messages = [
+      ...(messagesQuery.data?.pages.flatMap((page) => page.items) ?? []),
+      ...(messagesQuery.liveMessages ?? []),
+    ]
+    const uniqueMessages = new Map(messages.map((message) => [message.id, message]))
+    return [...uniqueMessages.values()].sort(
+      (left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt),
+    )
+  }, [messagesQuery.data, messagesQuery.liveMessages])
+
+  // API trả từng trang mới nhất trước; UI cần timeline cũ đến mới.
+  const groups = useMemo(() => {
+    if (!selected || !messageItems) return []
+    const chatMsgs = messageItems.map((m) => mapMessageResponse(m, user?.id))
+    return buildDayGroupsFromMessages(chatMsgs, todayLabel)
+  }, [selected, messageItems, user?.id, todayLabel])
 
   const handleSelect = (id: string) => {
     setSelectedId(id)
     setTab('messages')
-    setReadIds((prev) => (prev.includes(id) ? prev : [...prev, id]))
   }
 
-  const userName = user?.fullName ?? 'Minh Anh'
+  const lastMessage = messageItems.at(-1)
+  const selectedUnread = selected?.unread
+  const lastMessageId = lastMessage?.id
+  const lastMessageConversationId = lastMessage?.conversationId
+  const markRead = markReadMutation.mutate
+  useEffect(() => {
+    const attemptKey = selectedId && lastMessageId ? `${selectedId}:${lastMessageId}` : null
+    if (
+      !selectedId ||
+      !selectedUnread ||
+      !lastMessageId ||
+      lastMessageConversationId !== selectedId ||
+      !attemptKey ||
+      lastReadAttempt.current === attemptKey
+    ) {
+      return
+    }
+    lastReadAttempt.current = attemptKey
+    markRead({ conversationId: selectedId, lastReadMessageId: lastMessageId })
+  }, [selectedId, selectedUnread, lastMessageId, lastMessageConversationId, markRead])
+
+  const handleSend = async (text: string): Promise<boolean> => {
+    if (!selectedId) return false
+    try {
+      await sendMessageMutation.mutateAsync(text)
+      return true
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : t('chat.sendMessageError'))
+      return false
+    }
+  }
+
+  const handleTypingStart = () => {
+    const now = Date.now()
+    if (selectedId && now - lastTypingSentAt.current >= TYPING_HEARTBEAT_MS) {
+      lastTypingSentAt.current = now
+      emitTypingStart(selectedId)
+    }
+  }
+
+  const handleTypingStop = () => {
+    lastTypingSentAt.current = 0
+    if (selectedId) emitTypingStop(selectedId)
+  }
+
+  const userName = user?.fullName ?? 'Lemon User'
 
   return (
     <main
@@ -75,6 +175,15 @@ export function ChatShell() {
         !selectedId && 'pb-16',
       )}
     >
+      {connectionStatus !== 'connected' && (
+        <div
+          className="fixed right-3 top-3 z-50 rounded-lg border border-border bg-card px-3 py-2 text-xs text-muted-foreground shadow-md"
+          role="status"
+          aria-live="polite"
+        >
+          {connectionStatus === 'connecting' ? t('chat.realtimeConnecting') : t('chat.realtimeOffline')}
+        </div>
+      )}
       <SideNav
         active={tab}
         onChange={(t) => {
@@ -91,7 +200,7 @@ export function ChatShell() {
         mobileBarVisible={!selectedId}
       />
 
-      {/* Panel B — ẩn trên mobile khi đang xem hội thoại; ẩn luôn khi sidebar thu gọn */}
+      {/* Panel B — danh sách hội thoại */}
       <div
         className={cn(
           selectedId ? 'hidden h-full min-h-0 md:flex md:h-full md:min-w-0' : 'flex h-full min-h-0 min-w-0 flex-1 md:flex-none',
@@ -101,6 +210,11 @@ export function ChatShell() {
         <MiddlePanel
           tab={tab}
           conversations={conversations}
+          conversationsLoading={conversationsQuery.isPending}
+          conversationsError={conversationsQuery.error?.message}
+          onRetryConversations={() => {
+            void conversationsQuery.refetch()
+          }}
           calls={calls}
           stories={stories}
           selectedId={selectedId}
@@ -117,11 +231,33 @@ export function ChatShell() {
       <div className={selectedId ? 'flex h-full min-h-0 w-full min-w-0 flex-1' : 'hidden h-full min-h-0 w-full min-w-0 flex-1 md:flex'}>
         {selected ? (
           <ConversationView
+            key={selected.id}
             conversation={selected}
             groups={groups}
-            onSend={(text) => send(selected.id, text, t('chat.mockReply'), selected.name, selected.isGroup)}
+            messagesLoading={messagesQuery.isPending}
+            messagesError={messagesQuery.isError && !messagesQuery.data ? messagesQuery.error.message : undefined}
+            onRetryMessages={() => {
+              void messagesQuery.refetch()
+            }}
+            hasOlderMessages={Boolean(messagesQuery.hasNextPage)}
+            isLoadingOlderMessages={messagesQuery.isFetchingNextPage}
+            onLoadOlderMessages={async () => {
+              const result = await messagesQuery.fetchNextPage()
+              if (result.isError) throw result.error
+            }}
+            hasNewerMessages={Boolean(messagesQuery.hasPreviousPage)}
+            isLoadingNewerMessages={messagesQuery.isFetchingPreviousPage}
+            onLoadNewerMessages={async () => {
+              const result = await messagesQuery.fetchPreviousPage()
+              if (result.isError) throw result.error
+            }}
+            onSend={handleSend}
+            isSending={sendMessageMutation.isPending}
             showBack
             onBack={() => setSelectedId(null)}
+            isTyping={isPartnerTyping}
+            onTypingStart={handleTypingStart}
+            onTypingStop={handleTypingStop}
           />
         ) : (
           <section className="hidden h-full min-h-0 w-full min-w-0 flex-1 flex-col items-center justify-center gap-4 bg-background p-8 text-center md:flex" aria-label={t('chat.noConversationSelected')}>

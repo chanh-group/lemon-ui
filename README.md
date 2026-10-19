@@ -28,10 +28,18 @@ src/
 ├── features/       # auth, users, dashboard... (api, components, hooks, schemas, types)
 ├── pages/          # LoginPage, RegisterPage, DashboardPage, NotFoundPage
 ├── hooks/          # useDebounce, useMediaQuery
-├── lib/            # api, query-client, storage, utils
+├── infrastructure/ # API client, auth/session, TanStack Query
+├── lib/            # Socket.IO, storage, utils
 ├── config/         # env, constants
 └── types/          # api, common
 ```
+
+## API và realtime
+
+Copy `.env.example` thành `.env`. `VITE_API_URL` cấu hình API; `VITE_WS_URL` tùy chọn cấu hình origin Socket.IO.
+Để `VITE_WS_URL` trống khi frontend dùng cùng origin với backend qua reverse proxy `/socket.io`.
+Nếu frontend và backend khác origin, đặt `VITE_WS_URL` thành origin backend và cấu hình backend `FRONTEND_URL`
+cho phép origin frontend. Trong môi trường phát triển, Vite proxy `/socket.io` tới backend cục bộ.
 
 ## Design tokens
 

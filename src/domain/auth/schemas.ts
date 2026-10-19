@@ -23,7 +23,7 @@ const usernameSchema = z
   .regex(/^[a-z0-9._-]+$/, 'errors.usernameRule')
 
 export const loginSchema = z.object({
-  email: emailSchema,
+  identifier: z.string().trim().min(1, 'errors.required'),
   password: z.string().min(1, 'errors.required'),
 })
 export type LoginInput = z.infer<typeof loginSchema>

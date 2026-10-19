@@ -1,4 +1,6 @@
+import { forwardRef, useImperativeHandle, useLayoutEffect, useMemo, useRef, type RefObject } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import { CheckCheckIcon as CheckCheckData, CheckIcon as CheckData, Film01Icon as FilmData, Image01Icon as ImageIconData, StickerIcon as StickerData } from '@hugeicons/core-free-icons'
 import { createIcon } from '@/components/icons/hugeIcon'
 const Check = createIcon(CheckData)
@@ -79,15 +81,32 @@ function MediaBubble({ label, kind }: { label: string; kind: ChatMessage['kind']
   )
 }
 
-function MessageGroupView({ group, senderLabel }: { group: MessageGroup; senderLabel: string }) {
+function MessageRowView({
+  group,
+  messageIndex,
+  senderLabel,
+}: {
+  group: MessageGroup
+  messageIndex: number
+  senderLabel: string
+}) {
   const { t } = useTranslation()
   const isMe = group.fromMe
   const total = group.messages.length
-  const last = group.messages[total - 1]
+  const msg = group.messages[messageIndex]
+  const isFirst = messageIndex === 0
+  const isLast = messageIndex === total - 1
   const authorName = group.sender ?? senderLabel
   return (
-    <div className={cn('msg-in flex w-full', isMe ? 'justify-end' : 'justify-start gap-2.5')}>
-      {!isMe && (
+    <div
+      data-message-id={msg.id}
+      className={cn(
+        'msg-in flex w-full',
+        isMe ? 'justify-end' : 'justify-start gap-2.5',
+        messageIndex > 0 && 'mt-0.5',
+      )}
+    >
+      {!isMe && isLast && (
         <span
           aria-hidden="true"
           className="mt-auto mb-4 grid size-7 shrink-0 place-items-center rounded-full text-[10px] font-bold text-foreground ring-1 ring-border"
@@ -96,52 +115,47 @@ function MessageGroupView({ group, senderLabel }: { group: MessageGroup; senderL
           {initials(authorName)}
         </span>
       )}
+      {!isMe && !isLast && <span aria-hidden="true" className="size-7 shrink-0" />}
       <div className={cn('flex max-w-[78%] flex-col sm:max-w-[65%]', isMe ? 'items-end' : 'items-start')}>
-        {group.messages.map((msg, i) => {
-          const hasMedia = msg.kind !== 'text'
-          return (
-            <div
-              key={msg.id}
-              className={cn(
-                'w-fit max-w-full px-3.5 py-2 text-sm leading-relaxed wrap-break-word whitespace-pre-wrap',
-                i > 0 && total > 1 && 'mt-0.5',
-                isMe ? 'bg-secondary text-foreground' : 'border border-border bg-card text-foreground shadow-sm',
-                bubbleRadius(i, total, isMe, hasMedia),
-              )}
-            >
-              {i === 0 && !isMe && group.sender && (
-                <span className="mb-0.5 block text-xs font-bold text-brand-ink">{group.sender}</span>
-              )}
-              {msg.kind === 'text' ? (
-                msg.text
+        <div
+          className={cn(
+            'w-fit max-w-full px-3.5 py-2 text-sm leading-relaxed wrap-break-word whitespace-pre-wrap',
+            isMe ? 'bg-secondary text-foreground' : 'border border-border bg-card text-foreground shadow-sm',
+            bubbleRadius(messageIndex, total, isMe, msg.kind !== 'text'),
+          )}
+        >
+          {isFirst && !isMe && group.sender && (
+            <span className="mb-0.5 block text-xs font-bold text-brand-ink">{group.sender}</span>
+          )}
+          {msg.kind === 'text' ? (
+            msg.text
+          ) : (
+            <span className="flex flex-col gap-1.5">
+              <MediaBubble label={msg.photoLabel ?? t('chat.attachment')} kind={msg.kind} />
+              {msg.text && <span>{msg.text}</span>}
+            </span>
+          )}
+          {msg.reactions && msg.reactions.length > 0 && (
+            <span className="mt-1.5 flex gap-1" aria-label={t('chat.reactions')}>
+              {msg.reactions.map((r) => (
+                <span key={r} className="rounded-full border border-border bg-card px-1.5 py-0.5 text-xs shadow-sm">
+                  {r}
+                </span>
+              ))}
+            </span>
+          )}
+        </div>
+        {isLast && (
+          <span className={cn('mt-1 flex items-center gap-1 px-1 text-[11px] text-muted-foreground', isMe ? 'justify-end' : 'justify-start')}>
+            {msg.time}
+            {isMe &&
+              (msg.status === 'read' ? (
+                <CheckCheck className="size-3.5 text-brand-ink" aria-label={t('chat.read')} />
               ) : (
-                <span className="flex flex-col gap-1.5">
-                  <MediaBubble label={msg.photoLabel ?? t('chat.attachment')} kind={msg.kind} />
-                  {msg.text && <span>{msg.text}</span>}
-                </span>
-              )}
-              {msg.reactions && msg.reactions.length > 0 && (
-                <span className="mt-1.5 flex gap-1" aria-label={t('chat.reactions')}>
-                  {msg.reactions.map((r) => (
-                    <span key={r} className="rounded-full border border-border bg-card px-1.5 py-0.5 text-xs shadow-sm">
-                      {r}
-                    </span>
-                  ))}
-                </span>
-              )}
-            </div>
-          )
-        })}
-        {/* Thời gian + trạng thái chỉ hiển thị ở tin cuối của cụm */}
-        <span className={cn('mt-1 flex items-center gap-1 px-1 text-[11px] text-muted-foreground', isMe ? 'justify-end' : 'justify-start')}>
-          {last.time}
-          {isMe &&
-            (last.status === 'read' ? (
-              <CheckCheck className="size-3.5 text-brand-ink" aria-label={t('chat.read')} />
-            ) : (
-              <Check className="size-3.5" aria-label={t('chat.sent')} />
-            ))}
-        </span>
+                <Check className="size-3.5" aria-label={t('chat.sent')} />
+              ))}
+          </span>
+        )}
       </div>
     </div>
   )
@@ -150,27 +164,98 @@ function MessageGroupView({ group, senderLabel }: { group: MessageGroup; senderL
 interface MessageListProps {
   groups: DayGroup[]
   senderLabel: string
+  scrollRef: RefObject<HTMLDivElement | null>
 }
 
-export function MessageList({ groups, senderLabel }: MessageListProps) {
+export interface MessageListHandle {
+  scrollToEnd: (behavior?: ScrollBehavior) => void
+}
+
+type MessageListRow =
+  | { kind: 'date'; key: string; date: string }
+  | { kind: 'message'; key: string; group: MessageGroup; messageIndex: number }
+
+export const MessageList = forwardRef<MessageListHandle, MessageListProps>(function MessageList(
+  { groups, senderLabel, scrollRef },
+  ref,
+) {
+  'use no memo'
+
+  const didInitialScroll = useRef(false)
+  const rows = useMemo(() => {
+    const result: MessageListRow[] = []
+    for (const day of groups) {
+      result.push({ kind: 'date', key: `date:${day.date}`, date: day.date })
+      for (const group of buildMessageGroups(day.messages)) {
+        group.messages.forEach((_, messageIndex) => {
+          const message = group.messages[messageIndex]
+          result.push({
+            kind: 'message',
+            key: message.id,
+            group,
+            messageIndex,
+          })
+        })
+      }
+    }
+    return result
+  }, [groups])
+
+  // TanStack Virtual exposes an imperative instance; this component opts out of compiler memoization above.
+  // eslint-disable-next-line react/incompatible-library
+  const virtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => scrollRef.current,
+    getItemKey: (index) => rows[index]?.key ?? index,
+    estimateSize: (index) => rows[index]?.kind === 'date' ? 48 : 80,
+    overscan: 10,
+    anchorTo: 'end',
+    followOnAppend: true,
+    scrollEndThreshold: 120,
+  })
+
+  useImperativeHandle(ref, () => ({
+    scrollToEnd: (behavior = 'auto') => virtualizer.scrollToEnd({ behavior }),
+  }), [virtualizer])
+
+  useLayoutEffect(() => {
+    if (rows.length === 0 || didInitialScroll.current) return
+    virtualizer.scrollToEnd()
+    didInitialScroll.current = true
+  }, [rows.length, virtualizer])
+
   return (
-    <div className="flex w-full flex-col gap-5">
-      {groups.map((group) => (
-        <div key={group.date} className="flex flex-col gap-3">
-          <div className="flex items-center gap-3" role="separator" aria-label={group.date}>
-            <span className="h-px flex-1 bg-border" aria-hidden="true" />
-            <span className="rounded-full border border-border bg-card px-3 py-1 text-[11px] font-semibold text-muted-foreground">
-              {group.date}
-            </span>
-            <span className="h-px flex-1 bg-border" aria-hidden="true" />
+    <div className="relative w-full" style={{ height: virtualizer.getTotalSize() }}>
+      {virtualizer.getVirtualItems().map((virtualRow) => {
+        const row = rows[virtualRow.index]
+        return (
+          <div
+            key={virtualRow.key}
+            ref={virtualizer.measureElement}
+            data-index={virtualRow.index}
+            className="absolute top-0 left-0 w-full"
+            style={{ transform: `translateY(${virtualRow.start}px)` }}
+          >
+            {row.kind === 'date' ? (
+              <div className="flex items-center gap-3 pt-2 pb-3" role="separator" aria-label={row.date}>
+                <span className="h-px flex-1 bg-border" aria-hidden="true" />
+                <span className="rounded-full border border-border bg-card px-3 py-1 text-[11px] font-semibold text-muted-foreground">
+                  {row.date}
+                </span>
+                <span className="h-px flex-1 bg-border" aria-hidden="true" />
+              </div>
+            ) : (
+              <div className={row.messageIndex === row.group.messages.length - 1 ? 'pb-2' : 'pb-0'}>
+                <MessageRowView
+                  group={row.group}
+                  messageIndex={row.messageIndex}
+                  senderLabel={senderLabel}
+                />
+              </div>
+            )}
           </div>
-          <div className="flex flex-col gap-2">
-            {buildMessageGroups(group.messages).map((mg) => (
-              <MessageGroupView key={mg.messages[0].id} group={mg} senderLabel={senderLabel} />
-            ))}
-          </div>
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
-}
+})
