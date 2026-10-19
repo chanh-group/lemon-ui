@@ -5,6 +5,7 @@ import { ThemeProvider } from '@/app/providers/ThemeProvider'
 import { LanguageProvider } from '@/app/providers/LanguageProvider'
 import { SessionProvider } from '@/app/providers/SessionProvider'
 import { router } from '@/app/router'
+import { FriendRequestRealtime } from '@/features/chat/hooks/FriendRequestRealtime'
 
 export default function App() {
   return (
@@ -12,6 +13,7 @@ export default function App() {
       <LanguageProvider>
         <SessionProvider>
           <CursorGlow />
+          <FriendRequestRealtime />
           <RouterProvider router={router} />
           <Toaster position="top-center" richColors closeButton />
         </SessionProvider>

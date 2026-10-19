@@ -8,8 +8,10 @@ export const queryKeys = {
   chat: {
     conversations: ['chat', 'conversations'] as const,
     messages: (conversationId: string) => ['chat', 'messages', conversationId] as const,
+    liveMessages: (conversationId: string) => ['chat', 'live-messages', conversationId] as const,
     stories: ['chat', 'stories'] as const,
     friendRequests: ['chat', 'friend-requests'] as const,
+    friends: ['chat', 'friends'] as const,
     userSearch: (field: 'username' | 'email', query: string) => ['chat', 'user-search', field, query] as const,
   },
 }

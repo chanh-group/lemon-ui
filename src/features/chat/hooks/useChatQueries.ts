@@ -1,4 +1,5 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useRef } from 'react'
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { queryKeys } from '@/infrastructure/query/keys'
@@ -19,6 +20,13 @@ import type {
 } from '../types/chat.types'
 
 export const CHAT_QUERY_KEYS = queryKeys.chat
+const MESSAGE_PAGE_SIZE = 30
+const INITIAL_MESSAGE_BUFFER_PAGES = 3
+
+export interface MessagePageParam {
+  cursor?: string
+  after?: string
+}
 
 /** Hook lấy danh sách hội thoại Inbox */
 export function useConversationsQuery() {
@@ -30,19 +38,96 @@ export function useConversationsQuery() {
   })
 }
 
-/** Hook lấy lịch sử tin nhắn của một cuộc hội thoại */
+/** Giữ tối đa 5 trang quanh vùng đang đọc và tải sẵn 2 trang lịch sử gần nhất. */
 export function useConversationMessagesQuery(conversationId: string | null) {
-  return useQuery<MessageTimelineResponse>({
+  const queryClient = useQueryClient()
+  const { t } = useTranslation()
+  const initialPrefetches = useRef(new Set<string>())
+  const activeConversationId = useRef(conversationId)
+  const query = useInfiniteQuery({
     queryKey: CHAT_QUERY_KEYS.messages(conversationId ?? 'none'),
-    queryFn: () => {
+    queryFn: ({ pageParam }: { pageParam: MessagePageParam }) => {
       if (!conversationId) {
         return Promise.resolve({ items: [], hasMore: false })
       }
-      return getConversationMessages(conversationId)
+      return getConversationMessages(conversationId, pageParam.cursor, MESSAGE_PAGE_SIZE, pageParam.after)
     },
+    initialPageParam: {} as MessagePageParam,
+    getNextPageParam: (lastPage) =>
+      lastPage.hasMore && lastPage.nextCursor ? { cursor: lastPage.nextCursor } : undefined,
+    getPreviousPageParam: (firstPage, _allPages, firstPageParam) => {
+      if (!firstPageParam.cursor && !firstPageParam.after) return undefined
+      if (firstPageParam.after) {
+        return firstPage.hasMore && firstPage.nextCursor
+          ? { after: firstPage.nextCursor }
+          : undefined
+      }
+      return firstPage.items[0]?.id ? { after: firstPage.items[0].id } : undefined
+    },
+    maxPages: 5,
     enabled: Boolean(conversationId),
     staleTime: 1000 * 60, // 1 phút
   })
+  const liveMessagesQuery = useQuery<MessageResponse[]>({
+    queryKey: CHAT_QUERY_KEYS.liveMessages(conversationId ?? 'none'),
+    queryFn: () => [],
+    enabled: Boolean(conversationId),
+    initialData: [],
+    staleTime: Infinity,
+  })
+  const { data, fetchNextPage, isFetchingNextPage } = query
+  const latestPage = data?.pages.at(-1)
+  const pageCount = data?.pages.length ?? 0
+
+  useEffect(() => {
+    activeConversationId.current = conversationId
+  }, [conversationId])
+
+  useEffect(() => {
+    if (
+      !conversationId ||
+      pageCount === 0 ||
+      !latestPage?.hasMore ||
+      pageCount >= INITIAL_MESSAGE_BUFFER_PAGES ||
+      isFetchingNextPage ||
+      initialPrefetches.current.has(conversationId)
+    ) {
+      return
+    }
+    initialPrefetches.current.add(conversationId)
+    const prefetchOlderPages = async () => {
+      for (let pagesLoaded = pageCount; pagesLoaded < INITIAL_MESSAGE_BUFFER_PAGES; pagesLoaded += 1) {
+        if (activeConversationId.current !== conversationId) return
+        const current = queryClient.getQueryData<InfiniteData<MessageTimelineResponse, MessagePageParam>>(
+          CHAT_QUERY_KEYS.messages(conversationId),
+        )
+        if (!current?.pages.at(-1)?.hasMore) return
+        const result = await fetchNextPage({ cancelRefetch: false })
+        if (result.isError) {
+          toast.error(t('chat.messagesLoadError'))
+          return
+        }
+      }
+    }
+    void prefetchOlderPages().catch((error: unknown) => {
+      toast.error(error instanceof Error ? error.message : t('chat.messagesLoadError'))
+    })
+  }, [conversationId, fetchNextPage, isFetchingNextPage, latestPage?.hasMore, pageCount, queryClient, t])
+
+  useEffect(() => {
+    const loadedMessages = data?.pages.flatMap((page) => page.items)
+    if (!loadedMessages?.length) return
+    const loadedIds = new Set(loadedMessages.map((message) => message.id))
+    const loadedClientIds = new Set(loadedMessages.flatMap((message) => message.clientMsgId ? [message.clientMsgId] : []))
+    queryClient.setQueryData<MessageResponse[]>(
+      CHAT_QUERY_KEYS.liveMessages(conversationId ?? 'none'),
+      (liveMessages) => liveMessages?.filter(
+        (message) => !loadedIds.has(message.id) && (!message.clientMsgId || !loadedClientIds.has(message.clientMsgId)),
+      ),
+    )
+  }, [conversationId, data, queryClient])
+
+  return { ...query, liveMessages: liveMessagesQuery.data }
 }
 
 /** Hook gửi tin nhắn mới */
@@ -63,18 +148,21 @@ export function useSendMessageMutation(conversationId: string | null) {
       if (!conversationId) return
 
       // Cập nhật messages cache
-      queryClient.setQueryData<MessageTimelineResponse>(
+      const timeline = queryClient.getQueryData<InfiniteData<MessageTimelineResponse, MessagePageParam>>(
         CHAT_QUERY_KEYS.messages(conversationId),
+      )
+      queryClient.setQueryData<MessageResponse[]>(
+        CHAT_QUERY_KEYS.liveMessages(conversationId),
         (old) => {
-          if (!old) return { items: [newMessage], hasMore: false }
-          // Tránh duplicate nếu socket đã add trước đó
-          if (old.items.some((m) => m.id === newMessage.id || (m.clientMsgId && m.clientMsgId === newMessage.clientMsgId))) {
-            return old
-          }
-          return {
-            ...old,
-            items: [...old.items, newMessage],
-          }
+          const alreadyLoaded = timeline?.pages.some((page) => page.items.some((message) =>
+            message.id === newMessage.id ||
+            (message.clientMsgId && message.clientMsgId === newMessage.clientMsgId),
+          ))
+          const alreadyLive = old?.some((message) =>
+            message.id === newMessage.id ||
+            (message.clientMsgId && message.clientMsgId === newMessage.clientMsgId),
+          )
+          return alreadyLoaded || alreadyLive ? old : [...(old ?? []), newMessage]
         },
       )
 
@@ -153,17 +241,26 @@ export function useRevokeMessageMutation(conversationId: string | null) {
     mutationFn: (messageId: string) => revokeMessage(messageId),
     onSuccess: (revokedMsg) => {
       if (!conversationId) return
-      queryClient.setQueryData<MessageTimelineResponse>(
+      queryClient.setQueryData<InfiniteData<MessageTimelineResponse, MessagePageParam>>(
         CHAT_QUERY_KEYS.messages(conversationId),
         (old) => {
           if (!old) return old
           return {
             ...old,
-            items: old.items.map((m) =>
-              m.id === revokedMsg.id ? { ...m, deletedAt: revokedMsg.deletedAt } : m,
-            ),
+            pages: old.pages.map((page) => ({
+              ...page,
+              items: page.items.map((m) =>
+                m.id === revokedMsg.id ? { ...m, deletedAt: revokedMsg.deletedAt } : m,
+              ),
+            })),
           }
         },
+      )
+      queryClient.setQueryData<MessageResponse[]>(
+        CHAT_QUERY_KEYS.liveMessages(conversationId),
+        (old) => old?.map((message) =>
+          message.id === revokedMsg.id ? { ...message, deletedAt: revokedMsg.deletedAt } : message,
+        ),
       )
     },
   })

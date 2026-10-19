@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft01Icon as ArrowLeftData, BellIcon as BellData, PaletteIcon as PaletteData, User02Icon as UserIconData } from '@hugeicons/core-free-icons'
@@ -11,7 +11,8 @@ import { useAuth } from '@/features/auth/api'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { ROUTES } from '@/config/constants'
 import { cn } from '@/lib/utils'
-import { avatarColor, initials, MOCK_CONVERSATIONS } from '../../data/mockData'
+import { avatarColor, initials } from '../../data/mockData'
+import { useConversationsQuery } from '../../hooks/useChatQueries'
 import type { SettingsSection } from '../../types/settings.types'
 import { SideNav } from '../SideNav'
 import { ProfileSettings } from './ProfileSettings'
@@ -36,10 +37,8 @@ export function SettingsView() {
   const userName = displayName || (user?.fullName ?? 'Minh Anh')
   const userEmail = user?.email ?? 'nguyen10t2lhp@gmail.com'
 
-  const totalUnread = useMemo(
-    () => MOCK_CONVERSATIONS.reduce((n, c) => n + c.unread, 0),
-    [],
-  )
+  const conversationsQuery = useConversationsQuery()
+  const totalUnread = (conversationsQuery.data ?? []).reduce((n, conversation) => n + conversation.unread, 0)
 
   const handleSelectSection = (section: SettingsSection) => {
     setActiveSection(section)

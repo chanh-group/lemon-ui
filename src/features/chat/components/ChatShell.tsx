@@ -98,8 +98,18 @@ export function ChatShell() {
 
   const selected = rawConversations.find((c) => c.id === selectedId) ?? null
 
-  const messageItems = messagesQuery.data?.items
-  // Chuyển đổi MessageResponse[] -> ChatMessage[] -> DayGroup[]
+  const messageItems = useMemo(() => {
+    const messages = [
+      ...(messagesQuery.data?.pages.flatMap((page) => page.items) ?? []),
+      ...(messagesQuery.liveMessages ?? []),
+    ]
+    const uniqueMessages = new Map(messages.map((message) => [message.id, message]))
+    return [...uniqueMessages.values()].sort(
+      (left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt),
+    )
+  }, [messagesQuery.data, messagesQuery.liveMessages])
+
+  // API trả từng trang mới nhất trước; UI cần timeline cũ đến mới.
   const groups = useMemo(() => {
     if (!selected || !messageItems) return []
     const chatMsgs = messageItems.map((m) => mapMessageResponse(m, user?.id))
@@ -111,7 +121,7 @@ export function ChatShell() {
     setTab('messages')
   }
 
-  const lastMessage = messagesQuery.data?.items.at(-1)
+  const lastMessage = messageItems.at(-1)
   const selectedUnread = selected?.unread
   const lastMessageId = lastMessage?.id
   const lastMessageConversationId = lastMessage?.conversationId
@@ -200,6 +210,11 @@ export function ChatShell() {
         <MiddlePanel
           tab={tab}
           conversations={conversations}
+          conversationsLoading={conversationsQuery.isPending}
+          conversationsError={conversationsQuery.error?.message}
+          onRetryConversations={() => {
+            void conversationsQuery.refetch()
+          }}
           calls={calls}
           stories={stories}
           selectedId={selectedId}
@@ -216,8 +231,26 @@ export function ChatShell() {
       <div className={selectedId ? 'flex h-full min-h-0 w-full min-w-0 flex-1' : 'hidden h-full min-h-0 w-full min-w-0 flex-1 md:flex'}>
         {selected ? (
           <ConversationView
+            key={selected.id}
             conversation={selected}
             groups={groups}
+            messagesLoading={messagesQuery.isPending}
+            messagesError={messagesQuery.isError && !messagesQuery.data ? messagesQuery.error.message : undefined}
+            onRetryMessages={() => {
+              void messagesQuery.refetch()
+            }}
+            hasOlderMessages={Boolean(messagesQuery.hasNextPage)}
+            isLoadingOlderMessages={messagesQuery.isFetchingNextPage}
+            onLoadOlderMessages={async () => {
+              const result = await messagesQuery.fetchNextPage()
+              if (result.isError) throw result.error
+            }}
+            hasNewerMessages={Boolean(messagesQuery.hasPreviousPage)}
+            isLoadingNewerMessages={messagesQuery.isFetchingPreviousPage}
+            onLoadNewerMessages={async () => {
+              const result = await messagesQuery.fetchPreviousPage()
+              if (result.isError) throw result.error
+            }}
             onSend={handleSend}
             isSending={sendMessageMutation.isPending}
             showBack

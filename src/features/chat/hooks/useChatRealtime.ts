@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQueryClient, type InfiniteData } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { useAuth } from '@/features/auth/api'
 import { connectChatSocket, disconnectChatSocket, getChatSocket, type SocketConnectionStatus } from '@/lib/socket'
-import { CHAT_QUERY_KEYS } from './useChatQueries'
+import { CHAT_QUERY_KEYS, type MessagePageParam } from './useChatQueries'
 import { markConversationRead } from '../api/chat.api'
 import type {
   ConversationResponse,
@@ -53,19 +53,28 @@ export function useChatRealtime(activeConversationId: string | null) {
       const convId = msg.conversationId
 
       // Cập nhật messages cache nếu đang có dữ liệu trong cache
-      queryClient.setQueryData<MessageTimelineResponse>(
-        CHAT_QUERY_KEYS.messages(convId),
-        (old) => {
-          if (!old) return { items: [msg], hasMore: false }
-          if (old.items.some((m) => m.id === msg.id || (m.clientMsgId && m.clientMsgId === msg.clientMsgId))) {
-            return old
-          }
-          return {
-            ...old,
-            items: [...old.items, msg],
-          }
-        },
-      )
+      if (
+        convId === activeConversationId ||
+        queryClient.getQueryData(CHAT_QUERY_KEYS.messages(convId))
+      ) {
+        const timeline = queryClient.getQueryData<InfiniteData<MessageTimelineResponse, MessagePageParam>>(
+          CHAT_QUERY_KEYS.messages(convId),
+        )
+        queryClient.setQueryData<MessageResponse[]>(
+          CHAT_QUERY_KEYS.liveMessages(convId),
+          (old) => {
+            const alreadyLoaded = timeline?.pages.some((page) => page.items.some((message) =>
+              message.id === msg.id ||
+              (message.clientMsgId && message.clientMsgId === msg.clientMsgId),
+            ))
+            if (old?.some((message) =>
+              message.id === msg.id ||
+              (message.clientMsgId && message.clientMsgId === msg.clientMsgId),
+            ) || alreadyLoaded) return old
+            return [...(old ?? []), msg]
+          },
+        )
+      }
 
       // Cập nhật conversations list
       const conversations = queryClient.getQueryData<ConversationResponse[]>(CHAT_QUERY_KEYS.conversations)
@@ -109,17 +118,28 @@ export function useChatRealtime(activeConversationId: string | null) {
 
     // B. Tin nhắn được chỉnh sửa
     const handleMessageUpdated = (updated: { id: string; conversationId: string; body: string; editedAt: string }) => {
-      queryClient.setQueryData<MessageTimelineResponse>(
+      queryClient.setQueryData<InfiniteData<MessageTimelineResponse, MessagePageParam>>(
         CHAT_QUERY_KEYS.messages(updated.conversationId),
         (old) => {
           if (!old) return old
           return {
             ...old,
-            items: old.items.map((m) =>
-              m.id === updated.id ? { ...m, body: updated.body, editedAt: updated.editedAt } : m,
-            ),
+            pages: old.pages.map((page) => ({
+              ...page,
+              items: page.items.map((m) =>
+                m.id === updated.id ? { ...m, body: updated.body, editedAt: updated.editedAt } : m,
+              ),
+            })),
           }
         },
+      )
+      queryClient.setQueryData<MessageResponse[]>(
+        CHAT_QUERY_KEYS.liveMessages(updated.conversationId),
+        (old) => old?.map((message) =>
+          message.id === updated.id
+            ? { ...message, body: updated.body, editedAt: updated.editedAt }
+            : message,
+        ),
       )
 
       void queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.conversations })
@@ -127,17 +147,26 @@ export function useChatRealtime(activeConversationId: string | null) {
 
     // C. Tin nhắn bị thu hồi
     const handleMessageRevoked = (revoked: MessageRevokedPayload) => {
-      queryClient.setQueryData<MessageTimelineResponse>(
+      queryClient.setQueryData<InfiniteData<MessageTimelineResponse, MessagePageParam>>(
         CHAT_QUERY_KEYS.messages(revoked.conversationId),
         (old) => {
           if (!old) return old
           return {
             ...old,
-            items: old.items.map((m) =>
-              m.id === revoked.id ? { ...m, deletedAt: revoked.deletedAt } : m,
-            ),
+            pages: old.pages.map((page) => ({
+              ...page,
+              items: page.items.map((m) =>
+                m.id === revoked.id ? { ...m, deletedAt: revoked.deletedAt } : m,
+              ),
+            })),
           }
         },
+      )
+      queryClient.setQueryData<MessageResponse[]>(
+        CHAT_QUERY_KEYS.liveMessages(revoked.conversationId),
+        (old) => old?.map((message) =>
+          message.id === revoked.id ? { ...message, deletedAt: revoked.deletedAt } : message,
+        ),
       )
 
       void queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.conversations })

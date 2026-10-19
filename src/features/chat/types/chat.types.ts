@@ -5,7 +5,7 @@ export interface ChatUser {
   id: string
   name: string
   username: string
-  email: string
+  email?: string
   avatarUrl?: string | null
 }
 
@@ -14,7 +14,7 @@ export interface FriendRequest {
   id: string
   user: ChatUser
   direction: 'incoming' | 'outgoing'
-  createdAt: number
+  createdAt: string
 }
 
 export interface Conversation {

@@ -29,6 +29,9 @@ import type { CallEntry, ChatTab, Conversation, StoryEntry } from '../types/chat
 interface MiddlePanelProps {
   tab: ChatTab
   conversations: Conversation[]
+  conversationsLoading: boolean
+  conversationsError?: string
+  onRetryConversations: () => void
   calls: CallEntry[]
   stories: StoryEntry[]
   selectedId: string | null
@@ -89,6 +92,9 @@ function ConversationAvatar({
 export function MiddlePanel({
   tab,
   conversations,
+  conversationsLoading,
+  conversationsError,
+  onRetryConversations,
   calls,
   stories,
   selectedId,
@@ -196,7 +202,17 @@ export function MiddlePanel({
       <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3" role="list" aria-label={activeMeta.title}>
         {tab === 'messages' && (
           <>
-            {conversations.length === 0 ? (
+            {conversationsLoading ? (
+              <p className="px-4 py-5 text-sm text-muted-foreground">{t('chat.pending')}</p>
+            ) : conversationsError ? (
+              <div className="px-4 py-5 text-sm">
+                <p className="font-semibold text-destructive">{t('chat.conversationsLoadError')}</p>
+                <p className="mt-1 text-muted-foreground">{conversationsError}</p>
+                <button type="button" onClick={onRetryConversations} className="mt-3 font-semibold text-brand-ink hover:underline">
+                  {t('common.retry')}
+                </button>
+              </div>
+            ) : conversations.length === 0 ? (
               <div className="px-2 pt-4">
                 <EmptyState
                   title={query ? t('chat.noResults') : t('chat.noConversations')}
