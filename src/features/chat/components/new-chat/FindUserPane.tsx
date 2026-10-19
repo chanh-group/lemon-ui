@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { useFindUserByEmail, useFindUserByUsername } from '../../hooks/useFriends'
@@ -19,19 +19,15 @@ export function FindUserPane({
   const { t } = useTranslation()
   const navigate = useNavigate()
   const [value, setValue] = useState('')
-  const [submitted, setSubmitted] = useState('')
-  const byUsername = useFindUserByUsername()
-  const byEmail = useFindUserByEmail()
+  const [debouncedValue, setDebouncedValue] = useState('')
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedValue(value.trim()), 300)
+    return () => window.clearTimeout(timer)
+  }, [value])
+  const byUsername = useFindUserByUsername(mode === 'username' ? debouncedValue : '')
+  const byEmail = useFindUserByEmail(mode === 'email' ? debouncedValue : '')
   const finder = mode === 'username' ? byUsername : byEmail
-  const user = finder.data ?? null
-
-  const handleNext = () => {
-    const v = value.trim()
-    if (!v) return
-    setSubmitted(v)
-    if (mode === 'username') byUsername.mutate(v)
-    else byEmail.mutate(v)
-  }
+  const users = finder.data ?? []
 
   const openMessages = () => navigate(ROUTES.messages)
 
@@ -43,7 +39,6 @@ export function FindUserPane({
           <input
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleNext()}
             placeholder={mode === 'username' ? t('chat.newChatByUsername') : t('chat.searchByEmailHint')}
             aria-label={hint}
             type={mode === 'email' ? 'email' : 'text'}
@@ -56,23 +51,18 @@ export function FindUserPane({
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto pb-3">
-        {user ? (
-          <SearchResultCard user={user} onMessage={openMessages} />
-        ) : submitted && !finder.isPending ? (
+        {users.length > 0 ? (
+          <div className="space-y-2 px-2">
+            {users.map((user) => (
+              <SearchResultCard key={user.id} user={user} onMessage={openMessages} />
+            ))}
+          </div>
+        ) : debouncedValue.length >= 2 && !finder.isPending ? (
           <p className="px-5 pt-4 text-sm text-muted-foreground">{t('chat.userNotFound')}</p>
         ) : null}
       </div>
 
-      <div className="flex shrink-0 justify-end px-4 pb-4">
-        <button
-          type="button"
-          onClick={handleNext}
-          disabled={!value.trim() || finder.isPending}
-          className="rounded-xl bg-primary px-5 py-2 text-sm font-bold text-primary-foreground shadow-sm transition-all hover:opacity-90 active:scale-95 disabled:opacity-40"
-        >
-          {finder.isPending ? t('chat.pending') : t('chat.next')}
-        </button>
-      </div>
+      {finder.isPending && <p className="px-5 pb-4 text-xs text-muted-foreground">{t('chat.pending')}</p>}
     </>
   )
 }

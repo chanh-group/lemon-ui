@@ -13,7 +13,7 @@ import { SideNav } from './SideNav'
 import { MiddlePanel } from './MiddlePanel'
 import { ConversationView } from './conversation'
 import { StoryViewer } from './StoryViewer'
-import { useAuth } from '@/app/providers/AuthProvider'
+import { useAuth } from '@/features/auth/api'
 
 export function ChatShell() {
   const { t } = useTranslation()

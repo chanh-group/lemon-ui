@@ -14,7 +14,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form'
-import { requestOtpSchema, type RequestOtpInput } from '@/features/auth/schemas/auth.schema'
+import { requestOtpSchema, type RequestOtpInput } from '@/domain/auth'
 
 type EmailStepProps = {
   defaultEmail?: string

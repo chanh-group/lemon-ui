@@ -9,7 +9,7 @@ const Gear = createIcon(GearData)
 const ChevronRight = createIcon(ChevronRightData)
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { ROUTES } from '@/config/constants'
-import { useAuth } from '@/app/providers/AuthProvider'
+import { useAuth } from '@/features/auth/api'
 import { avatarColor, initials } from '../../data/mockData'
 import type { StoryEntry } from '../../types/chat.types'
 import type { CreateMediaStoryPayload, CreateTextStoryPayload } from '../../api/stories.api'

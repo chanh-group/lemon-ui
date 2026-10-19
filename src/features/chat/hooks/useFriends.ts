@@ -56,10 +56,20 @@ export function useCreateGroup() {
   return useMutation({ mutationFn: createGroup })
 }
 
-export function useFindUserByUsername() {
-  return useMutation({ mutationFn: findUserByUsername })
+export function useFindUserByUsername(query: string) {
+  return useQuery({
+    queryKey: ['chat', 'user-search', 'username', query],
+    queryFn: () => findUserByUsername(query),
+    enabled: query.length >= 2,
+    staleTime: 30_000,
+  })
 }
 
-export function useFindUserByEmail() {
-  return useMutation({ mutationFn: findUserByEmail })
+export function useFindUserByEmail(query: string) {
+  return useQuery({
+    queryKey: ['chat', 'user-search', 'email', query],
+    queryFn: () => findUserByEmail(query),
+    enabled: query.length >= 2,
+    staleTime: 30_000,
+  })
 }

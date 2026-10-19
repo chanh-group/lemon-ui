@@ -12,9 +12,7 @@ const passwordSchema = z
   .min(1, 'errors.required')
   .min(PASSWORD_MIN_LENGTH, 'errors.passwordMinLength')
 
-const otpCodeSchema = z
-  .string()
-  .regex(/^\d{6}$/, 'errors.otpInvalid')
+const otpCodeSchema = z.string().regex(/^\d{6}$/, 'errors.otpInvalid')
 
 const usernameSchema = z
   .string()
@@ -24,15 +22,11 @@ const usernameSchema = z
   .max(30, 'errors.usernameMaxLength')
   .regex(/^[a-z0-9._-]+$/, 'errors.usernameRule')
 
-/* ---- Login ---- */
-
 export const loginSchema = z.object({
   email: emailSchema,
   password: z.string().min(1, 'errors.required'),
 })
 export type LoginInput = z.infer<typeof loginSchema>
-
-/* ---- Signup wizard ---- */
 
 export const requestOtpSchema = z.object({
   email: emailSchema,
@@ -78,10 +72,12 @@ export const signupSchema = z.object({
 })
 export type SignupInput = z.infer<typeof signupSchema>
 
-/* ---- Forgot password ---- */
+export const forgotOtpSchema = z.object({ email: emailSchema })
+export type ForgotOtpInput = z.infer<typeof forgotOtpSchema>
 
 export const resetPasswordSchema = z
   .object({
+    email: emailSchema.optional(),
     otp: otpCodeSchema,
     newPassword: z
       .string()

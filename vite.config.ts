@@ -33,6 +33,12 @@ export default defineConfig({
           if (id.includes('node_modules/zod')) {
             return 'vendor-zod'
           }
+          if (id.includes('node_modules/axios')) {
+            return 'vendor-axios'
+          }
+          if (id.includes('node_modules/zustand')) {
+            return 'vendor-zustand'
+          }
         },
       },
     },

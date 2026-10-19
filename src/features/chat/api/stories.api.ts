@@ -1,5 +1,5 @@
 import { isAuthBypass } from '@/config/env'
-import { request } from '@/lib/api'
+import { api } from '@/infrastructure/api/client'
 import { MOCK_STORIES } from '../data/mockData'
 import type { StoryEntry } from '../types/chat.types'
 
@@ -26,7 +26,7 @@ export interface CreateTextStoryPayload {
 }
 
 /* ------------------------------------------------------------------ */
-/* API — khi hết bypass sẽ gọi thẳng request() như auth                */
+/* API — khi hết bypass gọi axios `api` (envelope đã unwrap)             */
 /* ------------------------------------------------------------------ */
 
 /** Danh sách story hiển thị ở tab Stories. */
@@ -35,7 +35,8 @@ export async function listStories(): Promise<StoryEntry[]> {
     await delay(200)
     return storyStore.map((s) => ({ ...s }))
   }
-  return request<StoryEntry[]>('/stories')
+  const res = await api.get<StoryEntry[]>('/stories')
+  return res.data
 }
 
 /** Đăng tin dạng văn bản — nền cố định, không chủ đề/không tùy chọn kiểu chữ. */
@@ -53,7 +54,8 @@ export async function createTextStory(payload: CreateTextStoryPayload): Promise<
     storyStore = [entry, ...storyStore]
     return { ...entry }
   }
-  return request<StoryEntry>('/stories/text', { method: 'POST', body: payload })
+  const res = await api.post<StoryEntry>('/stories/text', payload)
+  return res.data
 }
 
 /** Đăng tin bằng ảnh / video (caption optional) — story chỉ còn loại media. */
@@ -71,5 +73,6 @@ export async function createMediaStory(payload: CreateMediaStoryPayload): Promis
     storyStore = [entry, ...storyStore]
     return { ...entry }
   }
-  return request<StoryEntry>('/stories/media', { method: 'POST', body: payload })
+  const res = await api.post<StoryEntry>('/stories/media', payload)
+  return res.data
 }
