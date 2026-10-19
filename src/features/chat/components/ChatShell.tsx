@@ -141,10 +141,12 @@ export function ChatShell() {
         )}
       </div>
 
-      {/* Story viewer — xem story, thả cảm xúc và phản hồi tin nhắn 1:1 */}
+      {/* Story viewer — xem story chuẩn Facebook 9:16, thả cảm xúc và phản hồi tin nhắn 1:1 */}
       {viewingStory && (
         <StoryViewer
           story={viewingStory}
+          stories={stories}
+          onSelectStory={setViewingStory}
           onClose={() => setViewingStory(null)}
           onReplySent={(s, text) => {
             const targetConv =
