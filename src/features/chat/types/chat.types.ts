@@ -29,6 +29,42 @@ export interface Conversation {
   lastActive?: string
 }
 
+export type StoryReactionType = '❤️' | '🔥' | '😂' | '😮' | '😢' | '👏' | '👍'
+
+export interface StoryPreview {
+  id: string
+  kind: 'TEXT' | 'MEDIA' | 'text' | 'media'
+  caption?: string | null
+  mediaUrl?: string | null
+  background?: string | null
+  authorName?: string | null
+}
+
+export interface StoryReactionItem {
+  id: string
+  storyId: string
+  userId: string
+  reaction: string
+  createdAt: string
+  user: {
+    id: string
+    fullName: string
+    avatarUrl?: string | null
+  }
+}
+
+export interface StoryViewerItem {
+  id: string
+  storyId: string
+  userId: string
+  viewedAt: string
+  user: {
+    id: string
+    fullName: string
+    avatarUrl?: string | null
+  }
+}
+
 export interface ChatMessage {
   id: string
   fromMe: boolean
@@ -39,6 +75,8 @@ export interface ChatMessage {
   time: string
   status?: 'sent' | 'read'
   reactions?: string[]
+  storyId?: string | null
+  storyPreview?: StoryPreview | null
 }
 
 export interface DayGroup {
@@ -63,4 +101,16 @@ export interface StoryEntry {
   /** Tin của chính ta — dành riêng cho hàng "Tin của bạn". */
   mine?: boolean
   online: boolean
+  authorId?: string
+  authorAvatar?: string | null
+  kind?: 'text' | 'media' | 'TEXT' | 'MEDIA'
+  caption?: string | null
+  mediaUrl?: string | null
+  background?: string | null
+  viewsCount?: number
+  reactionsCount?: number
+  viewerReaction?: string | null
+  viewerHasViewed?: boolean
+  reactionsSummary?: { reaction: string; count: number }[]
 }
+

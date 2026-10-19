@@ -33,7 +33,7 @@ export function ChatShell() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const todayLabel = t('chat.today')
 
-  const { threads, send } = useChatThreads({ todayLabel })
+  const { threads, send, sendStoryReply } = useChatThreads({ todayLabel })
 
   const q = query.trim().toLowerCase()
   const conversations = useMemo(
@@ -141,8 +141,23 @@ export function ChatShell() {
         )}
       </div>
 
-      {/* Story viewer — tách thành component riêng */}
-      {viewingStory && <StoryViewer story={viewingStory} onClose={() => setViewingStory(null)} />}
+      {/* Story viewer — xem story, thả cảm xúc và phản hồi tin nhắn 1:1 */}
+      {viewingStory && (
+        <StoryViewer
+          story={viewingStory}
+          onClose={() => setViewingStory(null)}
+          onReplySent={(s, text) => {
+            const targetConv =
+              MOCK_CONVERSATIONS.find(
+                (c) => c.name.toLowerCase() === s.name.toLowerCase(),
+              ) ?? MOCK_CONVERSATIONS[1] // 'mai-anh'
+            if (targetConv) {
+              sendStoryReply(targetConv.id, text, s, t('chat.mockReply'))
+              handleSelect(targetConv.id)
+            }
+          }}
+        />
+      )}
     </main>
   )
 }

@@ -79,6 +79,27 @@ function MediaBubble({ label, kind }: { label: string; kind: ChatMessage['kind']
   )
 }
 
+function StoryReplyQuote({ preview, defaultAuthor }: { preview: NonNullable<ChatMessage['storyPreview']>; defaultAuthor: string }) {
+  const { t } = useTranslation()
+  const author = preview.authorName || defaultAuthor
+  return (
+    <div className="mb-2 flex items-center gap-2.5 rounded-xl border border-border/80 bg-muted/70 p-2 text-xs shadow-xs">
+      <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-linear-to-br from-primary via-secondary to-ring text-xs font-bold shadow-xs">
+        🍋
+      </div>
+      <div className="min-w-0 flex-1 text-left">
+        <p className="flex items-center gap-1 text-[11px] font-semibold text-brand-ink">
+          <span>{t('chat.replyToStory')}</span>
+          <span className="font-normal text-muted-foreground">· {author}</span>
+        </p>
+        <p className="truncate text-xs text-muted-foreground">
+          {preview.caption || t('chat.unnamedStory')}
+        </p>
+      </div>
+    </div>
+  )
+}
+
 function MessageGroupView({ group, senderLabel }: { group: MessageGroup; senderLabel: string }) {
   const { t } = useTranslation()
   const isMe = group.fromMe
@@ -111,6 +132,9 @@ function MessageGroupView({ group, senderLabel }: { group: MessageGroup; senderL
             >
               {i === 0 && !isMe && group.sender && (
                 <span className="mb-0.5 block text-xs font-bold text-brand-ink">{group.sender}</span>
+              )}
+              {msg.storyPreview && (
+                <StoryReplyQuote preview={msg.storyPreview} defaultAuthor={authorName} />
               )}
               {msg.kind === 'text' ? (
                 msg.text

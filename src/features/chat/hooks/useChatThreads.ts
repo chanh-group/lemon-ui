@@ -63,5 +63,44 @@ export function useChatThreads({ todayLabel }: UseChatThreadsOptions) {
     }, 1200)
   }
 
-  return { threads, send }
+  const sendStoryReply = (
+    conversationId: string,
+    text: string,
+    story: { id: string; name: string; kind?: string; caption?: string | null; mediaUrl?: string | null; background?: string | null },
+    mockReply: string,
+  ) => {
+    const msg: ChatMessage = {
+      id: crypto.randomUUID(),
+      fromMe: true,
+      text,
+      kind: 'text',
+      time: nowTime(),
+      status: 'sent',
+      storyId: story.id,
+      storyPreview: {
+        id: story.id,
+        kind: story.kind === 'MEDIA' ? 'MEDIA' : 'TEXT',
+        caption: story.caption || story.name,
+        mediaUrl: story.mediaUrl,
+        background: story.background,
+        authorName: story.name,
+      },
+    }
+    appendMessage(conversationId, msg)
+
+    if (replyTimer.current !== null) window.clearTimeout(replyTimer.current)
+    replyTimer.current = window.setTimeout(() => {
+      appendMessage(conversationId, {
+        id: crypto.randomUUID(),
+        fromMe: false,
+        sender: story.name,
+        text: mockReply,
+        kind: 'text',
+        time: nowTime(),
+      })
+    }, 1200)
+  }
+
+  return { threads, send, sendStoryReply }
 }
+
