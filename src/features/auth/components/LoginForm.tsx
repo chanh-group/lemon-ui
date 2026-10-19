@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { ROUTES } from '@/config/constants'
-import { loginSchema, type LoginInput } from '@/features/auth/schemas/auth.schema'
+import { loginSchema, type LoginInput } from '@/domain/auth'
 import { useLogin } from '@/features/auth/hooks/useAuth'
 import { GoogleButton } from './GoogleButton'
 

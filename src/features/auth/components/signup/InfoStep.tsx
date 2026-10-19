@@ -17,7 +17,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form'
-import { signupInfoSchema, type SignupInfoInput } from '@/features/auth/schemas/auth.schema'
+import { signupInfoSchema, type SignupInfoInput } from '@/domain/auth'
 import { usernameFromEmail } from '../../utils/username'
 
 type InfoStepProps = {

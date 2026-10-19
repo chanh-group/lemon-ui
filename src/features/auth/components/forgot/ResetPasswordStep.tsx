@@ -18,7 +18,7 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { OtpInputGroup } from '@/features/auth/components/otp'
-import { resetPasswordSchema, type ResetPasswordInput } from '@/features/auth/schemas/auth.schema'
+import { resetPasswordSchema, type ResetPasswordInput } from '@/domain/auth'
 
 type ResetPasswordStepProps = {
   email: string

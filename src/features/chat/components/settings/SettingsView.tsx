@@ -7,7 +7,7 @@ const ArrowLeft = createIcon(ArrowLeftData)
 const Bell = createIcon(BellData)
 const Palette = createIcon(PaletteData)
 const UserIcon = createIcon(UserIconData)
-import { useAuth } from '@/app/providers/AuthProvider'
+import { useAuth } from '@/features/auth/api'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { ROUTES } from '@/config/constants'
 import { cn } from '@/lib/utils'

@@ -8,7 +8,8 @@ const Send = createIcon(SendData)
 interface MessageComposerProps {
   draft: string
   onDraftChange: (v: string) => void
-  onSubmit: () => void
+  onSubmit: () => void | Promise<void>
+  disabled?: boolean
   onTypingStart?: () => void
   onTypingStop?: () => void
 }
@@ -17,6 +18,7 @@ export function MessageComposer({
   draft,
   onDraftChange,
   onSubmit,
+  disabled = false,
   onTypingStart,
   onTypingStop,
 }: MessageComposerProps) {
@@ -59,6 +61,7 @@ export function MessageComposer({
           <span className="sr-only">{t('chat.sendMessage')}</span>
           <input
             value={draft}
+            disabled={disabled}
             onChange={(e) => handleChange(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
@@ -82,7 +85,7 @@ export function MessageComposer({
         <button
           type="button"
           onClick={handleSubmit}
-          disabled={!draft.trim()}
+          disabled={disabled || !draft.trim()}
           aria-label={t('chat.sendMessage')}
           title={t('chat.sendMessage')}
           className="chat-send grid size-11 min-h-11 min-w-11 shrink-0 place-items-center rounded-full bg-brand-ink text-primary-foreground shadow-md transition-all duration-150 hover:shadow-lg active:scale-90 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none"

@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 import { BrandMark } from '@/components/common/BrandMark'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { cn } from '@/lib/utils'
@@ -21,7 +22,9 @@ import { SideNav } from './SideNav'
 import { MiddlePanel } from './MiddlePanel'
 import { ConversationView } from './conversation'
 import { StoryViewer } from './StoryViewer'
-import { useAuth } from '@/app/providers/AuthProvider'
+import { useAuth } from '@/features/auth/api'
+
+const TYPING_HEARTBEAT_MS = 1_500
 
 export function ChatShell() {
   const { t } = useTranslation()
@@ -41,13 +44,15 @@ export function ChatShell() {
   const todayLabel = t('chat.today')
 
   // Realtime Socket.IO sync
-  const { isPartnerTyping } = useChatRealtime(selectedId)
+  const { isPartnerTyping, connectionStatus } = useChatRealtime(selectedId)
 
   // API Queries & Mutations
   const conversationsQuery = useConversationsQuery()
   const messagesQuery = useConversationMessagesQuery(selectedId)
   const sendMessageMutation = useSendMessageMutation(selectedId)
   const markReadMutation = useMarkReadMutation()
+  const lastTypingSentAt = useRef(0)
+  const lastReadAttempt = useRef<string | null>(null)
 
   const [prevInitialSelect, setPrevInitialSelect] = useState(initialSelect)
   if (initialSelect !== prevInitialSelect) {
@@ -76,6 +81,11 @@ export function ChatShell() {
   )
 
   const storiesQuery = useStoriesList()
+  useEffect(() => {
+    if (storiesQuery.isError) {
+      toast.error(storiesQuery.error instanceof Error ? storiesQuery.error.message : t('chat.storiesLoadError'))
+    }
+  }, [storiesQuery.isError, storiesQuery.error, t])
   const stories = useMemo(
     () => (storiesQuery.data ?? []).filter((s) => !q || s.name.toLowerCase().includes(q)),
     [storiesQuery.data, q],
@@ -99,28 +109,50 @@ export function ChatShell() {
   const handleSelect = (id: string) => {
     setSelectedId(id)
     setTab('messages')
+  }
 
-    // Đánh dấu đã đọc nếu hội thoại có tin chưa đọc
-    const target = rawConversations.find((c) => c.id === id)
-    if (target && target.unread > 0) {
-      const msgs = messagesQuery.data?.items ?? []
-      const lastMsg = msgs[msgs.length - 1]
-      if (lastMsg) {
-        markReadMutation.mutate({ conversationId: id, lastReadMessageId: lastMsg.id })
-      }
+  const lastMessage = messagesQuery.data?.items.at(-1)
+  const selectedUnread = selected?.unread
+  const lastMessageId = lastMessage?.id
+  const lastMessageConversationId = lastMessage?.conversationId
+  const markRead = markReadMutation.mutate
+  useEffect(() => {
+    const attemptKey = selectedId && lastMessageId ? `${selectedId}:${lastMessageId}` : null
+    if (
+      !selectedId ||
+      !selectedUnread ||
+      !lastMessageId ||
+      lastMessageConversationId !== selectedId ||
+      !attemptKey ||
+      lastReadAttempt.current === attemptKey
+    ) {
+      return
+    }
+    lastReadAttempt.current = attemptKey
+    markRead({ conversationId: selectedId, lastReadMessageId: lastMessageId })
+  }, [selectedId, selectedUnread, lastMessageId, lastMessageConversationId, markRead])
+
+  const handleSend = async (text: string): Promise<boolean> => {
+    if (!selectedId) return false
+    try {
+      await sendMessageMutation.mutateAsync(text)
+      return true
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : t('chat.sendMessageError'))
+      return false
     }
   }
 
-  const handleSend = (text: string) => {
-    if (!selectedId) return
-    sendMessageMutation.mutate(text)
-  }
-
   const handleTypingStart = () => {
-    if (selectedId) emitTypingStart(selectedId)
+    const now = Date.now()
+    if (selectedId && now - lastTypingSentAt.current >= TYPING_HEARTBEAT_MS) {
+      lastTypingSentAt.current = now
+      emitTypingStart(selectedId)
+    }
   }
 
   const handleTypingStop = () => {
+    lastTypingSentAt.current = 0
     if (selectedId) emitTypingStop(selectedId)
   }
 
@@ -133,6 +165,15 @@ export function ChatShell() {
         !selectedId && 'pb-16',
       )}
     >
+      {connectionStatus !== 'connected' && (
+        <div
+          className="fixed right-3 top-3 z-50 rounded-lg border border-border bg-card px-3 py-2 text-xs text-muted-foreground shadow-md"
+          role="status"
+          aria-live="polite"
+        >
+          {connectionStatus === 'connecting' ? t('chat.realtimeConnecting') : t('chat.realtimeOffline')}
+        </div>
+      )}
       <SideNav
         active={tab}
         onChange={(t) => {
@@ -178,6 +219,7 @@ export function ChatShell() {
             conversation={selected}
             groups={groups}
             onSend={handleSend}
+            isSending={sendMessageMutation.isPending}
             showBack
             onBack={() => setSelectedId(null)}
             isTyping={isPartnerTyping}

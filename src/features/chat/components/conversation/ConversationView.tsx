@@ -11,7 +11,8 @@ import { MessageComposer } from './MessageComposer'
 interface ConversationViewProps {
   conversation: Conversation
   groups: DayGroup[]
-  onSend: (text: string) => void
+  onSend: (text: string) => Promise<boolean>
+  isSending: boolean
   onBack?: () => void
   showBack: boolean
   isTyping?: boolean
@@ -23,6 +24,7 @@ export function ConversationView({
   conversation,
   groups,
   onSend,
+  isSending,
   onBack,
   showBack,
   isTyping,
@@ -60,10 +62,11 @@ export function ConversationView({
     setShowJump(!nearBottom)
   }
 
-  const submit = () => {
+  const submit = async () => {
     const text = draft.trim()
-    if (!text) return
-    onSend(text)
+    if (!text || isSending) return
+    const sent = await onSend(text)
+    if (!sent) return
     setDraft('')
     setStickToBottom(true)
   }
@@ -98,6 +101,7 @@ export function ConversationView({
         draft={draft}
         onDraftChange={setDraft}
         onSubmit={submit}
+        disabled={isSending}
         onTypingStart={onTypingStart}
         onTypingStop={onTypingStop}
       />

@@ -1,5 +1,5 @@
 import { isAuthBypass } from '@/config/env'
-import { request } from '@/lib/api'
+import { api } from '@/infrastructure/api/client'
 import type {
   ChatUser,
   ConversationResponse,
@@ -8,6 +8,14 @@ import type {
   MessageTimelineResponse,
   SendMessageDto,
 } from '../types/chat.types'
+
+interface UserSearchResponse {
+  id: string
+  name: string
+  username: string
+  email: string
+  avatarUrl?: string | null
+}
 
 /* ------------------------------------------------------------------ */
 /* Mock directory — backend thật chưa có, dữ liệu chỉ nằm trong session */
@@ -44,59 +52,30 @@ let groupSeq = 0
 const delay = (ms = 350) => new Promise<void>((r) => setTimeout(r, ms))
 
 /* ------------------------------------------------------------------ */
-/* Chat API — khi hết bypass sẽ gọi thẳng request() như auth            */
+/* Chat API — khi hết bypass gọi axios `api` (envelope đã unwrap)         */
 /* ------------------------------------------------------------------ */
 
-/** Tìm user theo username (chính xác, không phân biệt hoa thường). */
-export async function findUserByUsername(username: string): Promise<ChatUser | null> {
-  const clean = username.trim().toLowerCase().replace(/^@/, '')
+/** Tìm user gần đúng theo username. */
+export async function findUserByUsername(username: string): Promise<ChatUser[]> {
+  const normalized = username.trim().replace(/^@/, '')
   if (isAuthBypass()) {
     await delay()
-    const hit = DIRECTORY.find((u) => u.username.toLowerCase() === clean)
-    return hit ? { ...hit } : null
+    const query = normalized.toLowerCase()
+    return DIRECTORY.filter((u) => u.username.toLowerCase().includes(query)).map((u) => ({ ...u }))
   }
-  const raw = await request<{
-    id: string
-    username: string
-    email: string
-    fullName?: string
-    name?: string
-    avatarUrl?: string | null
-  } | null>(`/users/by-username/${encodeURIComponent(clean)}`)
-  if (!raw) return null
-  return {
-    id: raw.id,
-    name: raw.fullName || raw.name || raw.username,
-    username: raw.username,
-    email: raw.email,
-    avatarUrl: raw.avatarUrl,
-  }
+  const res = await api.get<UserSearchResponse[]>('/users/search', { params: { q: normalized, field: 'username' } })
+  return res.data.map((user) => ({ ...user, name: user.name || user.username }))
 }
 
-/** Tìm user theo email (chính xác, không phân biệt hoa thường). */
-export async function findUserByEmail(email: string): Promise<ChatUser | null> {
+/** Tìm user gần đúng theo email. */
+export async function findUserByEmail(email: string): Promise<ChatUser[]> {
   const normalized = email.trim().toLowerCase()
   if (isAuthBypass()) {
     await delay()
-    const hit = DIRECTORY.find((u) => u.email.toLowerCase() === normalized)
-    return hit ? { ...hit } : null
+    return DIRECTORY.filter((u) => u.email.toLowerCase().includes(normalized)).map((u) => ({ ...u }))
   }
-  const raw = await request<{
-    id: string
-    username: string
-    email: string
-    fullName?: string
-    name?: string
-    avatarUrl?: string | null
-  } | null>(`/users/by-email/${encodeURIComponent(normalized)}`)
-  if (!raw) return null
-  return {
-    id: raw.id,
-    name: raw.fullName || raw.name || raw.username,
-    username: raw.username,
-    email: raw.email,
-    avatarUrl: raw.avatarUrl,
-  }
+  const res = await api.get<UserSearchResponse[]>('/users/search', { params: { q: normalized, field: 'email' } })
+  return res.data.map((user) => ({ ...user, name: user.name || user.username }))
 }
 
 /** Gửi lời mời kết bạn. */
@@ -107,7 +86,7 @@ export async function sendFriendRequest(userId: string): Promise<void> {
     if (user) pendingRequests.push({ id: `fr-out-${userId}`, user: { ...user }, direction: 'outgoing', createdAt: Date.now() })
     return
   }
-  await request<void>('/friends/requests', { method: 'POST', body: { userId } })
+  await api.post('/friends/requests', { userId })
 }
 
 /** Danh sách lời mời:incoming chờ mình xử lý + outgoing chờ đối phương. */
@@ -119,12 +98,8 @@ export async function getFriendRequests(): Promise<{ incoming: FriendRequest[]; 
       outgoing: pendingRequests.filter((r) => r.direction === 'outgoing').map((r) => ({ ...r })),
     }
   }
-  try {
-    return await request<{ incoming: FriendRequest[]; outgoing: FriendRequest[] }>('/friends/requests')
-  } catch {
-    // Backend chưa triển khai Friends module -> trả về rỗng không báo lỗi
-    return { incoming: [], outgoing: [] }
-  }
+  const res = await api.get<{ incoming: FriendRequest[]; outgoing: FriendRequest[] }>('/friends/requests')
+  return res.data
 }
 
 /** Chấp nhận lời mời kết bạn. */
@@ -135,7 +110,7 @@ export async function acceptFriendRequest(requestId: string): Promise<void> {
     if (i >= 0) pendingRequests.splice(i, 1)
     return
   }
-  await request<void>(`/friends/requests/${requestId}/accept`, { method: 'POST' })
+  await api.post(`/friends/requests/${requestId}/accept`)
 }
 
 /** Từ chối lời mời kết bạn. */
@@ -146,7 +121,7 @@ export async function declineFriendRequest(requestId: string): Promise<void> {
     if (i >= 0) pendingRequests.splice(i, 1)
     return
   }
-  await request<void>(`/friends/requests/${requestId}/decline`, { method: 'POST' })
+  await api.post(`/friends/requests/${requestId}/decline`)
 }
 
 /** Hủy lời mời mình đã gửi. */
@@ -157,7 +132,7 @@ export async function cancelFriendRequest(requestId: string): Promise<void> {
     if (i >= 0) pendingRequests.splice(i, 1)
     return
   }
-  await request<void>(`/friends/requests/${requestId}`, { method: 'DELETE' })
+  await api.delete(`/friends/requests/${requestId}`)
 }
 
 /** Xóa kết bạn. */
@@ -166,7 +141,7 @@ export async function removeFriend(friendId: string): Promise<void> {
     await delay()
     return
   }
-  await request<void>(`/friends/${friendId}`, { method: 'DELETE' })
+  await api.delete(`/friends/${friendId}`)
 }
 
 /** Chặn người dùng. */
@@ -175,7 +150,7 @@ export async function blockUser(userId: string): Promise<void> {
     await delay()
     return
   }
-  await request<void>(`/users/${userId}/block`, { method: 'POST' })
+  await api.post(`/users/${userId}/block`)
 }
 
 /** Tạo nhóm từ danh sách bạn bè đã chọn. */
@@ -184,7 +159,8 @@ export async function createGroup(payload: { name: string; memberIds: string[] }
     await delay(500)
     return { id: `mock-group-${++groupSeq}`, name: payload.name }
   }
-  return request<{ id: string; name: string }>('/groups', { method: 'POST', body: payload })
+  const res = await api.post<{ id: string; name: string }>('/groups', payload)
+  return res.data
 }
 
 /* ------------------------------------------------------------------ */
@@ -193,20 +169,20 @@ export async function createGroup(payload: { name: string; memberIds: string[] }
 
 /** Lấy danh sách hội thoại Inbox. */
 export async function getConversations(limit = 20): Promise<ConversationResponse[]> {
-  return request<ConversationResponse[]>(`/conversations?limit=${limit}`)
+  const res = await api.get<ConversationResponse[]>('/conversations', { params: { limit } })
+  return res.data
 }
 
 /** Lấy thông tin chi tiết một cuộc hội thoại. */
 export async function getConversationById(id: string): Promise<ConversationResponse> {
-  return request<ConversationResponse>(`/conversations/${id}`)
+  const res = await api.get<ConversationResponse>(`/conversations/${id}`)
+  return res.data
 }
 
 /** Tạo hoặc lấy cuộc hội thoại 1-1 với một user. */
 export async function getOrCreateDirectConversation(targetUserId: string): Promise<ConversationResponse> {
-  return request<ConversationResponse>('/conversations/direct', {
-    method: 'POST',
-    body: { targetUserId },
-  })
+  const res = await api.post<ConversationResponse>('/conversations/direct', { targetUserId })
+  return res.data
 }
 
 /** Lấy lịch sử tin nhắn trong cuộc hội thoại (phân trang con trỏ). */
@@ -215,10 +191,10 @@ export async function getConversationMessages(
   cursor?: string,
   limit = 30,
 ): Promise<MessageTimelineResponse> {
-  const query = new URLSearchParams()
-  query.set('limit', String(limit))
-  if (cursor) query.set('cursor', cursor)
-  return request<MessageTimelineResponse>(`/conversations/${conversationId}/messages?${query.toString()}`)
+  const res = await api.get<MessageTimelineResponse>(`/conversations/${conversationId}/messages`, {
+    params: { cursor, limit },
+  })
+  return res.data
 }
 
 /** Gửi tin nhắn mới vào cuộc hội thoại. */
@@ -226,10 +202,8 @@ export async function sendMessage(
   conversationId: string,
   payload: SendMessageDto,
 ): Promise<MessageResponse> {
-  return request<MessageResponse>(`/conversations/${conversationId}/messages`, {
-    method: 'POST',
-    body: payload,
-  })
+  const res = await api.post<MessageResponse>(`/conversations/${conversationId}/messages`, payload)
+  return res.data
 }
 
 /** Đánh dấu cuộc hội thoại đã đọc đến tin nhắn cụ thể. */
@@ -237,24 +211,17 @@ export async function markConversationRead(
   conversationId: string,
   lastReadMessageId: string,
 ): Promise<void> {
-  await request<void>(`/conversations/${conversationId}/read`, {
-    method: 'POST',
-    body: { lastReadMessageId },
-  })
+  await api.post(`/conversations/${conversationId}/read`, { lastReadMessageId })
 }
 
 /** Chỉnh sửa nội dung tin nhắn. */
 export async function editMessage(messageId: string, body: string): Promise<MessageResponse> {
-  return request<MessageResponse>(`/messages/${messageId}`, {
-    method: 'PATCH',
-    body: { body },
-  })
+  const res = await api.patch<MessageResponse>(`/messages/${messageId}`, { body })
+  return res.data
 }
 
 /** Thu hồi tin nhắn (soft delete). */
 export async function revokeMessage(messageId: string): Promise<MessageResponse> {
-  return request<MessageResponse>(`/messages/${messageId}`, {
-    method: 'DELETE',
-  })
+  const res = await api.delete<MessageResponse>(`/messages/${messageId}`)
+  return res.data
 }
-

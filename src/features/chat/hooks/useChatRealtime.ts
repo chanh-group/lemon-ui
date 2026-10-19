@@ -1,13 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { useAuth } from '@/app/providers/AuthProvider'
-import {
-  connectChatSocket,
-  disconnectChatSocket,
-  getChatSocket,
-  joinConversation,
-  leaveConversation,
-} from '@/lib/socket'
+import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
+import { useAuth } from '@/features/auth/api'
+import { connectChatSocket, disconnectChatSocket, getChatSocket, type SocketConnectionStatus } from '@/lib/socket'
 import { CHAT_QUERY_KEYS } from './useChatQueries'
 import { markConversationRead } from '../api/chat.api'
 import type {
@@ -21,39 +17,36 @@ import type {
 
 export function useChatRealtime(activeConversationId: string | null) {
   const { user, status } = useAuth()
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
   const [partnerTypingMap, setPartnerTypingMap] = useState<Record<string, boolean>>({})
+  const [connectionStatus, setConnectionStatus] = useState<SocketConnectionStatus>('connecting')
+  const userId = user?.id
 
   // 1. Quản lý kết nối socket theo trạng thái đăng nhập
   useEffect(() => {
-    if (status !== 'authenticated' || !user) {
+    if (status !== 'authenticated' || !userId) {
       disconnectChatSocket()
       return
     }
 
     connectChatSocket()
+  }, [status, userId])
 
-    return () => {
-      // Giữ kết nối khi đổi tab/page trong phiên đăng nhập
-    }
-  }, [status, user])
-
-  // 2. Quản lý tham gia / rời phòng chat khi activeConversationId thay đổi
-  useEffect(() => {
-    if (!activeConversationId || status !== 'authenticated') return
-
-    joinConversation(activeConversationId)
-
-    return () => {
-      leaveConversation(activeConversationId)
-    }
-  }, [activeConversationId, status])
-
-  // 3. Đăng ký các realtime event listeners
+  // 2. Đăng ký realtime event listeners
   useEffect(() => {
     if (status !== 'authenticated') return
 
     const socket = getChatSocket()
+    const handleConnect = () => setConnectionStatus('connected')
+    const handleDisconnect = () => setConnectionStatus('disconnected')
+    const handleConnectError = () => setConnectionStatus('error')
+    const handleReconnectAttempt = () => setConnectionStatus('connecting')
+
+    socket.on('connect', handleConnect)
+    socket.on('disconnect', handleDisconnect)
+    socket.on('connect_error', handleConnectError)
+    socket.io.on('reconnect_attempt', handleReconnectAttempt)
 
     // A. Nhận tin nhắn mới
     const handleNewMessage = (msg: MessageResponse) => {
@@ -75,28 +68,42 @@ export function useChatRealtime(activeConversationId: string | null) {
       )
 
       // Cập nhật conversations list
-      queryClient.setQueryData<ConversationResponse[]>(
-        CHAT_QUERY_KEYS.conversations,
-        (old) => {
-          if (!old) return old
-          return old.map((c) => {
-            if (c.id === convId) {
+      const conversations = queryClient.getQueryData<ConversationResponse[]>(CHAT_QUERY_KEYS.conversations)
+      if (conversations?.some((conversation) => conversation.id === convId)) {
+        queryClient.setQueryData<ConversationResponse[]>(
+          CHAT_QUERY_KEYS.conversations,
+          (old) =>
+            old?.map((conversation) => {
+              if (conversation.id !== convId) return conversation
               const isCurrentActive = convId === activeConversationId
               return {
-                ...c,
+                ...conversation,
                 lastMessagePreview: msg.deletedAt ? 'Tin nhắn đã bị thu hồi' : (msg.body ?? ''),
                 lastMessageAt: msg.createdAt,
-                unreadCount: isCurrentActive || msg.senderId === user?.id ? c.unreadCount : (c.unreadCount || 0) + 1,
+                unreadCount:
+                  isCurrentActive || msg.senderId === userId
+                    ? conversation.unreadCount
+                    : (conversation.unreadCount || 0) + 1,
               }
-            }
-            return c
-          })
-        },
-      )
+            }),
+        )
+      } else {
+        void queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.conversations })
+      }
 
       // Nếu đang mở đúng conversation này và tin nhắn do đối phương gửi -> Đánh dấu đã đọc
-      if (convId === activeConversationId && user?.id && msg.senderId !== user.id) {
-        markConversationRead(convId, msg.id).catch(() => {})
+      if (convId === activeConversationId && userId && msg.senderId !== userId) {
+        void markConversationRead(convId, msg.id)
+          .then(() => {
+            queryClient.setQueryData<ConversationResponse[]>(CHAT_QUERY_KEYS.conversations, (old) =>
+              old?.map((conversation) =>
+                conversation.id === convId ? { ...conversation, unreadCount: 0 } : conversation,
+              ),
+            )
+          })
+          .catch((error: unknown) => {
+            toast.error(error instanceof Error ? error.message : t('chat.markReadError'))
+          })
       }
     }
 
@@ -115,14 +122,7 @@ export function useChatRealtime(activeConversationId: string | null) {
         },
       )
 
-      // Cập nhật preview nếu là tin nhắn cuối
-      queryClient.setQueryData<ConversationResponse[]>(
-        CHAT_QUERY_KEYS.conversations,
-        (old) => {
-          if (!old) return old
-          return old.map((c) => (c.id === updated.conversationId ? { ...c, lastMessagePreview: updated.body } : c))
-        },
-      )
+      void queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.conversations })
     }
 
     // C. Tin nhắn bị thu hồi
@@ -140,20 +140,12 @@ export function useChatRealtime(activeConversationId: string | null) {
         },
       )
 
-      queryClient.setQueryData<ConversationResponse[]>(
-        CHAT_QUERY_KEYS.conversations,
-        (old) => {
-          if (!old) return old
-          return old.map((c) =>
-            c.id === revoked.conversationId ? { ...c, lastMessagePreview: 'Tin nhắn đã bị thu hồi' } : c,
-          )
-        },
-      )
+      void queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.conversations })
     }
 
     // D. Đối phương đang gõ phím
     const handleTyping = (data: TypingEventPayload) => {
-      if (data.userId === user?.id) return
+      if (data.userId === userId) return
       setPartnerTypingMap((prev) => ({
         ...prev,
         [data.conversationId]: data.isTyping,
@@ -173,17 +165,22 @@ export function useChatRealtime(activeConversationId: string | null) {
     socket.on('read:updated', handleReadUpdated)
 
     return () => {
+      socket.off('connect', handleConnect)
+      socket.off('disconnect', handleDisconnect)
+      socket.off('connect_error', handleConnectError)
+      socket.io.off('reconnect_attempt', handleReconnectAttempt)
       socket.off('message:new', handleNewMessage)
       socket.off('message:updated', handleMessageUpdated)
       socket.off('message:revoked', handleMessageRevoked)
       socket.off('typing', handleTyping)
       socket.off('read:updated', handleReadUpdated)
     }
-  }, [status, activeConversationId, user?.id, queryClient])
+  }, [status, activeConversationId, userId, queryClient, t])
 
   const isPartnerTyping = Boolean(activeConversationId && partnerTypingMap[activeConversationId])
 
   return {
     isPartnerTyping,
+    connectionStatus,
   }
 }

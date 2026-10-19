@@ -14,12 +14,13 @@ const ChevronRight = createIcon(ChevronRightData)
 const Phone = createIcon(PhoneData)
 const X = createIcon(XData)
 import { useTranslation } from 'react-i18next'
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ROUTES } from '@/config/constants'
-import { useAuth } from '@/app/providers/AuthProvider'
+import { useAuth } from '@/features/auth/api'
 import { avatarColor, initials } from '../data/mockData'
 import { useFriendRequests } from '../hooks/useFriends'
 import { storyDisplayName, storyTime } from '../data/storiesData'
@@ -108,7 +109,13 @@ export function MiddlePanel({
   }
   const activeMeta = meta[tab]
   // Badge trên nút soạn tin = số lời mời kết bạn NHẬN VỀ (lời đi không tính)
-  const { data: requests } = useFriendRequests()
+  const requestsQuery = useFriendRequests()
+  const { data: requests } = requestsQuery
+  useEffect(() => {
+    if (requestsQuery.isError) {
+      toast.error(requestsQuery.error instanceof Error ? requestsQuery.error.message : t('chat.friendRequestsLoadError'))
+    }
+  }, [requestsQuery.isError, requestsQuery.error, t])
   const incomingRequests = requests?.incoming.length ?? 0
   // Story theo tên người gửi — 1-1 mới bọc ring/bubble (Messenger không cho group)
   const storyByName = useMemo(() => new Map(stories.map((s) => [s.name, s])), [stories])

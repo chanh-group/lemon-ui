@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { queryKeys } from '@/infrastructure/query/keys'
 import { createMediaStory, createTextStory, listStories, type CreateMediaStoryPayload, type CreateTextStoryPayload } from '../api/stories.api'
 
-const STORIES_KEY = ['chat', 'stories'] as const
+const STORIES_KEY = queryKeys.chat.stories
 
 export function useStoriesList() {
   return useQuery({

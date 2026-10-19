@@ -1,4 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
+import { queryKeys } from '@/infrastructure/query/keys'
 import {
   getConversations,
   getConversationMessages,
@@ -15,10 +18,7 @@ import type {
   MessageTimelineResponse,
 } from '../types/chat.types'
 
-export const CHAT_QUERY_KEYS = {
-  conversations: ['conversations'] as const,
-  messages: (conversationId: string) => ['messages', conversationId] as const,
-}
+export const CHAT_QUERY_KEYS = queryKeys.chat
 
 /** Hook lấy danh sách hội thoại Inbox */
 export function useConversationsQuery() {
@@ -33,7 +33,7 @@ export function useConversationsQuery() {
 /** Hook lấy lịch sử tin nhắn của một cuộc hội thoại */
 export function useConversationMessagesQuery(conversationId: string | null) {
   return useQuery<MessageTimelineResponse>({
-    queryKey: conversationId ? CHAT_QUERY_KEYS.messages(conversationId) : ['messages', 'none'],
+    queryKey: CHAT_QUERY_KEYS.messages(conversationId ?? 'none'),
     queryFn: () => {
       if (!conversationId) {
         return Promise.resolve({ items: [], hasMore: false })
@@ -124,6 +124,7 @@ export function useCreateDirectChatMutation() {
 /** Hook đánh dấu đã đọc */
 export function useMarkReadMutation() {
   const queryClient = useQueryClient()
+  const { t } = useTranslation()
 
   return useMutation({
     mutationFn: ({ conversationId, lastReadMessageId }: { conversationId: string; lastReadMessageId: string }) =>
@@ -137,6 +138,9 @@ export function useMarkReadMutation() {
           return old.map((conv) => (conv.id === conversationId ? { ...conv, unreadCount: 0 } : conv))
         },
       )
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : t('chat.markReadError'))
     },
   })
 }
@@ -164,4 +168,3 @@ export function useRevokeMessageMutation(conversationId: string | null) {
     },
   })
 }
-

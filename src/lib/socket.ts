@@ -1,25 +1,26 @@
 import { io, type Socket } from 'socket.io-client'
-import { getAccessToken } from './token-manager'
+import { env } from '@/config/env'
+import { useAuthStore } from '@/infrastructure/auth/auth-store'
 
 let socket: Socket | null = null
 let pingTimer: ReturnType<typeof setInterval> | null = null
 
-function getSocketUrl(): string {
-  // Trỏ trực tiếp backend port 3000 hoặc dùng origin nếu proxy
-  return import.meta.env.VITE_WS_URL || 'http://localhost:3000'
+export type SocketConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'error'
+
+function getSocketUrl(): string | undefined {
+  return env.WS_URL.trim() || undefined
 }
 
 /**
  * Khởi tạo hoặc lấy Socket singleton instance với handshake auth token.
  */
 export function getChatSocket(): Socket {
-  const token = getAccessToken()
-
   if (!socket) {
     socket = io(getSocketUrl(), {
-      auth: { token },
+      auth: (callback) => callback({ token: useAuthStore.getState().accessToken }),
       transports: ['websocket', 'polling'],
       autoConnect: false,
+      withCredentials: true,
     })
 
     socket.on('connect', () => {
@@ -43,9 +44,6 @@ export function getChatSocket(): Socket {
       // Token expired or invalid
       console.warn('[Socket] Connect error:', err.message)
     })
-  } else {
-    // Cập nhật auth token mới nếu token thay đổi
-    socket.auth = { token }
   }
 
   return socket
@@ -56,9 +54,6 @@ export function getChatSocket(): Socket {
  */
 export function connectChatSocket(): Socket {
   const s = getChatSocket()
-  const token = getAccessToken()
-  s.auth = { token }
-
   if (!s.connected) {
     s.connect()
   }
@@ -76,26 +71,6 @@ export function disconnectChatSocket(): void {
   if (socket) {
     socket.disconnect()
     socket = null
-  }
-}
-
-/**
- * Tham gia room cuộc hội thoại
- */
-export function joinConversation(conversationId: string): void {
-  const s = getChatSocket()
-  if (s.connected) {
-    s.emit('conv:join', { conversationId })
-  }
-}
-
-/**
- * Rời room cuộc hội thoại
- */
-export function leaveConversation(conversationId: string): void {
-  const s = getChatSocket()
-  if (s.connected) {
-    s.emit('conv:leave', { conversationId })
   }
 }
 
@@ -118,4 +93,3 @@ export function emitTypingStop(conversationId: string): void {
     s.emit('typing:stop', { conversationId })
   }
 }
-

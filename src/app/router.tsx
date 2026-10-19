@@ -1,6 +1,6 @@
 import { createBrowserRouter, Navigate, useLocation } from 'react-router-dom'
 import type { ReactNode } from 'react'
-import { useAuth } from '@/app/providers/AuthProvider'
+import { useAuth } from '@/features/auth/api'
 import { ROUTES } from '@/config/constants'
 import { LoginPage } from '@/pages/LoginPage'
 import { RegisterPage } from '@/pages/RegisterPage'

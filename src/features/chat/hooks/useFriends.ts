@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { queryKeys } from '@/infrastructure/query/keys'
 import {
   acceptFriendRequest,
   blockUser,
@@ -12,7 +13,7 @@ import {
   sendFriendRequest,
 } from '../api/chat.api'
 
-const FRIEND_REQUESTS_KEY = ['chat', 'friend-requests'] as const
+const FRIEND_REQUESTS_KEY = queryKeys.chat.friendRequests
 
 /** Lời mời kết bạn:incoming chờ xử lý + outgoing đang chờ đối phương. */
 export function useFriendRequests() {
@@ -56,10 +57,20 @@ export function useCreateGroup() {
   return useMutation({ mutationFn: createGroup })
 }
 
-export function useFindUserByUsername() {
-  return useMutation({ mutationFn: findUserByUsername })
+export function useFindUserByUsername(query: string) {
+  return useQuery({
+    queryKey: queryKeys.chat.userSearch('username', query),
+    queryFn: () => findUserByUsername(query),
+    enabled: query.length >= 2,
+    staleTime: 30_000,
+  })
 }
 
-export function useFindUserByEmail() {
-  return useMutation({ mutationFn: findUserByEmail })
+export function useFindUserByEmail(query: string) {
+  return useQuery({
+    queryKey: queryKeys.chat.userSearch('email', query),
+    queryFn: () => findUserByEmail(query),
+    enabled: query.length >= 2,
+    staleTime: 30_000,
+  })
 }

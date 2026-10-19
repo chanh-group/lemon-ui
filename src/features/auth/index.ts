@@ -5,7 +5,8 @@ export {
   signupInfoSchema,
   signupSchema,
   resetPasswordSchema,
-} from './schemas/auth.schema'
+  forgotOtpSchema,
+} from '@/domain/auth'
 export type {
   LoginInput,
   RequestOtpInput,
@@ -13,9 +14,15 @@ export type {
   SignupInfoInput,
   SignupInput,
   ResetPasswordInput,
-} from './schemas/auth.schema'
+  ForgotOtpInput,
+  AuthUser,
+  VerificationErrorCode,
+  SignupStep,
+  ForgotStep,
+} from '@/domain/auth'
 export {
   useAuth,
+  useMe,
   useLogin,
   useRequestOtp,
   useVerifyOtpEarly,
@@ -23,7 +30,6 @@ export {
   useAutoSignin,
   useForgotPassword,
   useResetPassword,
-  useResendOtp,
   useLogout,
 } from './hooks/useAuth'
 export { useOtpCountdown, formatCountdown } from './hooks/useOtpCountdown'
@@ -31,17 +37,3 @@ export { LoginForm } from './components/LoginForm'
 export { SignupWizard, EmailStep, OtpStep, InfoStep } from './components/signup'
 export { ForgotPasswordWizard, ResetPasswordStep } from './components/forgot'
 export { OtpInputGroup, VerificationMessage } from './components/otp'
-export type {
-  User,
-  AuthSession,
-  VerificationErrorCode,
-  RequestOtpPayload,
-  VerifyOtpEarlyPayload,
-  SignupPayload,
-  ResetPasswordPayload,
-  ResendOtpPayload,
-  LoginPayload,
-  RegisterPayload,
-  SignupStep,
-  ForgotStep,
-} from './types/auth.types'

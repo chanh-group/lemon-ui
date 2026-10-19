@@ -5,8 +5,7 @@ import {
   MAX_OTP_ATTEMPTS,
   OTP_TTL_MS,
 } from '@/config/constants'
-import type { SignupStep, SignupPayload } from '@/features/auth/types/auth.types'
-import type { SignupInfoInput } from '@/features/auth/schemas/auth.schema'
+import type { SignupStep, SignupInput, SignupInfoInput } from '@/domain/auth'
 import {
   useAutoSignin,
   useRequestOtp,
@@ -122,7 +121,7 @@ export function SignupWizard() {
   }
 
   const handleSignup = (values: SignupInfoInput) => {
-    const payload: SignupPayload = {
+    const payload: SignupInput = {
       email,
       fullName: values.fullName,
       username: values.username,

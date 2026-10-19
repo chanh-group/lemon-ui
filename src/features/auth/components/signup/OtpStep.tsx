@@ -15,7 +15,7 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { OtpInputGroup } from '@/features/auth/components/otp'
-import { verifyOtpSchema, type VerifyOtpInput } from '@/features/auth/schemas/auth.schema'
+import { verifyOtpSchema, type VerifyOtpInput } from '@/domain/auth'
 import { formatCountdown } from '@/features/auth/hooks/useOtpCountdown'
 
 type OtpStepProps = {

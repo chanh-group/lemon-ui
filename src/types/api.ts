@@ -1,18 +1,14 @@
-export interface ApiError {
+/** Envelope LemonCore — success (`utils/response.ts`) + error (`ErrorFilter`). */
+export interface SuccessEnvelope<T = unknown> {
+  success: true
   message: string
-  status: number
-  code?: string
-  fieldErrors?: Record<string, string[]>
+  data?: T
 }
 
-export interface ApiResponse<T> {
-  data: T
-  message?: string
+export interface ErrorEnvelope {
+  success: false
+  code: string
+  message: string
 }
 
-export interface PaginatedResponse<T> {
-  data: T[]
-  total: number
-  page: number
-  limit: number
-}
+export type ApiEnvelope<T = unknown> = SuccessEnvelope<T> | ErrorEnvelope
