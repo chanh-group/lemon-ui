@@ -155,8 +155,36 @@ export async function listStories(currentUserId?: string): Promise<StoryEntry[]>
     return storyStore.map((s) => ({ ...s }))
   }
   try {
-    const res = await api.get<BackendStoryResponse[]>('/stories/feed')
-    return (res.data ?? []).map((item) => mapBackendStoryToEntry(item, currentUserId))
+    const res = await api.get<any[]>('/stories/feed')
+    const raw = res.data ?? []
+    const flattened: StoryEntry[] = []
+
+    for (const group of raw) {
+      if (group && typeof group === 'object' && 'stories' in group && Array.isArray(group.stories)) {
+        for (const item of group.stories) {
+          flattened.push({
+            id: item.id,
+            name: group.user?.fullName || item.caption?.slice(0, 18) || 'Story',
+            time: formatRelativeTime(item.createdAt),
+            viewed: Boolean(item.hasViewed),
+            mine: currentUserId ? item.userId === currentUserId : false,
+            online: true,
+            authorId: item.userId,
+            authorAvatar: group.user?.avatarUrl,
+            kind: item.kind === 'TEXT' ? 'TEXT' : 'MEDIA',
+            caption: item.caption,
+            background: item.background,
+            viewsCount: 0,
+            reactionsCount: item.reactionsCount ?? 0,
+            viewerReaction: item.myReaction ?? null,
+            viewerHasViewed: Boolean(item.hasViewed),
+          })
+        }
+      } else {
+        flattened.push(mapBackendStoryToEntry(group as BackendStoryResponse, currentUserId))
+      }
+    }
+    return flattened
   } catch {
     const res = await api.get<BackendStoryResponse[]>('/stories')
     return (res.data ?? []).map((item) => mapBackendStoryToEntry(item, currentUserId))
@@ -234,8 +262,11 @@ export async function reactStory(storyId: string, reaction: StoryReactionType | 
     })
     return { success: true, reaction }
   }
-  const res = await api.post<{ id: string; reaction: string }>(`/stories/${storyId}/react`, { reaction })
-  return { success: true, reaction: res.data?.reaction ?? reaction }
+  const res = await api.post<{ id: string; emoji?: string; reaction?: string }>(`/stories/${storyId}/react`, {
+    emoji: reaction,
+    reaction,
+  })
+  return { success: true, reaction: res.data?.emoji ?? res.data?.reaction ?? reaction }
 }
 
 /** Gỡ cảm xúc khỏi Story. */
@@ -308,7 +339,10 @@ export async function replyStory(storyId: string, payload: ReplyStoryPayload): P
       recipientId: story?.authorId ?? 'recipient',
     }
   }
-  const res = await api.post<StoryReplyResponse>(`/stories/${storyId}/reply`, payload)
+  const res = await api.post<StoryReplyResponse>(`/stories/${storyId}/reply`, {
+    body: payload.content,
+    content: payload.content,
+  })
   return res.data
 }
 
@@ -328,6 +362,11 @@ export async function getStoryViews(storyId: string): Promise<StoryViewerItem[]>
     await delay(100)
     return []
   }
-  const res = await api.get<StoryViewerItem[]>(`/stories/${storyId}/views`)
-  return res.data ?? []
+  try {
+    const res = await api.get<StoryViewerItem[]>(`/stories/${storyId}/viewers`)
+    return res.data ?? []
+  } catch {
+    const res = await api.get<StoryViewerItem[]>(`/stories/${storyId}/views`)
+    return res.data ?? []
+  }
 }
