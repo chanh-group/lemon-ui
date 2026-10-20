@@ -307,24 +307,24 @@ export function StoryViewer({
         </header>
 
         {/* Khung giữa: Nút Previous + Card 9:16 + Nút Next */}
-        <div className="flex items-center justify-center w-full flex-1 relative my-auto px-2">
+        <div className="flex items-center justify-center w-full flex-1 relative px-2 min-h-0 py-1">
           {hasPrev ? (
             <button
               type="button"
               onClick={handlePrevStory}
               aria-label="Story trước"
               title="Story trước (Phím ←)"
-              className="hidden md:grid size-12 lg:size-14 place-items-center rounded-full bg-[#242526]/90 hover:bg-[#3a3b3c] text-white shadow-2xl transition-all hover:scale-110 active:scale-95 cursor-pointer mr-4 lg:mr-8 xl:mr-10 shrink-0 ring-1 ring-white/15"
+              className="hidden md:grid size-11 lg:size-12 place-items-center rounded-full bg-[#242526]/90 hover:bg-[#3a3b3c] text-white shadow-2xl transition-all hover:scale-110 active:scale-95 cursor-pointer mr-3 lg:mr-6 shrink-0 ring-1 ring-white/15"
             >
-              <ArrowLeft className="size-6 lg:size-7" aria-hidden="true" />
+              <ArrowLeft className="size-5 lg:size-6" aria-hidden="true" />
             </button>
           ) : (
-            <div className="hidden md:block w-12 lg:w-14 mr-4 lg:mr-8 xl:mr-10 shrink-0" />
+            <div className="hidden md:block w-11 lg:w-12 mr-3 lg:mr-6 shrink-0" />
           )}
 
           {/* Story Card Lớn Chuẩn Facebook Desktop — Tối ưu hóa kích thước dài & rộng */}
           <div
-            className="story-card relative flex h-[calc(100dvh-100px)] max-h-[920px] min-h-[580px] w-auto aspect-[9/16] min-w-[340px] sm:min-w-[420px] md:min-w-[460px] lg:min-w-[500px] xl:min-w-[520px] max-w-[560px] flex-col overflow-hidden rounded-2xl md:rounded-3xl bg-neutral-950 shadow-2xl shadow-black ring-1 ring-white/20 transition-all select-none"
+            className="story-card relative flex h-[calc(100dvh-120px)] max-h-[840px] aspect-[9/16] w-auto max-w-[calc(100vw-32px)] flex-col overflow-hidden rounded-2xl md:rounded-3xl bg-neutral-950 shadow-2xl shadow-black ring-1 ring-white/20 transition-all select-none"
             onMouseEnter={() => setIsPaused(true)}
             onMouseLeave={() => {
               if (!draft.trim()) setIsPaused(false)
@@ -341,16 +341,16 @@ export function StoryViewer({
               ) : (
                 <div
                   className={cn(
-                    'relative flex h-full w-full flex-col items-center justify-center px-8 py-28 text-center bg-linear-to-br',
+                    'relative flex h-full w-full flex-col items-center justify-center px-6 py-20 text-center bg-linear-to-br',
                     story.background || TEXT_STORY_BG,
                   )}
                 >
-                  <BrandMark animated={false} className="size-20 md:size-24 mb-8 drop-shadow-2xl opacity-95 transition-transform hover:scale-105" />
-                  <p className="text-2xl sm:text-3xl md:text-4xl lg:text-[38px] font-extrabold text-white leading-relaxed drop-shadow-xl max-w-md px-6 wrap-break-word text-center">
+                  <BrandMark animated={false} className="size-16 sm:size-20 mb-6 drop-shadow-2xl opacity-95 transition-transform hover:scale-105" />
+                  <p className="text-xl sm:text-2xl md:text-3xl font-extrabold text-white leading-snug drop-shadow-xl max-w-xs px-2 wrap-break-word text-center">
                     {story.caption || t('chat.storyGreeting', { name: story.name })}
                   </p>
                   {!story.caption && (
-                    <p className="mt-5 text-sm sm:text-base md:text-lg text-white/90 max-w-sm drop-shadow-md text-center">
+                    <p className="mt-4 text-xs sm:text-sm text-white/90 max-w-xs drop-shadow-md text-center">
                       {t('chat.storyBody')}
                     </p>
                   )}
@@ -480,21 +480,21 @@ export function StoryViewer({
               onClick={handleNextStory}
               aria-label="Story tiếp theo"
               title="Story tiếp theo (Phím →)"
-              className="hidden md:grid size-12 lg:size-14 place-items-center rounded-full bg-[#242526]/90 hover:bg-[#3a3b3c] text-white shadow-2xl transition-all hover:scale-110 active:scale-95 cursor-pointer ml-4 lg:ml-8 xl:ml-10 shrink-0 ring-1 ring-white/15"
+              className="hidden md:grid size-11 lg:size-12 place-items-center rounded-full bg-[#242526]/90 hover:bg-[#3a3b3c] text-white shadow-2xl transition-all hover:scale-110 active:scale-95 cursor-pointer ml-3 lg:ml-6 shrink-0 ring-1 ring-white/15"
             >
-              <ArrowRight className="size-6 lg:size-7" aria-hidden="true" />
+              <ArrowRight className="size-5 lg:size-6" aria-hidden="true" />
             </button>
           ) : (
-            <div className="hidden md:block w-12 lg:w-14 ml-4 lg:ml-8 xl:ml-10 shrink-0" />
+            <div className="hidden md:block w-11 lg:w-12 ml-3 lg:ml-6 shrink-0" />
           )}
         </div>
 
         {/* Bottom Interaction Dock — Rộng rãi khớp với khung Story Card */}
-        <footer className="w-full max-w-[560px] md:max-w-[600px] lg:max-w-[680px] flex items-center justify-center gap-2 sm:gap-3 pt-2 pb-2.5 px-3 z-20 pointer-events-auto shrink-0">
+        <footer className="w-full max-w-[480px] flex items-center justify-center gap-2 pt-2 pb-2.5 px-3 z-20 pointer-events-auto shrink-0">
           {!story.mine ? (
             <>
               {/* Form phản hồi */}
-              <form onSubmit={handleSendReply} className="flex-1 min-w-[180px] max-w-[340px]">
+              <form onSubmit={handleSendReply} className="flex-1 min-w-[130px] max-w-[220px]">
                 <label className="flex h-11 items-center rounded-full bg-[#18191a]/85 hover:bg-[#242526] focus-within:bg-[#242526] border border-white/20 focus-within:border-white/50 px-4 text-white text-sm backdrop-blur-md transition-all shadow-lg cursor-text">
                   <input
                     ref={replyInputRef}
@@ -803,7 +803,7 @@ export function StoryViewer({
         </header>
 
         {/* Khung giữa: Nút Previous + Card 9:16 + Nút Next */}
-        <div className="flex items-center justify-center w-full flex-1 relative my-auto">
+        <div className="flex items-center justify-center w-full flex-1 relative px-2 min-h-0 py-1">
           {/* Nút mũi tên Previous ngoài khung story */}
           {hasPrev ? (
             <button
@@ -811,17 +811,17 @@ export function StoryViewer({
               onClick={handlePrevStory}
               aria-label="Story trước"
               title="Story trước (Phím ←)"
-              className="hidden md:grid size-12 place-items-center rounded-full bg-[#242526]/90 hover:bg-[#3a3b3c] text-white shadow-2xl transition-all hover:scale-110 active:scale-95 cursor-pointer mr-4 lg:mr-8 shrink-0 ring-1 ring-white/10"
+              className="hidden md:grid size-11 lg:size-12 place-items-center rounded-full bg-[#242526]/90 hover:bg-[#3a3b3c] text-white shadow-2xl transition-all hover:scale-110 active:scale-95 cursor-pointer mr-3 lg:mr-6 shrink-0 ring-1 ring-white/10"
             >
-              <ArrowLeft className="size-6" aria-hidden="true" />
+              <ArrowLeft className="size-5 lg:size-6" aria-hidden="true" />
             </button>
           ) : (
-            <div className="hidden md:block w-12 mr-4 lg:mr-8 shrink-0" />
+            <div className="hidden md:block w-11 lg:w-12 mr-3 lg:mr-6 shrink-0" />
           )}
 
           {/* Story Card Lớn Chuẩn Facebook Desktop */}
           <div
-            className="story-card relative flex h-[calc(100dvh-100px)] max-h-[920px] min-h-[580px] w-auto aspect-[9/16] min-w-[340px] sm:min-w-[420px] md:min-w-[460px] lg:min-w-[500px] xl:min-w-[520px] max-w-[560px] flex-col overflow-hidden rounded-2xl md:rounded-3xl bg-neutral-950 shadow-2xl shadow-black ring-1 ring-white/20 transition-all select-none"
+            className="story-card relative flex h-[calc(100dvh-120px)] max-h-[840px] aspect-[9/16] w-auto max-w-[calc(100vw-32px)] flex-col overflow-hidden rounded-2xl md:rounded-3xl bg-neutral-950 shadow-2xl shadow-black ring-1 ring-white/20 transition-all select-none"
             onMouseEnter={() => setIsPaused(true)}
             onMouseLeave={() => {
               if (!draft.trim()) setIsPaused(false)
@@ -838,16 +838,16 @@ export function StoryViewer({
               ) : (
                 <div
                   className={cn(
-                    'relative flex h-full w-full flex-col items-center justify-center px-8 py-28 text-center bg-linear-to-br',
+                    'relative flex h-full w-full flex-col items-center justify-center px-6 py-20 text-center bg-linear-to-br',
                     story.background || TEXT_STORY_BG,
                   )}
                 >
-                  <BrandMark animated={false} className="size-20 md:size-24 mb-8 drop-shadow-2xl opacity-95 transition-transform hover:scale-105" />
-                  <p className="text-2xl sm:text-3xl md:text-4xl lg:text-[38px] font-extrabold text-white leading-relaxed drop-shadow-xl max-w-md px-6 wrap-break-word text-center">
+                  <BrandMark animated={false} className="size-16 sm:size-20 mb-6 drop-shadow-2xl opacity-95 transition-transform hover:scale-105" />
+                  <p className="text-xl sm:text-2xl md:text-3xl font-extrabold text-white leading-snug drop-shadow-xl max-w-xs px-2 wrap-break-word text-center">
                     {story.caption || t('chat.storyGreeting', { name: story.name })}
                   </p>
                   {!story.caption && (
-                    <p className="mt-5 text-sm sm:text-base md:text-lg text-white/90 max-w-sm drop-shadow-md text-center">
+                    <p className="mt-4 text-xs sm:text-sm text-white/90 max-w-xs drop-shadow-md text-center">
                       {t('chat.storyBody')}
                     </p>
                   )}
@@ -977,23 +977,23 @@ export function StoryViewer({
               onClick={handleNextStory}
               aria-label="Story tiếp theo"
               title="Story tiếp theo (Phím →)"
-              className="hidden md:grid size-12 place-items-center rounded-full bg-[#242526]/90 hover:bg-[#3a3b3c] text-white shadow-2xl transition-all hover:scale-110 active:scale-95 cursor-pointer ml-4 lg:ml-8 shrink-0 ring-1 ring-white/10"
+              className="hidden md:grid size-11 lg:size-12 place-items-center rounded-full bg-[#242526]/90 hover:bg-[#3a3b3c] text-white shadow-2xl transition-all hover:scale-110 active:scale-95 cursor-pointer ml-3 lg:ml-6 shrink-0 ring-1 ring-white/10"
             >
-              <ArrowRight className="size-6" aria-hidden="true" />
+              <ArrowRight className="size-5 lg:size-6" aria-hidden="true" />
             </button>
           ) : (
-            <div className="hidden md:block w-12 ml-4 lg:ml-8 shrink-0" />
+            <div className="hidden md:block w-11 lg:w-12 ml-3 lg:ml-6 shrink-0" />
           )}
         </div>
 
         {/* =========================================================================
             BOTTOM INTERACTION DOCK: NẰM DƯỚI CÙNG CARD KIỂU FACEBOOK WEB
            ========================================================================= */}
-        <footer className="w-full max-w-[620px] flex items-center justify-center gap-3 pt-2 pb-1 px-2 z-20 pointer-events-auto">
+        <footer className="w-full max-w-[480px] flex items-center justify-center gap-2 pt-2 pb-2.5 px-3 z-20 pointer-events-auto">
           {!story.mine ? (
             <>
               {/* Thanh gõ tin nhắn phản hồi story 1:1 kiểu Facebook */}
-              <form onSubmit={handleSendReply} className="flex-1 min-w-[200px] max-w-[340px]">
+              <form onSubmit={handleSendReply} className="flex-1 min-w-[130px] max-w-[220px]">
                 <label className="flex h-11 items-center rounded-full bg-[#18191a]/85 hover:bg-[#242526] focus-within:bg-[#242526] border border-white/20 focus-within:border-white/50 px-4 text-white text-sm backdrop-blur-md transition-all shadow-lg cursor-text">
                   <input
                     ref={replyInputRef}
