@@ -31,6 +31,7 @@ interface MiddlePanelProps {
   calls: CallEntry[]
   stories: StoryEntry[]
   selectedId: string | null
+  activeStoryId?: string | null
   query: string
   onQuery: (q: string) => void
   onSelectConversation: (id: string) => void
@@ -91,6 +92,7 @@ export function MiddlePanel({
   calls,
   stories,
   selectedId,
+  activeStoryId,
   query,
   onQuery,
   onSelectConversation,
@@ -323,7 +325,7 @@ export function MiddlePanel({
           </>
         )}
 
-        {tab === 'stories' && <StoriesTab stories={stories} onOpenStory={onOpenStory} onOpenCreate={() => navigate(ROUTES.storiesCreate)} />}
+        {tab === 'stories' && <StoriesTab stories={stories} activeStoryId={activeStoryId} onOpenStory={onOpenStory} onOpenCreate={() => navigate(ROUTES.storiesCreate)} />}
       </div>
     </section>
   )
@@ -331,12 +333,13 @@ export function MiddlePanel({
 
 interface StoriesTabProps {
   stories: StoryEntry[]
+  activeStoryId?: string | null
   onOpenStory: (story: StoryEntry) => void
   onOpenCreate: () => void
 }
 
 /** Tab Stories — danh sách DỌC kiểu Messenger/FB: hàng "Tin của bạn" + từng hàng tin của bạn bè. */
-function StoriesTab({ stories, onOpenStory, onOpenCreate }: StoriesTabProps) {
+function StoriesTab({ stories, activeStoryId, onOpenStory, onOpenCreate }: StoriesTabProps) {
   const { t } = useTranslation()
   const { user } = useAuth()
   const userName = user?.fullName ?? 'Nguyên Đào Trọng'
@@ -352,7 +355,12 @@ function StoriesTab({ stories, onOpenStory, onOpenCreate }: StoriesTabProps) {
           type="button"
           onClick={myStory ? () => onOpenStory(myStory) : onOpenCreate}
           aria-label={myStory ? t('chat.yourStory') : t('chat.createStoryTitle')}
-          className="chat-item group flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-all duration-150 hover:translate-x-0.5 hover:bg-muted"
+          className={cn(
+            'chat-item group flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-all duration-150',
+            myStory && myStory.id === activeStoryId
+              ? 'bg-muted ring-1 ring-border shadow-xs'
+              : 'hover:translate-x-0.5 hover:bg-muted',
+          )}
         >
           <span
             aria-hidden="true"
@@ -395,14 +403,21 @@ function StoriesTab({ stories, onOpenStory, onOpenCreate }: StoriesTabProps) {
           <EmptyState title={t('chat.noStories')} message={t('chat.storiesEmpty')} />
         </li>
       ) : (
-        friendStories.map((s) => (
-          <li key={s.id}>
-            <button
-              type="button"
-              onClick={() => onOpenStory(s)}
-              aria-label={`${t('chat.storyOf', { name: s.name })}, ${storyTime(s, t('chat.now'))}`}
-              className="chat-item group flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-all duration-150 hover:translate-x-0.5 hover:bg-muted"
-            >
+        friendStories.map((s) => {
+          const isSelected = s.id === activeStoryId
+          return (
+            <li key={s.id}>
+              <button
+                type="button"
+                onClick={() => onOpenStory(s)}
+                aria-label={`${t('chat.storyOf', { name: s.name })}, ${storyTime(s, t('chat.now'))}`}
+                className={cn(
+                  'chat-item group flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-all duration-150',
+                  isSelected
+                    ? 'bg-muted ring-1 ring-border shadow-xs'
+                    : 'hover:translate-x-0.5 hover:bg-muted',
+                )}
+              >
               <span
                 aria-hidden="true"
                 className={cn(
@@ -419,7 +434,8 @@ function StoriesTab({ stories, onOpenStory, onOpenCreate }: StoriesTabProps) {
               </span>
             </button>
           </li>
-        ))
+          )
+        })
       )}
     </ul>
   )

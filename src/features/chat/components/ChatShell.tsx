@@ -57,6 +57,9 @@ export function ChatShell() {
     [readIds],
   )
 
+  // Khi ở tab stories, nếu chưa bấm story nào thì tự động hiển thị story đầu tiên
+  const currentStory = tab === 'stories' ? (viewingStory ?? stories[0] ?? null) : null
+
   const selected = MOCK_CONVERSATIONS.find((c) => c.id === selectedId) ?? null
   const groups: DayGroup[] = selected ? (threads[selected.id] ?? []) : []
 
@@ -80,6 +83,9 @@ export function ChatShell() {
         onChange={(t) => {
           setTab(t)
           setQuery('')
+          if (t === 'stories' && !viewingStory && stories.length > 0) {
+            setViewingStory(stories[0])
+          }
           // Mobile: quay về danh sách để chuyển tab/đổi hội thoại dễ dàng; desktop giữ phiên đang mở
           if (isMdDown) setSelectedId(null)
         }}
@@ -91,10 +97,12 @@ export function ChatShell() {
         mobileBarVisible={!selectedId}
       />
 
-      {/* Panel B — ẩn trên mobile khi đang xem hội thoại; ẩn luôn khi sidebar thu gọn */}
+      {/* Panel B — danh sách (tin nhắn / cuộc gọi / story) */}
       <div
         className={cn(
-          selectedId ? 'hidden h-full min-h-0 md:flex md:h-full md:min-w-0' : 'flex h-full min-h-0 min-w-0 flex-1 md:flex-none',
+          (selectedId || (tab === 'stories' && viewingStory))
+            ? 'hidden h-full min-h-0 md:flex md:h-full md:min-w-0'
+            : 'flex h-full min-h-0 min-w-0 flex-1 md:flex-none',
           !sidebarOpen && 'hidden md:hidden',
         )}
       >
@@ -104,18 +112,60 @@ export function ChatShell() {
           calls={calls}
           stories={stories}
           selectedId={selectedId}
+          activeStoryId={tab === 'stories' ? currentStory?.id : null}
           query={query}
           onQuery={setQuery}
           onSelectConversation={handleSelect}
-          onOpenStory={setViewingStory}
+          onOpenStory={(s) => setViewingStory(s)}
           onCall={() => navigate(ROUTES.calls)}
           onNewChat={() => navigate(ROUTES.newChat)}
         />
       </div>
 
-      {/* Panel C — hội thoại, kéo dài full layout */}
-      <div className={selectedId ? 'flex h-full min-h-0 w-full min-w-0 flex-1' : 'hidden h-full min-h-0 w-full min-w-0 flex-1 md:flex'}>
-        {selected ? (
+      {/* Panel C — Hội thoại hoặc Story Viewer trực tiếp trên màn hình chính */}
+      <div
+        className={
+          (selectedId || (tab === 'stories' && viewingStory))
+            ? 'flex h-full min-h-0 w-full min-w-0 flex-1'
+            : 'hidden h-full min-h-0 w-full min-w-0 flex-1 md:flex'
+        }
+      >
+        {tab === 'stories' ? (
+          currentStory ? (
+            <StoryViewer
+              story={currentStory}
+              stories={stories}
+              embedded={true}
+              onSelectStory={setViewingStory}
+              onClose={() => setViewingStory(null)}
+              onReplySent={(s, text) => {
+                const targetConv =
+                  MOCK_CONVERSATIONS.find(
+                    (c) => c.name.toLowerCase() === s.name.toLowerCase(),
+                  ) ?? MOCK_CONVERSATIONS[1] // 'mai-anh'
+                if (targetConv) {
+                  sendStoryReply(targetConv.id, text, s, t('chat.mockReply'))
+                  handleSelect(targetConv.id)
+                }
+              }}
+            />
+          ) : (
+            <section
+              className="hidden h-full min-h-0 w-full min-w-0 flex-1 flex-col items-center justify-center gap-4 bg-background p-8 text-center md:flex"
+              aria-label="Chọn tin để xem"
+            >
+              <span className="grid size-20 place-items-center rounded-[28px] bg-primary/20 text-primary shadow-md">
+                <BrandMark animated className="size-12" />
+              </span>
+              <div>
+                <h2 className="text-lg font-bold">Chọn một tin để xem</h2>
+                <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
+                  Chọn tin của bạn bè ở danh sách bên trái để xem nội dung và tương tác.
+                </p>
+              </div>
+            </section>
+          )
+        ) : selected ? (
           <ConversationView
             conversation={selected}
             groups={groups}
@@ -124,7 +174,10 @@ export function ChatShell() {
             onBack={() => setSelectedId(null)}
           />
         ) : (
-          <section className="hidden h-full min-h-0 w-full min-w-0 flex-1 flex-col items-center justify-center gap-4 bg-background p-8 text-center md:flex" aria-label={t('chat.noConversationSelected')}>
+          <section
+            className="hidden h-full min-h-0 w-full min-w-0 flex-1 flex-col items-center justify-center gap-4 bg-background p-8 text-center md:flex"
+            aria-label={t('chat.noConversationSelected')}
+          >
             <span className="grid size-20 place-items-center rounded-[28px] bg-primary shadow-md">
               <BrandMark animated className="size-12" />
             </span>
@@ -140,26 +193,6 @@ export function ChatShell() {
           </section>
         )}
       </div>
-
-      {/* Story viewer — xem story chuẩn Facebook 9:16, thả cảm xúc và phản hồi tin nhắn 1:1 */}
-      {viewingStory && (
-        <StoryViewer
-          story={viewingStory}
-          stories={stories}
-          onSelectStory={setViewingStory}
-          onClose={() => setViewingStory(null)}
-          onReplySent={(s, text) => {
-            const targetConv =
-              MOCK_CONVERSATIONS.find(
-                (c) => c.name.toLowerCase() === s.name.toLowerCase(),
-              ) ?? MOCK_CONVERSATIONS[1] // 'mai-anh'
-            if (targetConv) {
-              sendStoryReply(targetConv.id, text, s, t('chat.mockReply'))
-              handleSelect(targetConv.id)
-            }
-          }}
-        />
-      )}
     </main>
   )
 }

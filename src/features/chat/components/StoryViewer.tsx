@@ -66,6 +66,7 @@ const FACEBOOK_REACTIONS: ReactionItem[] = [
 interface StoryViewerProps {
   story: StoryEntry
   stories?: StoryEntry[]
+  embedded?: boolean
   onSelectStory?: (story: StoryEntry) => void
   onClose: () => void
   onReplySent?: (story: StoryEntry, text: string) => void
@@ -82,6 +83,7 @@ interface StoryViewerProps {
 export function StoryViewer({
   story,
   stories = [],
+  embedded = false,
   onSelectStory,
   onClose,
   onReplySent,
@@ -132,7 +134,10 @@ export function StoryViewer({
     setReactionsCount(story.reactionsCount ?? 0)
 
     if (!story.mine && !story.viewed) {
-      viewMutation.mutate(story.id)
+      const timer = setTimeout(() => {
+        viewMutation.mutate(story.id)
+      }, 50)
+      return () => clearTimeout(timer)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [story.id])
@@ -241,6 +246,325 @@ export function StoryViewer({
   const authorTitle = storyDisplayName(story, t)
   const isMedia = story.kind === 'MEDIA' || Boolean(story.mediaUrl)
   const segmentsCount = Math.max(1, authorStories.length)
+
+  if (embedded) {
+    return (
+      <div
+        role="region"
+        aria-label={t('chat.storyOf', { name: story.name })}
+        className="relative flex h-full w-full flex-col items-center justify-between bg-black text-white select-none overflow-hidden font-sans"
+      >
+        {/* Top Header trên Right Stage */}
+        <header className="w-full flex items-center justify-between z-20 pointer-events-auto px-4 pt-3 pb-1 shrink-0">
+          {/* Mobile-only header (Back) */}
+          <div className="flex md:hidden items-center gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label={t('chat.closeStory')}
+              className="grid size-9 place-items-center rounded-full bg-[#242526] hover:bg-[#3a3b3c] text-white transition-colors"
+            >
+              <ArrowLeft className="size-5" />
+            </button>
+            <BrandMark animated={false} className="size-7" />
+            <span className="font-bold text-sm text-white">Tin</span>
+          </div>
+
+          <div className="hidden md:block" />
+
+          {/* Top-right Action Buttons */}
+          <div className="flex items-center gap-2 ml-auto">
+            <button
+              type="button"
+              onClick={() => setIsMuted((m) => !m)}
+              aria-label={isMuted ? 'Bật âm thanh' : 'Tắt âm thanh'}
+              title={isMuted ? 'Bật âm thanh' : 'Tắt âm thanh'}
+              className="grid size-9 place-items-center rounded-full bg-[#242526] hover:bg-[#3a3b3c] text-white transition-colors cursor-pointer"
+            >
+              {isMuted ? <VolumeMute className="size-4.5" /> : <VolumeHigh className="size-4.5" />}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsPaused((p) => !p)}
+              aria-label={isPaused ? 'Phát tiếp' : 'Tạm dừng'}
+              title={isPaused ? 'Phát tiếp (Phím cách)' : 'Tạm dừng (Phím cách)'}
+              className="grid size-9 place-items-center rounded-full bg-[#242526] hover:bg-[#3a3b3c] text-white transition-colors cursor-pointer"
+            >
+              {isPaused ? <Play className="size-4.5" /> : <Pause className="size-4.5" />}
+            </button>
+
+            {user && (
+              <span
+                className="grid size-9 shrink-0 place-items-center rounded-full text-xs font-bold text-foreground ring-1 ring-white/20 ml-1"
+                style={{ backgroundColor: avatarColor(user.fullName) }}
+                title={user.fullName}
+              >
+                {initials(user.fullName)}
+              </span>
+            )}
+          </div>
+        </header>
+
+        {/* Khung giữa: Nút Previous + Card 9:16 + Nút Next */}
+        <div className="flex items-center justify-center w-full flex-1 relative my-auto px-2">
+          {hasPrev ? (
+            <button
+              type="button"
+              onClick={handlePrevStory}
+              aria-label="Story trước"
+              title="Story trước (Phím ←)"
+              className="hidden md:grid size-11 lg:size-12 place-items-center rounded-full bg-[#242526]/90 hover:bg-[#3a3b3c] text-white shadow-2xl transition-all hover:scale-110 active:scale-95 cursor-pointer mr-3 lg:mr-6 shrink-0 ring-1 ring-white/10"
+            >
+              <ArrowLeft className="size-5.5 lg:size-6" aria-hidden="true" />
+            </button>
+          ) : (
+            <div className="hidden md:block w-11 lg:w-12 mr-3 lg:mr-6 shrink-0" />
+          )}
+
+          {/* Story Card Chuẩn 9:16 */}
+          <div
+            className="story-card relative flex h-[70vh] sm:h-[74vh] md:h-[76vh] lg:h-[78vh] max-h-[820px] aspect-[9/16] flex-col overflow-hidden rounded-2xl bg-neutral-950 shadow-2xl shadow-black ring-1 ring-white/15 transition-all select-none"
+            onMouseEnter={() => setIsPaused(true)}
+            onMouseLeave={() => {
+              if (!draft.trim()) setIsPaused(false)
+            }}
+          >
+            {/* Lớp hiển thị nội dung Story */}
+            <div className="absolute inset-0 z-0 flex items-center justify-center overflow-hidden">
+              {isMedia && story.mediaUrl ? (
+                <img
+                  src={story.mediaUrl}
+                  alt={story.caption || story.name}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <div
+                  className={cn(
+                    'relative flex h-full w-full flex-col items-center justify-center px-8 py-28 text-center bg-linear-to-br',
+                    story.background || TEXT_STORY_BG,
+                  )}
+                >
+                  <BrandMark animated={false} className="size-16 mb-6 drop-shadow-xl opacity-90" />
+                  <p className="text-2xl sm:text-3xl font-extrabold text-white leading-relaxed drop-shadow-lg max-w-sm wrap-break-word">
+                    {story.caption || t('chat.storyGreeting', { name: story.name })}
+                  </p>
+                  {!story.caption && (
+                    <p className="mt-4 text-sm sm:text-base text-white/85 max-w-xs drop-shadow-md">
+                      {t('chat.storyBody')}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Vùng chạm điều hướng */}
+            <div className="absolute inset-0 z-10 grid grid-cols-3 pointer-events-auto">
+              <div
+                role="button"
+                tabIndex={-1}
+                aria-label="Story trước"
+                onClick={handlePrevStory}
+                className="h-full cursor-pointer"
+              />
+              <div
+                role="button"
+                tabIndex={-1}
+                aria-label="Tạm dừng / Tiếp tục"
+                onClick={() => setIsPaused((p) => !p)}
+                className="h-full cursor-pointer"
+              />
+              <div
+                role="button"
+                tabIndex={-1}
+                aria-label="Story tiếp theo"
+                onClick={handleNextStory}
+                className="h-full cursor-pointer"
+              />
+            </div>
+
+            {/* Header trên Card */}
+            <div className="absolute top-0 inset-x-0 z-20 flex flex-col gap-3 bg-linear-to-b from-black/85 via-black/45 to-transparent pt-3 pb-10 px-3.5 pointer-events-auto">
+              {/* Segmented Progress Bars */}
+              <div className="flex items-center gap-1.5 w-full" aria-hidden="true">
+                {Array.from({ length: segmentsCount }).map((_, idx) => {
+                  let segWidth = 0
+                  if (idx < authorStoryIndex) {
+                    segWidth = 100
+                  } else if (idx === authorStoryIndex) {
+                    segWidth = progress
+                  } else {
+                    segWidth = 0
+                  }
+
+                  return (
+                    <div
+                      key={idx}
+                      className="h-1 flex-1 overflow-hidden rounded-full bg-white/30 backdrop-blur-xs"
+                    >
+                      <div
+                        className="h-full rounded-full bg-white transition-[width] duration-100 ease-linear shadow-xs"
+                        style={{ width: `${segWidth}%` }}
+                      />
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Thông tin tác giả & Thẻ nhạc */}
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span
+                    aria-hidden="true"
+                    className="grid size-10 shrink-0 place-items-center rounded-full text-[13px] font-bold text-foreground ring-2 ring-white/40 shadow-md"
+                    style={{ backgroundColor: avatarColor(story.name) }}
+                  >
+                    {initials(story.name)}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <p className="truncate text-sm sm:text-base font-bold text-white drop-shadow-sm leading-tight">
+                        {authorTitle}
+                      </p>
+                      <span className="text-white/70 text-xs shrink-0">·</span>
+                      <span className="text-white/80 text-xs shrink-0">{story.time || t('chat.now')}</span>
+                      <span title="Bạn bè" className="flex items-center">
+                        <UserGroup className="size-3.5 text-white/75 shrink-0" />
+                      </span>
+                    </div>
+
+                    {/* Tag nhạc */}
+                    <div className="flex items-center gap-1 mt-0.5 text-[11px] text-white/85 truncate">
+                      <MusicNote className="size-3 text-white/80 shrink-0" />
+                      <span className="truncate">Rapital · U Mê (feat. RPT Duke, RPT TC)</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Nút điều khiển */}
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setIsMuted((m) => !m)}
+                    aria-label={isMuted ? 'Bật âm thanh' : 'Tắt âm thanh'}
+                    className="grid size-8 place-items-center rounded-full bg-black/40 hover:bg-black/60 text-white backdrop-blur-xs transition-colors"
+                  >
+                    {isMuted ? <VolumeMute className="size-4" /> : <VolumeHigh className="size-4" />}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsPaused((p) => !p)}
+                    aria-label={isPaused ? 'Phát tiếp' : 'Tạm dừng'}
+                    className="grid size-8 place-items-center rounded-full bg-black/40 hover:bg-black/60 text-white backdrop-blur-xs transition-colors"
+                  >
+                    {isPaused ? <Play className="size-4" /> : <Pause className="size-4" />}
+                  </button>
+
+                  <button
+                    type="button"
+                    aria-label="Tùy chọn khác"
+                    className="grid size-8 place-items-center rounded-full bg-black/40 hover:bg-black/60 text-white backdrop-blur-xs transition-colors"
+                  >
+                    <MoreHorizontal className="size-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Nút mũi tên Next ngoài khung story */}
+          {hasNext ? (
+            <button
+              type="button"
+              onClick={handleNextStory}
+              aria-label="Story tiếp theo"
+              title="Story tiếp theo (Phím →)"
+              className="hidden md:grid size-11 lg:size-12 place-items-center rounded-full bg-[#242526]/90 hover:bg-[#3a3b3c] text-white shadow-2xl transition-all hover:scale-110 active:scale-95 cursor-pointer ml-3 lg:ml-6 shrink-0 ring-1 ring-white/10"
+            >
+              <ArrowRight className="size-5.5 lg:size-6" aria-hidden="true" />
+            </button>
+          ) : (
+            <div className="hidden md:block w-11 lg:w-12 ml-3 lg:ml-6 shrink-0" />
+          )}
+        </div>
+
+        {/* Bottom Interaction Dock */}
+        <footer className="w-full max-w-[620px] flex items-center justify-center gap-3 pt-2 pb-3 px-2 z-20 pointer-events-auto shrink-0">
+          {!story.mine ? (
+            <>
+              {/* Form phản hồi */}
+              <form onSubmit={handleSendReply} className="flex-1 min-w-[180px] max-w-[340px]">
+                <label className="flex h-11 items-center rounded-full bg-[#18191a]/85 hover:bg-[#242526] focus-within:bg-[#242526] border border-white/20 focus-within:border-white/50 px-4 text-white text-sm backdrop-blur-md transition-all shadow-lg cursor-text">
+                  <input
+                    ref={replyInputRef}
+                    type="text"
+                    value={draft}
+                    onFocus={() => setIsPaused(true)}
+                    onBlur={() => {
+                      if (!draft.trim()) setIsPaused(false)
+                    }}
+                    onChange={(e) => setDraft(e.target.value)}
+                    placeholder="Gửi tin nhắn..."
+                    aria-label="Gửi tin nhắn..."
+                    className="h-11 min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/60"
+                  />
+                  {draft.trim() && (
+                    <button
+                      type="submit"
+                      disabled={isSending}
+                      aria-label={t('chat.sendMessage')}
+                      className="grid size-8 place-items-center rounded-full bg-primary text-primary-foreground shadow-md transition-all hover:scale-105 active:scale-95 disabled:opacity-40"
+                    >
+                      <Send className="size-4" aria-hidden="true" />
+                    </button>
+                  )}
+                </label>
+              </form>
+
+              {/* Dải 7 biểu cảm Facebook */}
+              <div
+                className="flex items-center gap-1 sm:gap-1.5"
+                role="toolbar"
+                aria-label={t('chat.reactions')}
+              >
+                {FACEBOOK_REACTIONS.map(({ emoji, label }) => {
+                  const isActive = viewerReaction === emoji
+                  return (
+                    <button
+                      key={emoji}
+                      type="button"
+                      onClick={() => handleToggleReaction(emoji)}
+                      className={cn(
+                        'grid size-8.5 sm:size-9.5 place-items-center rounded-full text-xl sm:text-2xl transition-transform duration-150 hover:scale-135 active:scale-95 cursor-pointer',
+                        isActive && 'scale-120 bg-white/20 ring-2 ring-white shadow-md',
+                      )}
+                      aria-label={`${isActive ? t('chat.unreactStory') : t('chat.reactStorySuccess')} ${emoji}`}
+                      title={`${label} (${emoji})`}
+                    >
+                      <span className="filter drop-shadow-md">{emoji}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            </>
+          ) : (
+            <div className="flex items-center justify-center gap-6 rounded-full bg-[#18191a]/85 border border-white/20 px-6 py-2.5 text-sm text-white shadow-xl backdrop-blur-md">
+              <span className="flex items-center gap-2 font-semibold">
+                <Eye className="size-4.5 text-[#2e89ff]" aria-hidden="true" />
+                <span>{story.viewsCount ?? 0} người xem</span>
+              </span>
+              <span className="text-white/40">·</span>
+              <span className="flex items-center gap-2 font-semibold">
+                <Heart className="size-4.5 text-rose-500 fill-rose-500" aria-hidden="true" />
+                <span>{reactionsCount} cảm xúc</span>
+              </span>
+            </div>
+          )}
+        </footer>
+      </div>
+    )
+  }
 
   return (
     <div
