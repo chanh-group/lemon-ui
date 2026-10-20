@@ -217,10 +217,6 @@ export function ChatShell() {
           tab={tab}
           conversations={conversations}
           conversationsLoading={conversationsQuery.isPending}
-          conversationsError={conversationsQuery.error?.message}
-          onRetryConversations={() => {
-            void conversationsQuery.refetch()
-          }}
           calls={calls}
           stories={stories}
           selectedId={selectedId}

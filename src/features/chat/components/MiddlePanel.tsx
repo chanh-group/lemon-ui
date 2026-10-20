@@ -31,8 +31,6 @@ interface MiddlePanelProps {
   tab: ChatTab
   conversations: Conversation[]
   conversationsLoading: boolean
-  conversationsError?: string
-  onRetryConversations: () => void
   calls: CallEntry[]
   stories: StoryEntry[]
   selectedId: string | null
@@ -95,8 +93,6 @@ export function MiddlePanel({
   tab,
   conversations,
   conversationsLoading,
-  conversationsError,
-  onRetryConversations,
   calls,
   stories,
   selectedId,
@@ -209,14 +205,6 @@ export function MiddlePanel({
           <>
             {conversationsLoading ? (
               <p className="px-4 py-5 text-sm text-muted-foreground">{t('chat.pending')}</p>
-            ) : conversationsError ? (
-              <div className="px-4 py-5 text-sm">
-                <p className="font-semibold text-destructive">{t('chat.conversationsLoadError')}</p>
-                <p className="mt-1 text-muted-foreground">{conversationsError}</p>
-                <button type="button" onClick={onRetryConversations} className="mt-3 font-semibold text-brand-ink hover:underline">
-                  {t('common.retry')}
-                </button>
-              </div>
             ) : conversations.length === 0 ? (
               <div className="px-2 pt-4">
                 <EmptyState

@@ -1,4 +1,5 @@
 import { api } from '@/infrastructure/api/client'
+import { isAuthBypass } from '@/config/env'
 import type { ChatUser, CursorPage, ConversationResponse, FriendRequest, FriendRequestsPageResponse, MessageResponse, MessageTimelineResponse, SendMessageDto, UserSearchItem } from '../types/chat.types'
 
 /* ------------------------------------------------------------------ */
@@ -86,6 +87,7 @@ export async function createGroup(payload: { name: string; memberIds: string[] }
 
 /** Lấy danh sách hội thoại Inbox. */
 export async function getConversations(limit = 20): Promise<ConversationResponse[]> {
+  if (isAuthBypass()) return []
   const res = await api.get<CursorPage<ConversationResponse>>('/conversations', {
     params: { limit },
   })
