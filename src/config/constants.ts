@@ -9,6 +9,7 @@ export const ROUTES = {
   calls: '/calls',
   newChat: '/new-chat',
   storiesCreate: '/stories/create',
+  storiesArchive: '/stories/archive',
   settings: '/settings',
 } as const
 
