@@ -314,17 +314,17 @@ export function StoryViewer({
               onClick={handlePrevStory}
               aria-label="Story trước"
               title="Story trước (Phím ←)"
-              className="hidden md:grid size-11 lg:size-12 place-items-center rounded-full bg-[#242526]/90 hover:bg-[#3a3b3c] text-white shadow-2xl transition-all hover:scale-110 active:scale-95 cursor-pointer mr-3 lg:mr-6 shrink-0 ring-1 ring-white/10"
+              className="hidden md:grid size-12 lg:size-14 place-items-center rounded-full bg-[#242526]/90 hover:bg-[#3a3b3c] text-white shadow-2xl transition-all hover:scale-110 active:scale-95 cursor-pointer mr-4 lg:mr-8 xl:mr-10 shrink-0 ring-1 ring-white/15"
             >
-              <ArrowLeft className="size-5.5 lg:size-6" aria-hidden="true" />
+              <ArrowLeft className="size-6 lg:size-7" aria-hidden="true" />
             </button>
           ) : (
-            <div className="hidden md:block w-11 lg:w-12 mr-3 lg:mr-6 shrink-0" />
+            <div className="hidden md:block w-12 lg:w-14 mr-4 lg:mr-8 xl:mr-10 shrink-0" />
           )}
 
-          {/* Story Card Chuẩn 9:16 */}
+          {/* Story Card Lớn Chuẩn Facebook Desktop — Tối ưu hóa kích thước dài & rộng */}
           <div
-            className="story-card relative flex h-[70vh] sm:h-[74vh] md:h-[76vh] lg:h-[78vh] max-h-[820px] aspect-[9/16] flex-col overflow-hidden rounded-2xl bg-neutral-950 shadow-2xl shadow-black ring-1 ring-white/15 transition-all select-none"
+            className="story-card relative flex h-[calc(100dvh-100px)] max-h-[920px] min-h-[580px] w-auto aspect-[9/16] min-w-[340px] sm:min-w-[420px] md:min-w-[460px] lg:min-w-[500px] xl:min-w-[520px] max-w-[560px] flex-col overflow-hidden rounded-2xl md:rounded-3xl bg-neutral-950 shadow-2xl shadow-black ring-1 ring-white/20 transition-all select-none"
             onMouseEnter={() => setIsPaused(true)}
             onMouseLeave={() => {
               if (!draft.trim()) setIsPaused(false)
@@ -345,12 +345,12 @@ export function StoryViewer({
                     story.background || TEXT_STORY_BG,
                   )}
                 >
-                  <BrandMark animated={false} className="size-16 mb-6 drop-shadow-xl opacity-90" />
-                  <p className="text-2xl sm:text-3xl font-extrabold text-white leading-relaxed drop-shadow-lg max-w-sm wrap-break-word">
+                  <BrandMark animated={false} className="size-20 md:size-24 mb-8 drop-shadow-2xl opacity-95 transition-transform hover:scale-105" />
+                  <p className="text-2xl sm:text-3xl md:text-4xl lg:text-[38px] font-extrabold text-white leading-relaxed drop-shadow-xl max-w-md px-6 wrap-break-word text-center">
                     {story.caption || t('chat.storyGreeting', { name: story.name })}
                   </p>
                   {!story.caption && (
-                    <p className="mt-4 text-sm sm:text-base text-white/85 max-w-xs drop-shadow-md">
+                    <p className="mt-5 text-sm sm:text-base md:text-lg text-white/90 max-w-sm drop-shadow-md text-center">
                       {t('chat.storyBody')}
                     </p>
                   )}
@@ -480,17 +480,17 @@ export function StoryViewer({
               onClick={handleNextStory}
               aria-label="Story tiếp theo"
               title="Story tiếp theo (Phím →)"
-              className="hidden md:grid size-11 lg:size-12 place-items-center rounded-full bg-[#242526]/90 hover:bg-[#3a3b3c] text-white shadow-2xl transition-all hover:scale-110 active:scale-95 cursor-pointer ml-3 lg:ml-6 shrink-0 ring-1 ring-white/10"
+              className="hidden md:grid size-12 lg:size-14 place-items-center rounded-full bg-[#242526]/90 hover:bg-[#3a3b3c] text-white shadow-2xl transition-all hover:scale-110 active:scale-95 cursor-pointer ml-4 lg:ml-8 xl:ml-10 shrink-0 ring-1 ring-white/15"
             >
-              <ArrowRight className="size-5.5 lg:size-6" aria-hidden="true" />
+              <ArrowRight className="size-6 lg:size-7" aria-hidden="true" />
             </button>
           ) : (
-            <div className="hidden md:block w-11 lg:w-12 ml-3 lg:ml-6 shrink-0" />
+            <div className="hidden md:block w-12 lg:w-14 ml-4 lg:ml-8 xl:ml-10 shrink-0" />
           )}
         </div>
 
-        {/* Bottom Interaction Dock */}
-        <footer className="w-full max-w-[620px] flex items-center justify-center gap-3 pt-2 pb-3 px-2 z-20 pointer-events-auto shrink-0">
+        {/* Bottom Interaction Dock — Rộng rãi khớp với khung Story Card */}
+        <footer className="w-full max-w-[560px] md:max-w-[600px] lg:max-w-[680px] flex items-center justify-center gap-2 sm:gap-3 pt-2 pb-2.5 px-3 z-20 pointer-events-auto shrink-0">
           {!story.mine ? (
             <>
               {/* Form phản hồi */}
@@ -819,9 +819,9 @@ export function StoryViewer({
             <div className="hidden md:block w-12 mr-4 lg:mr-8 shrink-0" />
           )}
 
-          {/* Story Card Chuẩn 9:16 Mobile-in-Desktop View */}
+          {/* Story Card Lớn Chuẩn Facebook Desktop */}
           <div
-            className="story-card relative flex h-[72vh] sm:h-[76vh] md:h-[80vh] lg:h-[82vh] max-h-[860px] aspect-[9/16] flex-col overflow-hidden rounded-2xl bg-neutral-950 shadow-2xl shadow-black ring-1 ring-white/15 transition-all select-none"
+            className="story-card relative flex h-[calc(100dvh-100px)] max-h-[920px] min-h-[580px] w-auto aspect-[9/16] min-w-[340px] sm:min-w-[420px] md:min-w-[460px] lg:min-w-[500px] xl:min-w-[520px] max-w-[560px] flex-col overflow-hidden rounded-2xl md:rounded-3xl bg-neutral-950 shadow-2xl shadow-black ring-1 ring-white/20 transition-all select-none"
             onMouseEnter={() => setIsPaused(true)}
             onMouseLeave={() => {
               if (!draft.trim()) setIsPaused(false)
@@ -842,12 +842,12 @@ export function StoryViewer({
                     story.background || TEXT_STORY_BG,
                   )}
                 >
-                  <BrandMark animated={false} className="size-16 mb-6 drop-shadow-xl opacity-90" />
-                  <p className="text-2xl sm:text-3xl font-extrabold text-white leading-relaxed drop-shadow-lg max-w-sm wrap-break-word">
+                  <BrandMark animated={false} className="size-20 md:size-24 mb-8 drop-shadow-2xl opacity-95 transition-transform hover:scale-105" />
+                  <p className="text-2xl sm:text-3xl md:text-4xl lg:text-[38px] font-extrabold text-white leading-relaxed drop-shadow-xl max-w-md px-6 wrap-break-word text-center">
                     {story.caption || t('chat.storyGreeting', { name: story.name })}
                   </p>
                   {!story.caption && (
-                    <p className="mt-4 text-sm sm:text-base text-white/85 max-w-xs drop-shadow-md">
+                    <p className="mt-5 text-sm sm:text-base md:text-lg text-white/90 max-w-sm drop-shadow-md text-center">
                       {t('chat.storyBody')}
                     </p>
                   )}
