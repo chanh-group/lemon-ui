@@ -29,7 +29,7 @@ export interface Conversation {
   lastActive?: string
 }
 
-export type StoryReactionType = '❤️' | '🔥' | '😂' | '😮' | '😢' | '👏' | '👍'
+export type StoryReactionType = '👍' | '❤️' | '🥰' | '😆' | '😂' | '😮' | '😢' | '😡' | '🔥' | '👏'
 
 export interface StoryPreview {
   id: string
