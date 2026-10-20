@@ -189,6 +189,12 @@ export function ChatShell() {
         onChange={(t) => {
           setTab(t)
           setQuery('')
+          // Persist the active tab in this history entry so reload does not
+          // restore a stale tab value from an earlier navigation.
+          navigate(ROUTES.messages, {
+            replace: true,
+            state: { tab: t, ...(!isMdDown && selectedId ? { select: selectedId } : {}) },
+          })
           // Mobile: quay về danh sách để chuyển tab/đổi hội thoại dễ dàng; desktop giữ phiên đang mở
           if (isMdDown) setSelectedId(null)
         }}
@@ -223,6 +229,7 @@ export function ChatShell() {
           onSelectConversation={handleSelect}
           onOpenStory={setViewingStory}
           onCall={() => navigate(ROUTES.calls)}
+          onNewCall={() => navigate(ROUTES.newCall)}
           onNewChat={() => navigate(ROUTES.newChat)}
         />
       </div>

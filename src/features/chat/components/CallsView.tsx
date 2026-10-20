@@ -1,8 +1,6 @@
-import { ArrowLeft01Icon as ArrowLeftData, CallingIcon as PhoneCallData, MoreHorizontalIcon as DotsThreeData, CallIcon as PhoneData, Search01Icon as SearchData, CallIncoming01Icon as PhoneIncomingData, CallOutgoing01Icon as PhoneOutgoingData, CallMissed01Icon as PhoneXData } from '@hugeicons/core-free-icons'
+import { ArrowLeft01Icon as ArrowLeftData, CallIcon as PhoneData, Search01Icon as SearchData, CallIncoming01Icon as PhoneIncomingData, CallOutgoing01Icon as PhoneOutgoingData, CallMissed01Icon as PhoneXData } from '@hugeicons/core-free-icons'
 import { createIcon } from '@/components/icons/hugeIcon'
 const ArrowLeft = createIcon(ArrowLeftData)
-const PhoneCall = createIcon(PhoneCallData)
-const DotsThree = createIcon(DotsThreeData)
 const Phone = createIcon(PhoneData)
 const Search = createIcon(SearchData)
 const PhoneIncoming = createIcon(PhoneIncomingData)
@@ -17,6 +15,7 @@ import { avatarColor, initials, MOCK_CALLS } from '../data/mockData'
 import { useConversationsQuery } from '../hooks/useChatQueries'
 import type { CallEntry } from '../types/chat.types'
 import { SideNav } from './SideNav'
+import { CallsHeaderActions } from './CallsHeaderActions'
 
 const DIRECTION_KEYS = { incoming: 'chat.incomingCall', outgoing: 'chat.outgoingCall', missed: 'chat.missedCall' } as const
 
@@ -93,22 +92,7 @@ export function CallsView() {
             </button>
             <h1 className="text-xl font-bold tracking-tight text-foreground">{t('chat.calls')}</h1>
           </div>
-          <div className="flex items-center gap-0.5">
-            <button
-              type="button"
-              aria-label={t('chat.callLink')}
-              className="grid size-10 place-items-center rounded-xl text-brand-ink transition-colors hover:bg-muted"
-            >
-              <PhoneCall className="size-5" aria-hidden="true" />
-            </button>
-            <button
-              type="button"
-              aria-label={t('chat.moreOptions')}
-              className="grid size-10 place-items-center rounded-xl text-brand-ink transition-colors hover:bg-muted"
-            >
-              <DotsThree className="size-5" strokeWidth={2.5} aria-hidden="true" />
-            </button>
-          </div>
+          <CallsHeaderActions onNewCall={() => navigate(ROUTES.newCall)} />
         </header>
 
         <div className="px-4 pb-2 sm:px-5">

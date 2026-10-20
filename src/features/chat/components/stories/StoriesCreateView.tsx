@@ -2,9 +2,9 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import { CancelCircleIcon as CloseData, ChevronRightIcon as ChevronRightData, Settings01Icon as GearData } from '@hugeicons/core-free-icons'
+import { ArrowLeft01Icon as BackData, ChevronRightIcon as ChevronRightData, Settings01Icon as GearData } from '@hugeicons/core-free-icons'
 import { createIcon } from '@/components/icons/hugeIcon'
-const Close = createIcon(CloseData)
+const Back = createIcon(BackData)
 const Gear = createIcon(GearData)
 const ChevronRight = createIcon(ChevronRightData)
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -72,7 +72,7 @@ export function StoriesCreateView() {
             aria-label={t('chat.backToList')}
             className="grid size-10 min-h-11 min-w-11 place-items-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
-            <Close className="size-5" aria-hidden="true" />
+            <Back className="size-5" aria-hidden="true" />
           </button>
           <h1 className="text-lg font-bold tracking-tight text-foreground">{t('chat.yourStory')}</h1>
           <button
@@ -99,6 +99,13 @@ export function StoriesCreateView() {
             <p className="truncate text-xs text-muted-foreground">{t('chat.addToStoryHint')}</p>
           </div>
         </div>
+
+        {/* Trên mobile, panel lựa chọn nằm dưới thông tin tài khoản; panel desktop bị ẩn ở breakpoint md. */}
+        {step === 'choose' && (
+          <div className="min-h-0 flex-1 overflow-y-auto md:hidden">
+            <ChooseStoryType onPickMedia={() => setStep('media')} onPickText={() => setStep('text')} />
+          </div>
+        )}
 
         {/* Tin đã chia sẻ của mình (nếu có) */}
         {myStories.length > 0 && (

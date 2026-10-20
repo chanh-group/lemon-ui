@@ -135,6 +135,16 @@ export function ConversationView({
               {t('common.retry')}
             </button>
           </div>
+        ) : groups.length === 0 ? (
+          <div className="flex h-full flex-col items-center justify-center px-6 text-center">
+            <span className="mb-4 grid size-14 place-items-center rounded-full bg-primary/10 text-brand-ink" aria-hidden="true">
+              ✓
+            </span>
+            <h2 className="text-base font-semibold text-foreground">
+              {t('chat.newConnectionTitle', { name: conversation.name })}
+            </h2>
+            <p className="mt-1 max-w-sm text-sm text-muted-foreground">{t('chat.newConnectionPrompt')}</p>
+          </div>
         ) : (
           <MessageList ref={messageListRef} groups={groups} senderLabel={conversation.name} scrollRef={scrollRef} />
         )}

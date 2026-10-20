@@ -1,5 +1,6 @@
 export { ChatShell } from './components/ChatShell'
 export { CallsView } from './components/CallsView'
+export { NewCallView } from './components/NewCallView'
 export { NewChatView } from './components/new-chat'
 export { StoriesCreateView } from './components/stories'
 export { SettingsView } from './components/settings'

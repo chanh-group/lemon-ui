@@ -1,20 +1,5 @@
 import { api } from '@/infrastructure/api/client'
-import type {
-  ChatUser,
-  ConversationResponse,
-  FriendRequest,
-  MessageResponse,
-  MessageTimelineResponse,
-  SendMessageDto,
-} from '../types/chat.types'
-
-interface UserSearchResponse {
-  id: string
-  name: string
-  username: string
-  email: string
-  avatarUrl?: string | null
-}
+import type { ChatUser, CursorPage, ConversationResponse, FriendRequest, FriendRequestsPageResponse, MessageResponse, MessageTimelineResponse, SendMessageDto, UserSearchItem } from '../types/chat.types'
 
 /* ------------------------------------------------------------------ */
 /* Chat API — Axios client unwraps the backend response envelope. */
@@ -23,15 +8,19 @@ interface UserSearchResponse {
 /** Tìm user gần đúng theo username. */
 export async function findUserByUsername(username: string): Promise<ChatUser[]> {
   const normalized = username.trim().replace(/^@/, '')
-  const res = await api.get<UserSearchResponse[]>('/users/search', { params: { q: normalized, field: 'username' } })
-  return res.data.map((user) => ({ ...user, name: user.name || user.username }))
+  const res = await api.get<CursorPage<UserSearchItem>>('/users/search', {
+    params: { q: normalized, field: 'username' },
+  })
+  return res.data.items
 }
 
 /** Tìm user gần đúng theo email. */
 export async function findUserByEmail(email: string): Promise<ChatUser[]> {
   const normalized = email.trim().toLowerCase()
-  const res = await api.get<UserSearchResponse[]>('/users/search', { params: { q: normalized, field: 'email' } })
-  return res.data.map((user) => ({ ...user, name: user.name || user.username }))
+  const res = await api.get<CursorPage<UserSearchItem>>('/users/search', {
+    params: { q: normalized, field: 'email' },
+  })
+  return res.data.items
 }
 
 /** Gửi lời mời kết bạn. */
@@ -40,23 +29,29 @@ export async function sendFriendRequest(userId: string): Promise<void> {
 }
 
 /** Danh sách lời mời:incoming chờ mình xử lý + outgoing chờ đối phương. */
-export async function getFriendRequests(): Promise<{ incoming: FriendRequest[]; outgoing: FriendRequest[] }> {
-  const res = await api.get<{ incoming: FriendRequest[]; outgoing: FriendRequest[] }>('/friends/requests')
+export async function getFriendRequests(): Promise<{
+  incoming: FriendRequest[]
+  outgoing: FriendRequest[]
+}> {
+  const res = await api.get<FriendRequestsPageResponse>('/friends/requests', {
+    params: { limit: 50 },
+  })
   return {
-    incoming: res.data?.incoming ?? [],
-    outgoing: res.data?.outgoing ?? [],
+    incoming: res.data.incoming.items,
+    outgoing: res.data.outgoing.items,
   }
 }
 
 /** Danh sách bạn bè đã chấp nhận lời mời. */
 export async function getFriends(): Promise<ChatUser[]> {
-  const res = await api.get<ChatUser[]>('/friends')
-  return res.data
+  const res = await api.get<CursorPage<ChatUser>>('/friends', { params: { limit: 50 } })
+  return res.data.items
 }
 
 /** Chấp nhận lời mời kết bạn. */
-export async function acceptFriendRequest(requestId: string): Promise<void> {
-  await api.post(`/friends/requests/${requestId}/accept`)
+export async function acceptFriendRequest(requestId: string): Promise<ConversationResponse> {
+  const res = await api.post<ConversationResponse>(`/friends/requests/${requestId}/accept`)
+  return res.data
 }
 
 /** Từ chối lời mời kết bạn. */
@@ -91,8 +86,10 @@ export async function createGroup(payload: { name: string; memberIds: string[] }
 
 /** Lấy danh sách hội thoại Inbox. */
 export async function getConversations(limit = 20): Promise<ConversationResponse[]> {
-  const res = await api.get<ConversationResponse[]>('/conversations', { params: { limit } })
-  return res.data
+  const res = await api.get<CursorPage<ConversationResponse>>('/conversations', {
+    params: { limit },
+  })
+  return res.data.items
 }
 
 /** Lấy thông tin chi tiết một cuộc hội thoại. */
@@ -108,12 +105,7 @@ export async function getOrCreateDirectConversation(targetUserId: string): Promi
 }
 
 /** Lấy lịch sử tin nhắn trong cuộc hội thoại (phân trang con trỏ). */
-export async function getConversationMessages(
-  conversationId: string,
-  cursor?: string,
-  limit = 30,
-  after?: string,
-): Promise<MessageTimelineResponse> {
+export async function getConversationMessages(conversationId: string, cursor?: string, limit = 30, after?: string): Promise<MessageTimelineResponse> {
   const res = await api.get<MessageTimelineResponse>(`/conversations/${conversationId}/messages`, {
     params: { cursor, limit, after },
   })
@@ -121,19 +113,13 @@ export async function getConversationMessages(
 }
 
 /** Gửi tin nhắn mới vào cuộc hội thoại. */
-export async function sendMessage(
-  conversationId: string,
-  payload: SendMessageDto,
-): Promise<MessageResponse> {
+export async function sendMessage(conversationId: string, payload: SendMessageDto): Promise<MessageResponse> {
   const res = await api.post<MessageResponse>(`/conversations/${conversationId}/messages`, payload)
   return res.data
 }
 
 /** Đánh dấu cuộc hội thoại đã đọc đến tin nhắn cụ thể. */
-export async function markConversationRead(
-  conversationId: string,
-  lastReadMessageId: string,
-): Promise<void> {
+export async function markConversationRead(conversationId: string, lastReadMessageId: string): Promise<void> {
   await api.post(`/conversations/${conversationId}/read`, { lastReadMessageId })
 }
 

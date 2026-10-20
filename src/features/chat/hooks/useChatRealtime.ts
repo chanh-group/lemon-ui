@@ -20,7 +20,11 @@ export function useChatRealtime(activeConversationId: string | null) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const [partnerTypingMap, setPartnerTypingMap] = useState<Record<string, boolean>>({})
-  const [connectionStatus, setConnectionStatus] = useState<SocketConnectionStatus>('connecting')
+  const [connectionStatus, setConnectionStatus] = useState<SocketConnectionStatus | null>(() => {
+    if (status !== 'authenticated') return null
+    const socket = getChatSocket()
+    return socket.connected ? 'connected' : socket.active ? 'connecting' : 'disconnected'
+  })
   const userId = user?.id
 
   // 1. Quản lý kết nối socket theo trạng thái đăng nhập

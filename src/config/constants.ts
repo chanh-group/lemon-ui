@@ -7,6 +7,7 @@ export const ROUTES = {
   forgotPassword: '/forgot-password',
   messages: '/messages',
   calls: '/calls',
+  newCall: '/calls/new',
   newChat: '/new-chat',
   storiesCreate: '/stories/create',
   settings: '/settings',

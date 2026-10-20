@@ -17,6 +17,24 @@ export interface FriendRequest {
   createdAt: string
 }
 
+export interface CursorPage<T> {
+  items: T[]
+  nextCursor?: string
+  hasMore: boolean
+}
+
+export interface FriendRequestsPageResponse {
+  incoming: CursorPage<FriendRequest>
+  outgoing: CursorPage<FriendRequest>
+}
+
+export interface UserSearchItem {
+  id: string
+  name: string
+  username: string
+  email: string
+}
+
 export interface Conversation {
   id: string
   name: string

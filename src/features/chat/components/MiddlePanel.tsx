@@ -25,6 +25,7 @@ import { avatarColor, initials } from '../data/mockData'
 import { useFriendRequests } from '../hooks/useFriends'
 import { storyDisplayName, storyTime } from '../data/storiesData'
 import type { CallEntry, ChatTab, Conversation, StoryEntry } from '../types/chat.types'
+import { CallsHeaderActions } from './CallsHeaderActions'
 
 interface MiddlePanelProps {
   tab: ChatTab
@@ -41,6 +42,7 @@ interface MiddlePanelProps {
   onOpenStory: (story: StoryEntry) => void
   onCall?: (name: string) => void
   onNewChat?: () => void
+  onNewCall?: () => void
 }
 
 function PreviewIcon({ kind }: { kind: Conversation['previewKind'] }) {
@@ -104,6 +106,7 @@ export function MiddlePanel({
   onOpenStory,
   onCall,
   onNewChat,
+  onNewCall,
 }: MiddlePanelProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
@@ -145,6 +148,8 @@ export function MiddlePanel({
             >
               <Plus className="size-5.5" aria-hidden="true" />
             </button>
+          ) : tab === 'calls' ? (
+            <CallsHeaderActions onNewCall={onNewCall ?? (() => navigate(ROUTES.newCall))} />
           ) : (
             <button
               type="button"
@@ -264,7 +269,13 @@ export function MiddlePanel({
                               )}
                             >
                               <PreviewIcon kind={c.previewKind} />
-                              {c.previewKind === 'photo' ? t('chat.photo') : c.previewKind === 'gif' ? t('chat.gif') : c.previewKind === 'sticker' ? t('chat.sticker') : c.preview}
+                              {c.previewKind === 'photo'
+                                ? t('chat.photo')
+                                : c.previewKind === 'gif'
+                                  ? t('chat.gif')
+                                  : c.previewKind === 'sticker'
+                                    ? t('chat.sticker')
+                                    : c.preview || (!c.isGroup ? t('chat.newConnectionPreview') : '')}
                             </span>
                             {c.unread > 0 && (
                               <span aria-hidden="true" className="grid min-w-5 shrink-0 place-items-center rounded-full bg-primary px-1.5 text-[11px] leading-5 font-bold text-primary-foreground">

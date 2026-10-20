@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@/infrastructure/query/keys'
+import type { ConversationResponse } from '../types/chat.types'
 import {
   acceptFriendRequest,
   blockUser,
@@ -42,8 +43,23 @@ export function useSendFriendRequest() {
 }
 
 export function useAcceptFriendRequest() {
-  const invalidate = useInvalidateFriendData()
-  return useMutation({ mutationFn: acceptFriendRequest, onSuccess: invalidate })
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: acceptFriendRequest,
+    onSuccess: async (conversation) => {
+      qc.setQueryData<ConversationResponse[]>(queryKeys.chat.conversations, (current) => {
+        if (!current) return [conversation]
+        if (current.some((item) => item.id === conversation.id)) {
+          return current.map((item) => (item.id === conversation.id ? conversation : item))
+        }
+        return [conversation, ...current]
+      })
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: FRIEND_REQUESTS_KEY }),
+        qc.invalidateQueries({ queryKey: FRIENDS_KEY }),
+      ])
+    },
+  })
 }
 
 export function useDeclineFriendRequest() {

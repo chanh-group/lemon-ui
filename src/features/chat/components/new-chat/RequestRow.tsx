@@ -1,15 +1,18 @@
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router-dom'
 import { CheckIcon as CheckData, MultiplicationSignIcon as XData } from '@hugeicons/core-free-icons'
 import { createIcon } from '@/components/icons/hugeIcon'
 const Check = createIcon(CheckData)
 const X = createIcon(XData)
 import { toast } from 'sonner'
+import { ROUTES } from '@/config/constants'
 import { useAcceptFriendRequest, useBlockUser, useCancelFriendRequest, useDeclineFriendRequest } from '../../hooks/useFriends'
 import type { FriendRequest } from '../../types/chat.types'
 import { Avatar } from './kit'
 
 export function RequestRow({ request }: { request: FriendRequest }) {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const accept = useAcceptFriendRequest()
   const decline = useDeclineFriendRequest()
   const cancel = useCancelFriendRequest()
@@ -19,7 +22,10 @@ export function RequestRow({ request }: { request: FriendRequest }) {
   const onError = (error: unknown) => toast.error(error instanceof Error ? error.message : t('common.error'))
   const handleAccept = () =>
     accept.mutate(request.id, {
-      onSuccess: () => toast.success(t('chat.friendRequestAccepted')),
+      onSuccess: (conversation) => {
+        toast.success(t('chat.friendRequestAccepted'))
+        navigate(ROUTES.messages, { state: { tab: 'messages', select: conversation.id } })
+      },
       onError,
     })
   const handleDecline = () =>
