@@ -137,7 +137,7 @@ export function ChatShell() {
     if (lastReadAttempt.current === lastMessageId) return
 
     lastReadAttempt.current = lastMessageId
-    markReadMutate(selectedId)
+    markReadMutate({ conversationId: selectedId, lastReadMessageId: lastMessageId })
   }, [selectedId, lastMessageId, lastMessageConversationId, selectedUnread, markReadMutate])
 
   const handleTypingStart = () => {
@@ -154,13 +154,15 @@ export function ChatShell() {
     emitTypingStop(selectedId)
   }
 
-  const handleSend = async (text: string) => {
-    if (!text.trim() || !selectedId) return
+  const handleSend = async (text: string): Promise<boolean> => {
+    if (!text.trim() || !selectedId) return false
     try {
       handleTypingStop()
       await sendMessageMutation.mutateAsync(text)
+      return true
     } catch (error) {
       toast.error(error instanceof Error ? error.message : t('chat.sendMessageError'))
+      return false
     }
   }
 
