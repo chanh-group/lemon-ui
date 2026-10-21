@@ -18,15 +18,18 @@ import type {
 } from '@/domain/auth'
 
 function createDevUser(partial: {
-  email: string
+  identifier?: string
+  email?: string
   fullName?: string
   username?: string
 }): AuthUser {
+  const identifier = partial.identifier ?? partial.email ?? 'devuser'
+  const email = partial.email ?? (identifier.includes('@') ? identifier : `${identifier}@lemon.dev`)
   return {
     id: 'dev-user',
-    fullName: partial.fullName ?? partial.email.split('@')[0] ?? 'Dev User',
+    fullName: partial.fullName ?? (identifier.split('@')[0] || 'Dev User'),
     username: partial.username ?? 'devuser',
-    email: partial.email,
+    email,
     createdAt: new Date().toISOString(),
   }
 }

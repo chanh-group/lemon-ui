@@ -14,8 +14,9 @@ const ChevronRight = createIcon(ChevronRightData)
 const Phone = createIcon(PhoneData)
 const X = createIcon(XData)
 import { useTranslation } from 'react-i18next'
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ROUTES } from '@/config/constants'
@@ -24,10 +25,12 @@ import { avatarColor, initials } from '../data/mockData'
 import { useFriendRequests } from '../hooks/useFriends'
 import { storyDisplayName, storyTime } from '../data/storiesData'
 import type { CallEntry, ChatTab, Conversation, StoryEntry } from '../types/chat.types'
+import { CallsHeaderActions } from './CallsHeaderActions'
 
 interface MiddlePanelProps {
   tab: ChatTab
   conversations: Conversation[]
+  conversationsLoading: boolean
   calls: CallEntry[]
   stories: StoryEntry[]
   selectedId: string | null
@@ -38,6 +41,7 @@ interface MiddlePanelProps {
   onOpenStory: (story: StoryEntry) => void
   onCall?: (name: string) => void
   onNewChat?: () => void
+  onNewCall?: () => void
 }
 
 function PreviewIcon({ kind }: { kind: Conversation['previewKind'] }) {
@@ -89,6 +93,7 @@ function ConversationAvatar({
 export function MiddlePanel({
   tab,
   conversations,
+  conversationsLoading,
   calls,
   stories,
   selectedId,
@@ -99,6 +104,7 @@ export function MiddlePanel({
   onOpenStory,
   onCall,
   onNewChat,
+  onNewCall,
 }: MiddlePanelProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
@@ -110,8 +116,14 @@ export function MiddlePanel({
   }
   const activeMeta = meta[tab]
   // Badge trên nút soạn tin = số lời mời kết bạn NHẬN VỀ (lời đi không tính)
-  const { data: requests } = useFriendRequests()
-  const incomingRequests = requests?.incoming.length ?? 0
+  const requestsQuery = useFriendRequests()
+  const { data: requests } = requestsQuery
+  useEffect(() => {
+    if (requestsQuery.isError) {
+      toast.error(requestsQuery.error instanceof Error ? requestsQuery.error.message : t('chat.friendRequestsLoadError'))
+    }
+  }, [requestsQuery.isError, requestsQuery.error, t])
+  const incomingRequests = requests?.incoming?.length ?? 0
   // Story theo tên người gửi — 1-1 mới bọc ring/bubble (Messenger không cho group)
   const storyByName = useMemo(() => new Map(stories.map((s) => [s.name, s])), [stories])
 
@@ -134,6 +146,8 @@ export function MiddlePanel({
             >
               <Plus className="size-5.5" aria-hidden="true" />
             </button>
+          ) : tab === 'calls' ? (
+            <CallsHeaderActions onNewCall={onNewCall ?? (() => navigate(ROUTES.newCall))} />
           ) : (
             <button
               type="button"
@@ -191,7 +205,9 @@ export function MiddlePanel({
       <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3" role="list" aria-label={activeMeta.title}>
         {tab === 'messages' && (
           <>
-            {conversations.length === 0 ? (
+            {conversationsLoading ? (
+              <p className="px-4 py-5 text-sm text-muted-foreground">{t('chat.pending')}</p>
+            ) : conversations.length === 0 ? (
               <div className="px-2 pt-4">
                 <EmptyState
                   title={query ? t('chat.noResults') : t('chat.noConversations')}
@@ -243,7 +259,13 @@ export function MiddlePanel({
                               )}
                             >
                               <PreviewIcon kind={c.previewKind} />
-                              {c.previewKind === 'photo' ? t('chat.photo') : c.previewKind === 'gif' ? t('chat.gif') : c.previewKind === 'sticker' ? t('chat.sticker') : c.preview}
+                              {c.previewKind === 'photo'
+                                ? t('chat.photo')
+                                : c.previewKind === 'gif'
+                                  ? t('chat.gif')
+                                  : c.previewKind === 'sticker'
+                                    ? t('chat.sticker')
+                                    : c.preview || (!c.isGroup ? t('chat.newConnectionPreview') : '')}
                             </span>
                             {c.unread > 0 && (
                               <span aria-hidden="true" className="grid min-w-5 shrink-0 place-items-center rounded-full bg-primary px-1.5 text-[11px] leading-5 font-bold text-primary-foreground">

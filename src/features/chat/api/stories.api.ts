@@ -154,7 +154,7 @@ export async function listStories(currentUserId?: string): Promise<StoryEntry[]>
     await delay(150)
     return storyStore.map((s) => ({ ...s }))
   }
-  try {
+try {
     const res = await api.get<any[]>('/stories/feed')
     const raw = res.data ?? []
     const flattened: StoryEntry[] = []
@@ -189,6 +189,7 @@ export async function listStories(currentUserId?: string): Promise<StoryEntry[]>
     const res = await api.get<BackendStoryResponse[]>('/stories')
     return (res.data ?? []).map((item) => mapBackendStoryToEntry(item, currentUserId))
   }
+
 }
 
 /** Đăng tin dạng văn bản — nền cố định, không chủ đề/không tùy chọn kiểu chữ. */

@@ -7,6 +7,7 @@ import { RegisterPage } from '@/pages/RegisterPage'
 import { ForgotPasswordPage } from '@/pages/ForgotPasswordPage'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { CallsPage } from '@/pages/CallsPage'
+import { NewCallPage } from '@/pages/NewCallPage'
 import { NewChatPage } from '@/pages/NewChatPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { StoriesCreatePage } from '@/pages/StoriesCreatePage'
@@ -80,6 +81,14 @@ export const router = createBrowserRouter(
       element: (
         <RequireAuth>
           <CallsPage />
+        </RequireAuth>
+      ),
+    },
+    {
+      path: ROUTES.newCall,
+      element: (
+        <RequireAuth>
+          <NewCallPage />
         </RequireAuth>
       ),
     },

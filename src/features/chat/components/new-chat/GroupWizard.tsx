@@ -5,8 +5,7 @@ import { createIcon } from '@/components/icons/hugeIcon'
 const Check = createIcon(CheckData)
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import { useCreateGroup } from '../../hooks/useFriends'
-import { MOCK_FRIENDS } from '../../data/mockData'
+import { useCreateGroup, useFriends } from '../../hooks/useFriends'
 import { Avatar, PaneHeader, SearchBox } from './kit'
 
 /** Wizard tạo nhóm 2 bước: chọn thành viên (chỉ bạn bè) → đặt tên nhóm. */
@@ -17,11 +16,14 @@ export function GroupWizard({ onBack, onDone }: { onBack: () => void; onDone: ()
   const [query, setQuery] = useState('')
   const [groupName, setGroupName] = useState('')
   const createGroup = useCreateGroup()
+  const friendsQuery = useFriends()
 
   const friends = useMemo(() => {
     const q = query.trim().toLowerCase()
-    return MOCK_FRIENDS.filter((f) => !q || f.name.toLowerCase().includes(q) || f.username.toLowerCase().includes(q))
-  }, [query])
+    return (friendsQuery.data ?? []).filter(
+      (friend) => !q || friend.name.toLowerCase().includes(q) || friend.username.toLowerCase().includes(q),
+    )
+  }, [friendsQuery.data, query])
 
   const toggle = (id: string) =>
     setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
@@ -36,6 +38,7 @@ export function GroupWizard({ onBack, onDone }: { onBack: () => void; onDone: ()
           toast.success(t('chat.groupCreated', { name: group.name }))
           onDone()
         },
+        onError: (error) => toast.error(error instanceof Error ? error.message : t('common.error')),
       },
     )
   }
@@ -54,6 +57,8 @@ export function GroupWizard({ onBack, onDone }: { onBack: () => void; onDone: ()
       <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
         {step === 'members' ? (
           <>
+            {friendsQuery.isPending && <p className="px-4 py-2 text-sm text-muted-foreground">{t('chat.pending')}</p>}
+            {friendsQuery.isError && <p className="px-4 py-2 text-sm text-destructive">{t('chat.friendsLoadError')}</p>}
             <ul className="flex flex-col gap-0.5" role="list">
               {friends.map((friend) => {
                 const checked = selected.includes(friend.id)
@@ -99,7 +104,7 @@ export function GroupWizard({ onBack, onDone }: { onBack: () => void; onDone: ()
               <button
                 type="button"
                 onClick={() => selected.length > 0 && setStep('name')}
-                disabled={selected.length === 0}
+                disabled={selected.length === 0 || friendsQuery.isPending || friendsQuery.isError}
                 className="rounded-xl bg-primary px-5 py-2 text-sm font-bold text-primary-foreground shadow-sm transition-all hover:opacity-90 active:scale-95 disabled:opacity-40"
               >
                 {t('chat.next')}
