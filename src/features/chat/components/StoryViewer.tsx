@@ -27,7 +27,23 @@ import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { avatarColor, initials } from '../data/mockData'
 import { storyDisplayName, TEXT_STORY_BG } from '../data/storiesData'
-import { useReactStory, useReplyStory, useUnreactStory, useViewStory } from '../hooks/useStories'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { StorySettingsModal } from './stories/StorySettingsModal'
+import {
+  useLikeStory,
+  useMuteAuthor,
+  useReactStory,
+  useReplyStory,
+  useUnlikeStory,
+  useUnreactStory,
+  useViewStory,
+} from '../hooks/useStories'
 import type { StoryEntry, StoryReactionType } from '../types/chat.types'
 
 const X = createIcon(Cancel01Icon)
@@ -99,6 +115,8 @@ export function StoryViewer({
   const [draft, setDraft] = useState('')
   const [isSending, setIsSending] = useState(false)
 
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+
   // Local optimistic interaction state
   const [viewerReaction, setViewerReaction] = useState<string | null>(story.viewerReaction ?? null)
   const [reactionsCount, setReactionsCount] = useState<number>(story.reactionsCount ?? 0)
@@ -124,6 +142,9 @@ export function StoryViewer({
   const viewMutation = useViewStory()
   const reactMutation = useReactStory()
   const unreactMutation = useUnreactStory()
+  const likeMutation = useLikeStory()
+  const unlikeMutation = useUnlikeStory()
+  const muteMutation = useMuteAuthor()
   const replyMutation = useReplyStory()
 
   // Reset local state khi đổi story
@@ -197,6 +218,40 @@ export function StoryViewer({
 
   const handleToggleReaction = async (emoji: StoryReactionType) => {
     setIsPaused(true)
+    if (story.allowReactions === false) {
+      toast.error('Người đăng đã tắt tính năng bày tỏ cảm xúc trên tin này')
+      return
+    }
+
+    // P0-2: Silent Like (chỉ hiện viewer list, không gửi tin nhắn DM)
+    if (emoji === '❤️') {
+      const isCurrentlyHeart = viewerReaction === '❤️'
+      if (isCurrentlyHeart) {
+        setViewerReaction(null)
+        setReactionsCount((prev) => Math.max(0, prev - 1))
+        try {
+          await unlikeMutation.mutateAsync(story.id)
+          toast.success(t('chat.unreactStorySuccess'))
+        } catch {
+          setViewerReaction('❤️')
+          setReactionsCount((prev) => prev + 1)
+        }
+      } else {
+        const prevReaction = viewerReaction
+        setViewerReaction('❤️')
+        setReactionsCount((prev) => prev + (prevReaction ? 0 : 1))
+        try {
+          await likeMutation.mutateAsync(story.id)
+          toast.success('Đã thích tin')
+        } catch {
+          setViewerReaction(prevReaction)
+          setReactionsCount((prev) => prev - (prevReaction ? 0 : 1))
+        }
+      }
+      return
+    }
+
+    // Các biểu cảm khác (👍, 🥰, 😆, 😮, 😢, 😡): mirror sang tin nhắn 1:1
     if (viewerReaction === emoji) {
       setViewerReaction(null)
       setReactionsCount((prev) => Math.max(0, prev - 1))
@@ -221,8 +276,23 @@ export function StoryViewer({
     }
   }
 
+  const handleMuteAuthor = async () => {
+    if (!story.authorId || story.mine) return
+    try {
+      await muteMutation.mutateAsync(story.authorId)
+      toast.success(`Đã ẩn tin của ${authorTitle}`)
+      handleNextStory()
+    } catch {
+      toast.error('Không thể ẩn tin của tác giả')
+    }
+  }
+
   const handleSendReply = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (story.allowReplies === false) {
+      toast.error('Người đăng đã tắt tính năng phản hồi tin nhắn trên tin này')
+      return
+    }
     const text = draft.trim()
     if (!text || isSending) return
 
@@ -419,13 +489,55 @@ export function StoryViewer({
                     {isPaused ? <Play className="size-4" /> : <Pause className="size-4" />}
                   </button>
 
-                  <button
-                    type="button"
-                    aria-label="Tùy chọn khác"
-                    className="grid size-8 place-items-center rounded-full bg-black/40 hover:bg-black/60 text-white backdrop-blur-xs transition-colors cursor-pointer"
-                  >
-                    <MoreHorizontal className="size-4" />
-                  </button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        type="button"
+                        aria-label="Tùy chọn khác"
+                        onClick={() => setIsPaused(true)}
+                        className="grid size-8 place-items-center rounded-full bg-black/40 hover:bg-black/60 text-white backdrop-blur-xs transition-colors cursor-pointer"
+                      >
+                        <MoreHorizontal className="size-4" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-52 bg-[#242526] text-white border-[#3e4042]">
+                      {!story.mine ? (
+                        <>
+                          <DropdownMenuItem
+                            onClick={handleMuteAuthor}
+                            className="text-rose-400 focus:bg-[#3a3b3c] focus:text-rose-400 cursor-pointer text-xs"
+                          >
+                            Ẩn tin của {authorTitle}
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator className="bg-[#3e4042]" />
+                          <DropdownMenuItem
+                            onClick={() => setIsSettingsOpen(true)}
+                            className="focus:bg-[#3a3b3c] focus:text-white cursor-pointer text-xs"
+                          >
+                            Cài đặt tin
+                          </DropdownMenuItem>
+                        </>
+                      ) : (
+                        <>
+                          <DropdownMenuItem
+                            onClick={() => {
+                              onClose()
+                              navigate(ROUTES.storiesArchive)
+                            }}
+                            className="focus:bg-[#3a3b3c] focus:text-white cursor-pointer text-xs"
+                          >
+                            Kho lưu trữ tin
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => setIsSettingsOpen(true)}
+                            className="focus:bg-[#3a3b3c] focus:text-white cursor-pointer text-xs"
+                          >
+                            Cài đặt tin
+                          </DropdownMenuItem>
+                        </>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
             </div>
@@ -452,39 +564,49 @@ export function StoryViewer({
           {!story.mine ? (
             <div className="flex items-center justify-center gap-2 sm:gap-3 max-w-[620px] w-full px-2">
               {/* Form phản hồi dạng viên thuốc */}
-              <form onSubmit={handleSendReply} className="w-[240px] sm:w-[280px] md:w-[300px] shrink-0">
-                <label className="flex h-11 items-center rounded-full border border-white/35 bg-transparent hover:border-white/55 focus-within:border-white px-4 text-white text-sm transition-all shadow-md cursor-text">
-                  <input
-                    ref={replyInputRef}
-                    type="text"
-                    value={draft}
-                    onFocus={() => setIsPaused(true)}
-                    onBlur={() => {
-                      if (!draft.trim()) setIsPaused(false)
-                    }}
-                    onChange={(e) => setDraft(e.target.value)}
-                    placeholder="Gửi tin nhắn..."
-                    aria-label="Gửi tin nhắn..."
-                    className="h-11 min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/70"
-                  />
-                  {draft.trim() && (
-                    <button
-                      type="submit"
-                      disabled={isSending}
-                      aria-label={t('chat.sendMessage')}
-                      className="grid size-8 place-items-center rounded-full bg-primary text-primary-foreground shadow-md transition-all hover:scale-105 active:scale-95 disabled:opacity-40 ml-1 shrink-0"
-                    >
-                      <Send className="size-4" aria-hidden="true" />
-                    </button>
-                  )}
-                </label>
-              </form>
+              {story.allowReplies === false ? (
+                <div className="w-[240px] sm:w-[280px] md:w-[300px] flex h-11 items-center justify-center rounded-full border border-white/20 bg-black/40 px-4 text-xs text-white/50 select-none text-center">
+                  Tác giả đã tắt tính năng phản hồi
+                </div>
+              ) : (
+                <form onSubmit={handleSendReply} className="w-[240px] sm:w-[280px] md:w-[300px] shrink-0">
+                  <label className="flex h-11 items-center rounded-full border border-white/35 bg-transparent hover:border-white/55 focus-within:border-white px-4 text-white text-sm transition-all shadow-md cursor-text">
+                    <input
+                      ref={replyInputRef}
+                      type="text"
+                      value={draft}
+                      onFocus={() => setIsPaused(true)}
+                      onBlur={() => {
+                        if (!draft.trim()) setIsPaused(false)
+                      }}
+                      onChange={(e) => setDraft(e.target.value)}
+                      placeholder="Gửi tin nhắn..."
+                      aria-label="Gửi tin nhắn..."
+                      className="h-11 min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/70"
+                    />
+                    {draft.trim() && (
+                      <button
+                        type="submit"
+                        disabled={isSending}
+                        aria-label={t('chat.sendMessage')}
+                        className="grid size-8 place-items-center rounded-full bg-primary text-primary-foreground shadow-md transition-all hover:scale-105 active:scale-95 disabled:opacity-40 ml-1 shrink-0"
+                      >
+                        <Send className="size-4" aria-hidden="true" />
+                      </button>
+                    )}
+                  </label>
+                </form>
+              )}
 
               {/* Dải 7 biểu cảm Facebook */}
               <div
-                className="flex items-center gap-1 sm:gap-1.5 shrink-0"
+                className={cn(
+                  'flex items-center gap-1 sm:gap-1.5 shrink-0',
+                  story.allowReactions === false && 'opacity-40 pointer-events-none',
+                )}
                 role="toolbar"
                 aria-label={t('chat.reactions')}
+                title={story.allowReactions === false ? 'Tác giả đã tắt bày tỏ cảm xúc' : undefined}
               >
                 {FACEBOOK_REACTIONS.map(({ emoji, label }) => {
                   const isActive = viewerReaction === emoji
@@ -545,6 +667,7 @@ export function StoryViewer({
             </div>
           )}
         </footer>
+        <StorySettingsModal open={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
       </div>
     )
   }
@@ -599,7 +722,7 @@ export function StoryViewer({
               <span className="text-[#b0b3b8]">·</span>
               <button
                 type="button"
-                onClick={() => navigate(ROUTES.settings)}
+                onClick={() => setIsSettingsOpen(true)}
                 className="hover:underline cursor-pointer flex items-center gap-1"
               >
                 <Settings className="size-3.5" />
@@ -921,13 +1044,55 @@ export function StoryViewer({
                     {isPaused ? <Play className="size-4" /> : <Pause className="size-4" />}
                   </button>
 
-                  <button
-                    type="button"
-                    aria-label="Tùy chọn khác"
-                    className="grid size-8 place-items-center rounded-full bg-black/40 hover:bg-black/60 text-white backdrop-blur-xs transition-colors"
-                  >
-                    <MoreHorizontal className="size-4" />
-                  </button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        type="button"
+                        aria-label="Tùy chọn khác"
+                        onClick={() => setIsPaused(true)}
+                        className="grid size-8 place-items-center rounded-full bg-black/40 hover:bg-black/60 text-white backdrop-blur-xs transition-colors cursor-pointer"
+                      >
+                        <MoreHorizontal className="size-4" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-52 bg-[#242526] text-white border-[#3e4042]">
+                      {!story.mine ? (
+                        <>
+                          <DropdownMenuItem
+                            onClick={handleMuteAuthor}
+                            className="text-rose-400 focus:bg-[#3a3b3c] focus:text-rose-400 cursor-pointer text-xs"
+                          >
+                            Ẩn tin của {authorTitle}
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator className="bg-[#3e4042]" />
+                          <DropdownMenuItem
+                            onClick={() => setIsSettingsOpen(true)}
+                            className="focus:bg-[#3a3b3c] focus:text-white cursor-pointer text-xs"
+                          >
+                            Cài đặt tin
+                          </DropdownMenuItem>
+                        </>
+                      ) : (
+                        <>
+                          <DropdownMenuItem
+                            onClick={() => {
+                              onClose()
+                              navigate(ROUTES.storiesArchive)
+                            }}
+                            className="focus:bg-[#3a3b3c] focus:text-white cursor-pointer text-xs"
+                          >
+                            Kho lưu trữ tin
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => setIsSettingsOpen(true)}
+                            className="focus:bg-[#3a3b3c] focus:text-white cursor-pointer text-xs"
+                          >
+                            Cài đặt tin
+                          </DropdownMenuItem>
+                        </>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
             </div>
@@ -956,39 +1121,49 @@ export function StoryViewer({
           {!story.mine ? (
             <div className="flex items-center justify-center gap-2 sm:gap-3 max-w-[620px] w-full px-2">
               {/* Form phản hồi dạng viên thuốc */}
-              <form onSubmit={handleSendReply} className="w-[240px] sm:w-[280px] md:w-[300px] shrink-0">
-                <label className="flex h-11 items-center rounded-full border border-white/35 bg-transparent hover:border-white/55 focus-within:border-white px-4 text-white text-sm transition-all shadow-md cursor-text">
-                  <input
-                    ref={replyInputRef}
-                    type="text"
-                    value={draft}
-                    onFocus={() => setIsPaused(true)}
-                    onBlur={() => {
-                      if (!draft.trim()) setIsPaused(false)
-                    }}
-                    onChange={(e) => setDraft(e.target.value)}
-                    placeholder="Gửi tin nhắn..."
-                    aria-label="Gửi tin nhắn..."
-                    className="h-11 min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/70"
-                  />
-                  {draft.trim() && (
-                    <button
-                      type="submit"
-                      disabled={isSending}
-                      aria-label={t('chat.sendMessage')}
-                      className="grid size-8 place-items-center rounded-full bg-primary text-primary-foreground shadow-md transition-all hover:scale-105 active:scale-95 disabled:opacity-40 ml-1 shrink-0"
-                    >
-                      <Send className="size-4" aria-hidden="true" />
-                    </button>
-                  )}
-                </label>
-              </form>
+              {story.allowReplies === false ? (
+                <div className="w-[240px] sm:w-[280px] md:w-[300px] flex h-11 items-center justify-center rounded-full border border-white/20 bg-black/40 px-4 text-xs text-white/50 select-none text-center">
+                  Tác giả đã tắt tính năng phản hồi
+                </div>
+              ) : (
+                <form onSubmit={handleSendReply} className="w-[240px] sm:w-[280px] md:w-[300px] shrink-0">
+                  <label className="flex h-11 items-center rounded-full border border-white/35 bg-transparent hover:border-white/55 focus-within:border-white px-4 text-white text-sm transition-all shadow-md cursor-text">
+                    <input
+                      ref={replyInputRef}
+                      type="text"
+                      value={draft}
+                      onFocus={() => setIsPaused(true)}
+                      onBlur={() => {
+                        if (!draft.trim()) setIsPaused(false)
+                      }}
+                      onChange={(e) => setDraft(e.target.value)}
+                      placeholder="Gửi tin nhắn..."
+                      aria-label="Gửi tin nhắn..."
+                      className="h-11 min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/70"
+                    />
+                    {draft.trim() && (
+                      <button
+                        type="submit"
+                        disabled={isSending}
+                        aria-label={t('chat.sendMessage')}
+                        className="grid size-8 place-items-center rounded-full bg-primary text-primary-foreground shadow-md transition-all hover:scale-105 active:scale-95 disabled:opacity-40 ml-1 shrink-0"
+                      >
+                        <Send className="size-4" aria-hidden="true" />
+                      </button>
+                    )}
+                  </label>
+                </form>
+              )}
 
               {/* Dải 7 biểu cảm Facebook */}
               <div
-                className="flex items-center gap-1 sm:gap-1.5 shrink-0"
+                className={cn(
+                  'flex items-center gap-1 sm:gap-1.5 shrink-0',
+                  story.allowReactions === false && 'opacity-40 pointer-events-none',
+                )}
                 role="toolbar"
                 aria-label={t('chat.reactions')}
+                title={story.allowReactions === false ? 'Tác giả đã tắt bày tỏ cảm xúc' : undefined}
               >
                 {FACEBOOK_REACTIONS.map(({ emoji, label }) => {
                   const isActive = viewerReaction === emoji
@@ -1040,6 +1215,7 @@ export function StoryViewer({
           )}
         </footer>
       </main>
+      <StorySettingsModal open={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
     </div>
   )
 }

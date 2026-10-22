@@ -136,6 +136,10 @@ export interface StoryEntry {
   viewerReaction?: string | null
   viewerHasViewed?: boolean
   reactionsSummary?: { reaction: string; count: number }[]
+  allowReplies?: boolean
+  allowReactions?: boolean
+  audienceMode?: 'ALL_FRIENDS' | 'CUSTOM' | 'EXCLUDE'
+  myReactionKind?: 'REACTION' | 'LIKE' | null
 }
 
 

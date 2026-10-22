@@ -26,7 +26,7 @@ export interface BackendStoryReactionSummary {
 export interface BackendStoryResponse {
   id: string
   userId: string
-  kind: 'TEXT' | 'MEDIA'
+  kind: 'TEXT' | 'MEDIA' | 'IMAGE' | 'VIDEO'
   caption?: string | null
   mediaUrl?: string | null
   background?: string | null
@@ -38,6 +38,10 @@ export interface BackendStoryResponse {
   viewerReaction?: string | null
   viewerHasViewed?: boolean
   reactionsSummary?: BackendStoryReactionSummary[]
+  allowReplies?: boolean
+  allowReactions?: boolean
+  audienceMode?: 'ALL_FRIENDS' | 'CUSTOM' | 'EXCLUDE'
+  myReactionKind?: 'REACTION' | 'LIKE' | null
 }
 
 export interface StoryReplyResponse {
@@ -103,7 +107,7 @@ export function mapBackendStoryToEntry(item: BackendStoryResponse, currentUserId
     online: true,
     authorId: item.userId,
     authorAvatar: item.user?.avatarUrl,
-    kind: item.kind,
+    kind: item.kind === 'TEXT' ? 'TEXT' : 'MEDIA',
     caption: item.caption,
     mediaUrl: item.mediaUrl,
     background: item.background,
@@ -112,6 +116,10 @@ export function mapBackendStoryToEntry(item: BackendStoryResponse, currentUserId
     viewerReaction: item.viewerReaction ?? null,
     viewerHasViewed: item.viewerHasViewed ?? false,
     reactionsSummary: item.reactionsSummary,
+    allowReplies: item.allowReplies ?? true,
+    allowReactions: item.allowReactions ?? true,
+    audienceMode: item.audienceMode ?? 'ALL_FRIENDS',
+    myReactionKind: item.myReactionKind ?? null,
   }
 }
 
@@ -123,10 +131,19 @@ export interface CreateMediaStoryPayload {
   mediaKind: 'photo' | 'gif' | 'sticker' | 'video'
   label: string
   captionText: string
+  allowReplies?: boolean
+  allowReactions?: boolean
+  audienceMode?: 'ALL_FRIENDS' | 'CUSTOM' | 'EXCLUDE'
+  audienceUserIds?: string[]
 }
 
 export interface CreateTextStoryPayload {
   text: string
+  background?: string
+  allowReplies?: boolean
+  allowReactions?: boolean
+  audienceMode?: 'ALL_FRIENDS' | 'CUSTOM' | 'EXCLUDE'
+  audienceUserIds?: string[]
 }
 
 export interface CreateStoryDto {
@@ -178,6 +195,10 @@ try {
             reactionsCount: item.reactionsCount ?? 0,
             viewerReaction: item.myReaction ?? null,
             viewerHasViewed: Boolean(item.hasViewed),
+            allowReplies: item.allowReplies ?? true,
+            allowReactions: item.allowReactions ?? true,
+            audienceMode: item.audienceMode ?? 'ALL_FRIENDS',
+            myReactionKind: item.myReactionKind ?? null,
           })
         }
       } else {
@@ -208,6 +229,9 @@ export async function createTextStory(payload: CreateTextStoryPayload): Promise<
       reactionsCount: 0,
       viewsCount: 0,
       viewerReaction: null,
+      allowReplies: payload.allowReplies ?? true,
+      allowReactions: payload.allowReactions ?? true,
+      audienceMode: payload.audienceMode ?? 'ALL_FRIENDS',
     }
     storyStore = [entry, ...storyStore]
     return { ...entry }
@@ -215,6 +239,11 @@ export async function createTextStory(payload: CreateTextStoryPayload): Promise<
   const res = await api.post<BackendStoryResponse>('/stories', {
     kind: 'TEXT',
     caption: payload.text.trim(),
+    background: payload.background,
+    allowReplies: payload.allowReplies ?? true,
+    allowReactions: payload.allowReactions ?? true,
+    audienceMode: payload.audienceMode ?? 'ALL_FRIENDS',
+    audienceUserIds: payload.audienceUserIds,
   })
   return mapBackendStoryToEntry(res.data)
 }
@@ -235,14 +264,21 @@ export async function createMediaStory(payload: CreateMediaStoryPayload): Promis
       reactionsCount: 0,
       viewsCount: 0,
       viewerReaction: null,
+      allowReplies: payload.allowReplies ?? true,
+      allowReactions: payload.allowReactions ?? true,
+      audienceMode: payload.audienceMode ?? 'ALL_FRIENDS',
     }
     storyStore = [entry, ...storyStore]
     return { ...entry }
   }
   const res = await api.post<BackendStoryResponse>('/stories', {
-    kind: 'MEDIA',
+    kind: payload.mediaKind === 'video' ? 'VIDEO' : 'IMAGE',
     caption: payload.captionText.trim() || undefined,
     objectKey: payload.label,
+    allowReplies: payload.allowReplies ?? true,
+    allowReactions: payload.allowReactions ?? true,
+    audienceMode: payload.audienceMode ?? 'ALL_FRIENDS',
+    audienceUserIds: payload.audienceUserIds,
   })
   return mapBackendStoryToEntry(res.data)
 }
@@ -369,5 +405,111 @@ export async function getStoryViews(storyId: string): Promise<StoryViewerItem[]>
   } catch {
     const res = await api.get<StoryViewerItem[]>(`/stories/${storyId}/views`)
     return res.data ?? []
+  }
+}
+
+
+/** Thích story im lặng (silent like - chỉ hiện ở viewer list, không gửi tin nhắn DM). */
+export async function likeStory(storyId: string): Promise<{ success: boolean; reaction: string; kind: 'LIKE' }> {
+  if (isAuthBypass()) {
+    await delay(100)
+    storyStore = storyStore.map((s) => {
+      if (s.id !== storyId) return s
+      const hadReaction = Boolean(s.viewerReaction)
+      return {
+        ...s,
+        viewerReaction: '❤️',
+        reactionsCount: (s.reactionsCount ?? 0) + (hadReaction ? 0 : 1),
+      }
+    })
+    return { success: true, reaction: '❤️', kind: 'LIKE' }
+  }
+  const res = await api.post<{ storyId: string; emoji: string; kind: 'LIKE' }>(`/stories/${storyId}/like`)
+  return { success: true, reaction: res.data?.emoji ?? '❤️', kind: 'LIKE' }
+}
+
+/** Bỏ thích story im lặng. */
+export async function unlikeStory(storyId: string): Promise<{ success: boolean }> {
+  if (isAuthBypass()) {
+    return unreactStory(storyId)
+  }
+  await api.delete(`/stories/${storyId}/like`)
+  return { success: true }
+}
+
+export interface UserStorySettings {
+  viewedReceiptsEnabled: boolean
+  archiveEnabled: boolean
+  archiveDurationSecs: number | null
+}
+
+/** Lấy cài đặt story của người dùng (view receipts, archive). */
+export async function getStorySettings(): Promise<UserStorySettings> {
+  if (isAuthBypass()) {
+    return {
+      viewedReceiptsEnabled: true,
+      archiveEnabled: true,
+      archiveDurationSecs: null,
+    }
+  }
+  const res = await api.get<UserStorySettings>('/stories/settings')
+  return res.data
+}
+
+/** Cập nhật cài đặt story của người dùng. */
+export async function updateStorySettings(
+  payload: Partial<UserStorySettings>,
+): Promise<UserStorySettings> {
+  if (isAuthBypass()) {
+    return {
+      viewedReceiptsEnabled: payload.viewedReceiptsEnabled ?? true,
+      archiveEnabled: payload.archiveEnabled ?? true,
+      archiveDurationSecs: payload.archiveDurationSecs ?? null,
+    }
+  }
+  const res = await api.patch<UserStorySettings>('/stories/settings', payload)
+  return res.data
+}
+
+/** Ẩn (mute) story của tác giả khác. */
+export async function muteAuthor(authorId: string): Promise<{ success: boolean }> {
+  if (isAuthBypass()) {
+    storyStore = storyStore.filter((s) => s.authorId !== authorId)
+    return { success: true }
+  }
+  await api.post(`/stories/mutes/${authorId}`)
+  return { success: true }
+}
+
+/** Bỏ ẩn (unmute) story của tác giả khác. */
+export async function unmuteAuthor(authorId: string): Promise<{ success: boolean }> {
+  if (isAuthBypass()) {
+    return { success: true }
+  }
+  await api.delete(`/stories/mutes/${authorId}`)
+  return { success: true }
+}
+
+/** Lấy danh sách ID các tác giả bị ẩn story. */
+export async function getMutedAuthors(): Promise<string[]> {
+  if (isAuthBypass()) {
+    return []
+  }
+  const res = await api.get<string[]>('/stories/mutes')
+  return res.data ?? []
+}
+
+/** Lấy kho lưu trữ tin (archive) của người dùng hiện tại. */
+export async function getArchivedStories(cursor?: string): Promise<{ items: StoryEntry[]; nextCursor: string | null }> {
+  if (isAuthBypass()) {
+    return { items: [], nextCursor: null }
+  }
+  const params = new URLSearchParams()
+  if (cursor) params.append('cursor', cursor)
+  const res = await api.get<any>(`/stories/archive?${params.toString()}`)
+  const raw = res.data?.items ?? res.data ?? []
+  return {
+    items: raw.map((item: any) => mapBackendStoryToEntry(item)),
+    nextCursor: res.data?.nextCursor ?? null,
   }
 }

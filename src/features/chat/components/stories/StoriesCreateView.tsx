@@ -19,6 +19,7 @@ import { SideNav } from '../SideNav'
 import { ChooseStoryType } from './ChooseStoryType'
 import { TextStoryEditor } from './TextStoryEditor'
 import { MediaStoryEditor } from './MediaStoryEditor'
+import { StorySettingsModal } from './StorySettingsModal'
 import { storyDisplayName, storyTime } from '../../data/storiesData'
 
 type StoryStep = 'choose' | 'media' | 'text'
@@ -30,6 +31,7 @@ export function StoriesCreateView() {
   const { user } = useAuth()
   const [step, setStep] = useState<StoryStep>('choose')
   const [viewingOwn, setViewingOwn] = useState<StoryEntry | null>(null)
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const createText = useCreateTextStory()
   const createMedia = useCreateMediaStory()
 
@@ -78,7 +80,8 @@ export function StoriesCreateView() {
           <button
             type="button"
             aria-label={t('chat.settingsTitle')}
-            className="grid size-9 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            onClick={() => setIsSettingsOpen(true)}
+            className="grid size-9 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground cursor-pointer"
           >
             <Gear className="size-4.5" aria-hidden="true" />
           </button>
@@ -169,6 +172,7 @@ export function StoriesCreateView() {
 
       {/* Xem lại tin của mình từ panel trái */}
       {viewingOwn && <StoryViewer story={viewingOwn} onClose={() => setViewingOwn(null)} />}
+      <StorySettingsModal open={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
     </main>
   )
 }
