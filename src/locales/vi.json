@@ -301,7 +301,16 @@
     "viewStoryOf": "Xem tin của {name}",
     "unnamedStory": "Tin không chú thích",
     "createStoryOptionText": "Tạo tin dạng văn bản",
-    "addTextHint": "Thêm dòng chữ…"
+    "addTextHint": "Thêm dòng chữ…",
+    "replyStoryPlaceholder": "Nhắn tin cho {{name}}…",
+    "replyStorySuccess": "Đã gửi phản hồi vào cuộc trò chuyện 1:1",
+    "replyStoryError": "Không thể gửi phản hồi",
+    "reactStorySuccess": "Đã thả cảm xúc",
+    "unreactStorySuccess": "Đã gỡ cảm xúc",
+    "unreactStory": "Gỡ cảm xúc",
+    "replyToStory": "Trả lời tin",
+    "storyViewsCount": "{{count}} người xem",
+    "storyReactionsCount": "{{count}} tương tác"
   },
   "theme": {
     "toLight": "Chuyển sang chế độ sáng",
