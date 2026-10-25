@@ -4,8 +4,6 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import {
   CheckCheckIcon as CheckCheckData,
   CheckIcon as CheckData,
-  Download01Icon as DownloadData,
-  EyeIcon as ViewPreviewData,
   Film01Icon as FilmData,
   Image01Icon as ImageIconData,
   StickerIcon as StickerData,
@@ -13,8 +11,6 @@ import {
 import { createIcon } from '@/components/icons/hugeIcon'
 const Check = createIcon(CheckData)
 const CheckCheck = createIcon(CheckCheckData)
-const DownloadIcon = createIcon(DownloadData)
-const ViewPreviewIcon = createIcon(ViewPreviewData)
 const Film = createIcon(FilmData)
 const ImageIcon = createIcon(ImageIconData)
 const Sticker = createIcon(StickerData)
@@ -22,8 +18,9 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { avatarColor, initials } from '../../data/mockData'
 import type { ChatMessage, DayGroup, MessageAttachmentItem } from '../../types/chat.types'
-import { isImage, isPreviewable, isVideo } from '../../utils/fileTypes'
-import { AttachmentActionMenu } from './AttachmentActionMenu'
+import { isImage, isVideo } from '../../utils/fileTypes'
+import { useRevokeMessageMutation } from '../../hooks/useChatQueries'
+import { MessageActionPill } from './AttachmentActionMenu'
 import { AttachmentBubble } from './AttachmentBubble'
 import { ImageLightboxModal } from './ImageLightboxModal'
 import { DocumentPreviewModal } from './DocumentPreviewModal'
@@ -124,12 +121,14 @@ function MessageRowView({
   senderLabel,
   onOpenLightbox,
   onOpenDocument,
+  onRevoke,
 }: {
   group: MessageGroup
   messageIndex: number
   senderLabel: string
   onOpenLightbox: (attachment: MessageAttachmentItem) => void
   onOpenDocument: (attachment: MessageAttachmentItem) => void
+  onRevoke?: (messageId: string) => void
 }) {
   const { t } = useTranslation()
   const isMe = group.fromMe
@@ -140,71 +139,74 @@ function MessageRowView({
   const authorName = group.sender ?? senderLabel
   const hasAttachments = Boolean(msg.attachments && msg.attachments.length > 0)
   const firstAttachment = hasAttachments ? msg.attachments![0] : undefined
-  const canPreview = firstAttachment ? isPreviewable(firstAttachment.mimeType, firstAttachment.fileName) : false
 
-  const handleQuickDownload = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    if (!firstAttachment) return
-    const url = firstAttachment.downloadUrl || firstAttachment.previewUrl
-    const a = document.createElement('a')
-    a.href = url
-    a.download = firstAttachment.fileName || 'download'
-    a.target = '_blank'
-    a.rel = 'noopener noreferrer'
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    toast.success(`${t('chat.downloading', 'Đang tải')} ${firstAttachment.fileName}`)
+  const [isHeld, setIsHeld] = useState(false)
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const handleTouchStart = () => {
+    holdTimerRef.current = setTimeout(() => {
+      setIsHeld(true)
+    }, 350)
   }
 
-  const handleQuickPreview = () => {
-    if (!firstAttachment) return
-    if (isImage(firstAttachment.mimeType, firstAttachment.fileName)) {
-      onOpenLightbox(firstAttachment)
-    } else {
-      onOpenDocument(firstAttachment)
+  const handleTouchEnd = () => {
+    if (holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current)
+      holdTimerRef.current = null
     }
   }
 
-  // Floating Action Bar on hover/hold (like Messenger)
-  const actionBar = firstAttachment ? (
-    <div className={cn(
-      'flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150 self-center shrink-0',
-      isMe ? 'mr-1.5' : 'ml-1.5'
-    )}>
-      {/* 3-dot More Options Menu */}
-      <AttachmentActionMenu
-        attachment={firstAttachment}
-        onPreview={handleQuickPreview}
-      />
-      {/* Quick Download Button */}
-      <button
-        type="button"
-        onClick={handleQuickDownload}
-        className="grid size-7 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-        title={t('chat.download', 'Tải xuống')}
-        aria-label={t('chat.download', 'Tải xuống')}
-      >
-        <DownloadIcon className="size-4" />
-      </button>
-      {/* Quick Preview Button (if previewable) */}
-      {canPreview && (
-        <button
-          type="button"
-          onClick={handleQuickPreview}
-          className="grid size-7 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-          title={t('chat.preview', 'Xem trực tiếp')}
-          aria-label={t('chat.preview', 'Xem trực tiếp')}
-        >
-          <ViewPreviewIcon className="size-4" />
-        </button>
+  const handleQuickPreview = (attachment: MessageAttachmentItem) => {
+    if (isImage(attachment.mimeType, attachment.fileName)) {
+      onOpenLightbox(attachment)
+    } else {
+      onOpenDocument(attachment)
+    }
+  }
+
+  // Floating 3-button Action Bar on hover/hold (Messenger-style: Emoji, Forward, 3-dots)
+  const showActions = isHeld || isMenuOpen
+  const actionBar = !msg.deletedAt ? (
+    <div
+      className={cn(
+        'flex items-center gap-1 transition-opacity duration-150 self-center shrink-0',
+        isMe ? 'mr-1.5' : 'ml-1.5',
+        showActions
+          ? 'opacity-100 pointer-events-auto'
+          : 'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto',
       )}
+    >
+      <MessageActionPill
+        message={msg}
+        attachment={firstAttachment}
+        isMe={isMe}
+        onPreview={handleQuickPreview}
+        onRevoke={onRevoke}
+        align={isMe ? 'end' : 'start'}
+        onOpenChange={setIsMenuOpen}
+      />
     </div>
   ) : null
+
+  const isPureMedia =
+    hasAttachments &&
+    !msg.text &&
+    (isImage(firstAttachment?.mimeType, firstAttachment?.fileName) ||
+      isVideo(firstAttachment?.mimeType, firstAttachment?.fileName))
+
+  const isMediaWithCaption =
+    hasAttachments &&
+    Boolean(msg.text) &&
+    (isImage(firstAttachment?.mimeType, firstAttachment?.fileName) ||
+      isVideo(firstAttachment?.mimeType, firstAttachment?.fileName))
 
   return (
     <div
       data-message-id={msg.id}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchEnd}
       className={cn(
         'group msg-in flex w-full items-center',
         isMe ? 'justify-end' : 'justify-start gap-2.5',
@@ -222,7 +224,7 @@ function MessageRowView({
       )}
       {!isMe && !isLast && <span aria-hidden="true" className="size-7 shrink-0" />}
 
-      {/* Action buttons on the left of bubble for isMe */}
+      {/* 3 action buttons on the left of bubble for isMe */}
       {isMe && actionBar}
 
       {/* Single Message Box */}
@@ -230,13 +232,19 @@ function MessageRowView({
         <div
           className={cn(
             'w-fit max-w-full text-sm leading-relaxed wrap-break-word whitespace-pre-wrap',
-            hasAttachments && !msg.text && (isImage(firstAttachment?.mimeType, firstAttachment?.fileName) || isVideo(firstAttachment?.mimeType, firstAttachment?.fileName))
+            isPureMedia
               ? 'p-0 bg-transparent border-0 shadow-none'
-              : cn(
-                  'px-3.5 py-2.5',
-                  isMe ? 'bg-secondary text-foreground' : 'border border-border bg-card text-foreground shadow-sm',
-                  bubbleRadius(messageIndex, total, isMe, msg.kind !== 'text'),
-                ),
+              : isMediaWithCaption
+                ? cn(
+                    'p-0 overflow-hidden shadow-sm',
+                    isMe ? 'bg-secondary text-foreground' : 'border border-border bg-card text-foreground',
+                    bubbleRadius(messageIndex, total, isMe, true),
+                  )
+                : cn(
+                    'px-3.5 py-2.5 shadow-sm',
+                    isMe ? 'bg-secondary text-foreground' : 'border border-border bg-card text-foreground',
+                    bubbleRadius(messageIndex, total, isMe, msg.kind !== 'text'),
+                  ),
           )}
         >
           {isFirst && !isMe && group.sender && (
@@ -247,32 +255,42 @@ function MessageRowView({
             <StoryReplyQuote preview={msg.storyPreview} defaultAuthor={authorName} />
           )}
 
-          {/* Render Attachments if present (Single Box) */}
-          {hasAttachments && (
-            <div className="flex flex-col gap-1.5">
-              {msg.attachments!.map((att) => (
-                <AttachmentBubble
-                  key={att.id}
-                  attachment={att}
-                  onOpenLightbox={onOpenLightbox}
-                  onOpenDocument={onOpenDocument}
-                  hasCaption={Boolean(msg.text)}
-                />
-              ))}
-            </div>
-          )}
-
-          {/* Render Text / Caption if present */}
-          {msg.text && (
-            <span>{msg.text}</span>
-          )}
-
-          {/* Legacy fallback for media without attachments */}
-          {!hasAttachments && !msg.storyPreview && msg.kind !== 'text' && (
-            <span className="flex flex-col gap-1.5">
-              <MediaBubble label={msg.photoLabel ?? t('chat.attachment')} kind={msg.kind} />
-              {msg.text && <span>{msg.text}</span>}
+          {msg.deletedAt ? (
+            <span className="italic text-muted-foreground text-xs">
+              {msg.text || t('chat.messageRevokedText', 'Tin nhắn đã bị thu hồi')}
             </span>
+          ) : (
+            <>
+              {/* Render Attachments if present (Single Box) */}
+              {hasAttachments && (
+                <div className="flex flex-col gap-1.5">
+                  {msg.attachments!.map((att) => (
+                    <AttachmentBubble
+                      key={att.id}
+                      attachment={att}
+                      onOpenLightbox={onOpenLightbox}
+                      onOpenDocument={onOpenDocument}
+                      hasCaption={Boolean(msg.text)}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {/* Render Text / Caption if present */}
+              {msg.text && (
+                <div className={cn(isMediaWithCaption && 'px-3.5 py-2 text-sm')}>
+                  {msg.text}
+                </div>
+              )}
+
+              {/* Legacy fallback for media without attachments */}
+              {!hasAttachments && !msg.storyPreview && msg.kind !== 'text' && (
+                <span className="flex flex-col gap-1.5">
+                  <MediaBubble label={msg.photoLabel ?? t('chat.attachment')} kind={msg.kind} />
+                  {msg.text && <span>{msg.text}</span>}
+                </span>
+              )}
+            </>
           )}
 
           {msg.reactions && msg.reactions.length > 0 && (
@@ -299,7 +317,7 @@ function MessageRowView({
         )}
       </div>
 
-      {/* Action buttons on the right of bubble for !isMe */}
+      {/* 3 action buttons on the right of bubble for !isMe */}
       {!isMe && actionBar}
     </div>
   )
@@ -309,6 +327,7 @@ interface MessageListProps {
   groups: DayGroup[]
   senderLabel: string
   scrollRef: RefObject<HTMLDivElement | null>
+  conversationId?: string
 }
 
 export interface MessageListHandle {
@@ -320,14 +339,28 @@ type MessageListRow =
   | { kind: 'message'; key: string; group: MessageGroup; messageIndex: number }
 
 export const MessageList = forwardRef<MessageListHandle, MessageListProps>(function MessageList(
-  { groups, senderLabel, scrollRef },
+  { groups, senderLabel, scrollRef, conversationId },
   ref,
 ) {
   'use no memo'
 
+  const { t } = useTranslation()
   const didInitialScroll = useRef(false)
   const [lightboxAttachment, setLightboxAttachment] = useState<MessageAttachmentItem | null>(null)
   const [documentAttachment, setDocumentAttachment] = useState<MessageAttachmentItem | null>(null)
+
+  const revokeMutation = useRevokeMessageMutation(conversationId ?? null)
+
+  const handleRevokeMessage = (messageId: string) => {
+    revokeMutation.mutate(messageId, {
+      onSuccess: () => {
+        toast.success(t('chat.messageRevoked', 'Đã gỡ tin nhắn'))
+      },
+      onError: () => {
+        toast.error(t('chat.messageRevokeFailed', 'Không thể gỡ tin nhắn'))
+      },
+    })
+  }
 
   const rows = useMemo(() => {
     const result: MessageListRow[] = []
@@ -391,6 +424,7 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
         senderLabel={senderLabel}
         onOpenLightbox={setLightboxAttachment}
         onOpenDocument={setDocumentAttachment}
+        onRevoke={handleRevokeMessage}
       />
     )
 

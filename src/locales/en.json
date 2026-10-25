@@ -320,7 +320,19 @@
     "unreactStory": "Remove reaction",
     "replyToStory": "Replied to story",
     "storyViewsCount": "{{count}} views",
-    "storyReactionsCount": "{{count}} reactions"
+    "storyReactionsCount": "{{count}} reactions",
+    "revoke": "Unsend",
+    "forward": "Forward",
+    "pin": "Pin",
+    "copyText": "Copy",
+    "report": "Report",
+    "messageRevoked": "Message unsent",
+    "messageRevokeFailed": "Failed to unsend message",
+    "messageRevokedText": "This message was unsent",
+    "forwardDeveloping": "Forwarding is coming soon",
+    "pinDeveloping": "Pinning is coming soon",
+    "reportSubmitted": "Report submitted",
+    "textCopied": "Message copied"
   },
   "theme": {
     "toLight": "Switch to light mode",

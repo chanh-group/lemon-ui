@@ -155,7 +155,13 @@ export function ConversationView({
             <p className="mt-1 max-w-sm text-sm text-muted-foreground">{t('chat.newConnectionPrompt')}</p>
           </div>
         ) : (
-          <MessageList ref={messageListRef} groups={groups} senderLabel={conversation.name} scrollRef={scrollRef} />
+          <MessageList
+            ref={messageListRef}
+            groups={groups}
+            senderLabel={conversation.name}
+            scrollRef={scrollRef}
+            conversationId={conversation.id}
+          />
         )}
 
         {showJump && (

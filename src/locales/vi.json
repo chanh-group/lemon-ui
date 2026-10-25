@@ -320,7 +320,19 @@
     "unreactStory": "Gỡ cảm xúc",
     "replyToStory": "Trả lời tin",
     "storyViewsCount": "{{count}} người xem",
-    "storyReactionsCount": "{{count}} tương tác"
+    "storyReactionsCount": "{{count}} tương tác",
+    "revoke": "Gỡ",
+    "forward": "Chuyển tiếp",
+    "pin": "Ghim",
+    "copyText": "Sao chép",
+    "report": "Báo cáo",
+    "messageRevoked": "Đã gỡ tin nhắn",
+    "messageRevokeFailed": "Không thể gỡ tin nhắn",
+    "messageRevokedText": "Tin nhắn đã bị thu hồi",
+    "forwardDeveloping": "Tính năng chuyển tiếp đang phát triển",
+    "pinDeveloping": "Tính năng ghim đang phát triển",
+    "reportSubmitted": "Đã gửi báo cáo",
+    "textCopied": "Đã sao chép tin nhắn"
   },
   "theme": {
     "toLight": "Chuyển sang chế độ sáng",
