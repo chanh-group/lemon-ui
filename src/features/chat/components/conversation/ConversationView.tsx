@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { ArrowDown01Icon as ArrowDownData } from '@hugeicons/core-free-icons'
@@ -57,6 +57,16 @@ export function ConversationView({
   const [showJump, setShowJump] = useState(false)
   const olderRequestPending = useRef(false)
   const newerRequestPending = useRef(false)
+  const latestMessage = groups.at(-1)?.messages.at(-1)
+  const previousLatestMessageId = useRef<string | undefined>(undefined)
+
+  useEffect(() => {
+    if (latestMessage?.id && previousLatestMessageId.current && latestMessage.id !== previousLatestMessageId.current && !latestMessage.fromMe) {
+      const el = scrollRef.current
+      if (el && el.scrollHeight - el.scrollTop - el.clientHeight >= 120) setShowJump(true)
+    }
+    previousLatestMessageId.current = latestMessage?.id
+  }, [latestMessage])
 
   const scrollToBottom = (smooth = true) => {
     messageListRef.current?.scrollToEnd(smooth ? 'smooth' : 'auto')
@@ -93,7 +103,7 @@ export function ConversationView({
     const el = scrollRef.current
     if (!el) return
     const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120
-    setShowJump(!nearBottom)
+    if (nearBottom) setShowJump(false)
 
     if (el.scrollTop < 250) loadOlderMessages()
 
@@ -152,9 +162,12 @@ export function ConversationView({
         {showJump && (
           <button
             type="button"
-            onClick={() => scrollToBottom()}
+            onClick={() => {
+              setShowJump(false)
+              scrollToBottom()
+            }}
             aria-label={t('chat.jumpToLatest')}
-            className="absolute right-4 bottom-2 flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-md transition-transform duration-150 hover:scale-105"
+            className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-md transition-transform duration-150 hover:scale-105"
           >
             <ArrowDown className="size-3.5" aria-hidden="true" />
             {t('chat.newMessages')}

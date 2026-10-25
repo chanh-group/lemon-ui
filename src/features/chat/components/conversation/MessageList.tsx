@@ -247,13 +247,33 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
 
   useLayoutEffect(() => {
     if (rows.length === 0 || didInitialScroll.current) return
-    virtualizer.scrollToEnd()
-    didInitialScroll.current = true
+    const frame = requestAnimationFrame(() => {
+      virtualizer.scrollToEnd({ behavior: 'auto' })
+      didInitialScroll.current = true
+    })
+    return () => cancelAnimationFrame(frame)
   }, [rows.length, virtualizer])
 
+  const virtualRows = virtualizer.getVirtualItems()
+  const renderRow = (row: MessageListRow) => row.kind === 'date' ? (
+    <div className="flex items-center gap-3 pt-2 pb-3" role="separator" aria-label={row.date}>
+      <span className="h-px flex-1 bg-border" aria-hidden="true" />
+      <span className="rounded-full border border-border bg-card px-3 py-1 text-[11px] font-semibold text-muted-foreground">
+        {row.date}
+      </span>
+      <span className="h-px flex-1 bg-border" aria-hidden="true" />
+    </div>
+  ) : (
+    <MessageRowView group={row.group} messageIndex={row.messageIndex} senderLabel={senderLabel} />
+  )
+
   return (
-    <div className="relative w-full" style={{ height: virtualizer.getTotalSize() }}>
-      {virtualizer.getVirtualItems().map((virtualRow) => {
+    <div className="relative w-full" style={virtualRows.length ? { height: virtualizer.getTotalSize() } : undefined}>
+      {virtualRows.length === 0 && rows.length > 0 ? rows.map((row) => (
+        <div key={row.key} className={row.kind === 'message' && row.messageIndex === row.group.messages.length - 1 ? 'pb-2' : 'pb-0'}>
+          {renderRow(row)}
+        </div>
+      )) : virtualRows.map((virtualRow) => {
         const row = rows[virtualRow.index]
         return (
           <div
@@ -263,23 +283,9 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
             className="absolute top-0 left-0 w-full"
             style={{ transform: `translateY(${virtualRow.start}px)` }}
           >
-            {row.kind === 'date' ? (
-              <div className="flex items-center gap-3 pt-2 pb-3" role="separator" aria-label={row.date}>
-                <span className="h-px flex-1 bg-border" aria-hidden="true" />
-                <span className="rounded-full border border-border bg-card px-3 py-1 text-[11px] font-semibold text-muted-foreground">
-                  {row.date}
-                </span>
-                <span className="h-px flex-1 bg-border" aria-hidden="true" />
-              </div>
-            ) : (
-              <div className={row.messageIndex === row.group.messages.length - 1 ? 'pb-2' : 'pb-0'}>
-                <MessageRowView
-                  group={row.group}
-                  messageIndex={row.messageIndex}
-                  senderLabel={senderLabel}
-                />
-              </div>
-            )}
+            <div className={row.kind === 'message' && row.messageIndex === row.group.messages.length - 1 ? 'pb-2' : 'pb-0'}>
+              {renderRow(row)}
+            </div>
           </div>
         )
       })}
