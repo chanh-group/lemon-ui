@@ -301,7 +301,17 @@
     "viewStoryOf": "View {name}'s story",
     "unnamedStory": "Untitled story",
     "createStoryOptionText": "Create a text story",
-    "addTextHint": "Tap to add text…"
+    "addTextHint": "Tap to add text…",
+    "preview": "Preview",
+    "download": "Download",
+    "copyLink": "Copy link",
+    "downloadFailed": "Failed to download file",
+    "downloading": "Downloading",
+    "linkCopied": "Link copied to clipboard",
+    "uploadingFiles": "Uploading attachments…",
+    "uploadFailed": "Failed to upload file. Please try again.",
+    "fileTooLarge": "File “{{fileName}}” exceeds 25MB limit ({{fileSize}}).",
+    "optimizingVideo": "Optimizing video “{{name}}”…"
   },
   "theme": {
     "toLight": "Switch to light mode",

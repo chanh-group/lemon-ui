@@ -44,7 +44,7 @@ export function AttachmentActionMenu({
     e.stopPropagation()
     const targetUrl = attachment.downloadUrl || attachment.previewUrl
     if (!targetUrl) {
-      toast.error(t('chat.downloadFailed') || 'Không thể tải tệp')
+      toast.error(t('chat.downloadFailed', 'Không thể tải tệp'))
       return
     }
 
@@ -57,7 +57,7 @@ export function AttachmentActionMenu({
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
-    toast.success(`${t('chat.downloading') || 'Đang tải'} ${attachment.fileName}`)
+    toast.success(`${t('chat.downloading', 'Đang tải')} ${attachment.fileName}`)
   }
 
   const handleCopyLink = (e: React.MouseEvent) => {
@@ -65,7 +65,7 @@ export function AttachmentActionMenu({
     const targetUrl = attachment.previewUrl || attachment.downloadUrl
     if (targetUrl) {
       navigator.clipboard.writeText(targetUrl)
-      toast.success(t('chat.linkCopied') || 'Đã sao chép liên kết')
+      toast.success(t('chat.linkCopied', 'Đã sao chép liên kết'))
     }
   }
 
@@ -93,17 +93,17 @@ export function AttachmentActionMenu({
         {canPreview && onPreview && (
           <DropdownMenuItem onClick={handlePreview} className="cursor-pointer gap-2">
             <ViewPreviewIcon className="size-4" />
-            <span>{t('chat.preview') || 'Xem trực tiếp'}</span>
+            <span>{t('chat.preview', 'Xem trực tiếp')}</span>
           </DropdownMenuItem>
         )}
         <DropdownMenuItem onClick={handleDownload} className="cursor-pointer gap-2">
           <DownloadIcon className="size-4" />
-          <span>{t('chat.download') || 'Tải xuống máy'}</span>
+          <span>{t('chat.download', 'Tải xuống')}</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleCopyLink} className="cursor-pointer gap-2">
           <CopyLinkIcon className="size-4" />
-          <span>{t('chat.copyLink') || 'Sao chép liên kết'}</span>
+          <span>{t('chat.copyLink', 'Sao chép liên kết')}</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

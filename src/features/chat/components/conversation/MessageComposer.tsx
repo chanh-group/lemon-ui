@@ -94,7 +94,7 @@ export function MessageComposer({
       if (rawFile.type.startsWith('video/')) {
         try {
           if (rawFile.size > 15 * 1024 * 1024) {
-            toast.info(`Đang tối ưu dung lượng video "${rawFile.name}"...`)
+            toast.info(t('chat.optimizingVideo', { name: rawFile.name, defaultValue: `Đang tối ưu dung lượng video "${rawFile.name}"...` }))
           }
           const compressed = await compressVideoIfNeeded(rawFile, { maxSizeBytes: MAX_FILE_SIZE })
           if (compressed instanceof File) {
@@ -107,7 +107,7 @@ export function MessageComposer({
       }
 
       if (fileToUse.size > MAX_FILE_SIZE) {
-        toast.error(`Tệp "${fileToUse.name}" vượt quá giới hạn 25MB (${formatBytes(fileToUse.size)}).`)
+        toast.error(t('chat.fileTooLarge', { fileName: fileToUse.name, fileSize: formatBytes(fileToUse.size), defaultValue: `Tệp "${fileToUse.name}" vượt quá giới hạn 25MB (${formatBytes(fileToUse.size)}).` }))
         continue
       }
 
@@ -194,7 +194,7 @@ export function MessageComposer({
       })
       setPendingFiles([])
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Tải tệp lên thất bại. Vui lòng thử lại.')
+      toast.error(err instanceof Error ? err.message : t('chat.uploadFailed', 'Tải tệp lên thất bại. Vui lòng thử lại.'))
     } finally {
       setIsUploading(false)
     }
@@ -240,7 +240,8 @@ export function MessageComposer({
           ))}
           {isUploading && (
             <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground animate-pulse">
-              Đang tải tệp lên Cloudflare R2...
+              <span className="size-2 rounded-full bg-primary animate-ping" />
+              <span>{t('chat.uploadingFiles', 'Đang gửi tệp đính kèm…')}</span>
             </div>
           )}
         </div>

@@ -301,7 +301,17 @@
     "viewStoryOf": "Xem tin của {name}",
     "unnamedStory": "Tin không chú thích",
     "createStoryOptionText": "Tạo tin dạng văn bản",
-    "addTextHint": "Thêm dòng chữ…"
+    "addTextHint": "Thêm dòng chữ…",
+    "preview": "Xem trực tiếp",
+    "download": "Tải xuống",
+    "copyLink": "Sao chép liên kết",
+    "downloadFailed": "Không thể tải tệp",
+    "downloading": "Đang tải",
+    "linkCopied": "Đã sao chép liên kết",
+    "uploadingFiles": "Đang gửi tệp đính kèm…",
+    "uploadFailed": "Tải tệp lên thất bại. Vui lòng thử lại.",
+    "fileTooLarge": "Tệp “{{fileName}}” vượt quá giới hạn 25MB ({{fileSize}}).",
+    "optimizingVideo": "Đang tối ưu dung lượng video “{{name}}”…"
   },
   "theme": {
     "toLight": "Chuyển sang chế độ sáng",
