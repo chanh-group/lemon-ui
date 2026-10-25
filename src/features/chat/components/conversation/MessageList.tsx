@@ -128,9 +128,14 @@ function MessageRowView({
       <div className={cn('flex max-w-[78%] flex-col sm:max-w-[65%]', isMe ? 'items-end' : 'items-start')}>
         <div
           className={cn(
-            'w-fit max-w-full px-3.5 py-2 text-sm leading-relaxed wrap-break-word whitespace-pre-wrap',
-            isMe ? 'bg-secondary text-foreground' : 'border border-border bg-card text-foreground shadow-sm',
-            bubbleRadius(messageIndex, total, isMe, msg.kind !== 'text'),
+            'w-fit max-w-full text-sm leading-relaxed wrap-break-word whitespace-pre-wrap',
+            hasAttachments && !msg.text
+              ? 'p-0 bg-transparent border-0 shadow-none'
+              : cn(
+                  'px-3.5 py-2',
+                  isMe ? 'bg-secondary text-foreground' : 'border border-border bg-card text-foreground shadow-sm',
+                  bubbleRadius(messageIndex, total, isMe, msg.kind !== 'text'),
+                ),
           )}
         >
           {isFirst && !isMe && group.sender && (
@@ -139,7 +144,7 @@ function MessageRowView({
 
           {/* Render Attachments if present */}
           {hasAttachments && (
-            <div className="flex flex-col gap-1.5 mb-1">
+            <div className={cn('flex flex-col gap-1.5', msg.text ? 'mb-1.5' : '')}>
               {msg.attachments!.map((att) => (
                 <AttachmentBubble
                   key={att.id}

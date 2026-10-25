@@ -76,8 +76,7 @@ export function MessageComposer({
     }
   }
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || [])
+  const processFiles = async (files: File[]) => {
     if (files.length === 0) return
 
     for (const rawFile of files) {
@@ -117,9 +116,36 @@ export function MessageComposer({
 
       setPendingFiles((prev) => [...prev, { id: fileId, file: fileToUse, previewUrl }])
     }
+  }
 
-    // Reset input để có thể chọn lại file cùng tên nếu muốn
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    await processFiles(files)
     if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  const handlePaste = async (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const clipboardFiles = e.clipboardData?.files
+    if (clipboardFiles && clipboardFiles.length > 0) {
+      const filesToAdd: File[] = []
+      for (let i = 0; i < clipboardFiles.length; i++) {
+        const f = clipboardFiles.item(i)
+        if (f) filesToAdd.push(f)
+      }
+      if (filesToAdd.length > 0) {
+        e.preventDefault()
+        await processFiles(filesToAdd)
+      }
+    }
+  }
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const droppedFiles = Array.from(e.dataTransfer.files || [])
+    if (droppedFiles.length > 0) {
+      await processFiles(droppedFiles)
+    }
   }
 
   const handleRemoveFile = (id: string) => {
@@ -203,7 +229,11 @@ export function MessageComposer({
   const canSubmit = (draft.trim().length > 0 || pendingFiles.length > 0) && !disabled && !isUploading
 
   return (
-    <footer className="shrink-0 border-t border-border bg-card px-3 py-2.5 sm:px-5">
+    <footer
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={handleDrop}
+      className="shrink-0 border-t border-border bg-card px-3 py-2.5 sm:px-5"
+    >
       {/* Pending Files Preview Tray */}
       {pendingFiles.length > 0 && (
         <div className="mb-2.5 flex flex-wrap gap-2 overflow-x-auto p-1.5 rounded-xl bg-muted/60 border border-border">
@@ -263,6 +293,7 @@ export function MessageComposer({
             value={draft}
             disabled={disabled || isUploading}
             onChange={(e) => handleChange(e.target.value)}
+            onPaste={handlePaste}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault()
