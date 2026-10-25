@@ -1,4 +1,4 @@
-import { forwardRef, useImperativeHandle, useLayoutEffect, useMemo, useRef, type RefObject } from 'react'
+import { forwardRef, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { CheckCheckIcon as CheckCheckData, CheckIcon as CheckData, Film01Icon as FilmData, Image01Icon as ImageIconData, StickerIcon as StickerData } from '@hugeicons/core-free-icons'
@@ -10,7 +10,10 @@ const ImageIcon = createIcon(ImageIconData)
 const Sticker = createIcon(StickerData)
 import { cn } from '@/lib/utils'
 import { avatarColor, initials } from '../../data/mockData'
-import type { ChatMessage, DayGroup } from '../../types/chat.types'
+import type { ChatMessage, DayGroup, MessageAttachmentItem } from '../../types/chat.types'
+import { AttachmentBubble } from './AttachmentBubble'
+import { ImageLightboxModal } from './ImageLightboxModal'
+import { DocumentPreviewModal } from './DocumentPreviewModal'
 
 // ---------------- logics tách cụm tin ----------------
 
@@ -85,10 +88,14 @@ function MessageRowView({
   group,
   messageIndex,
   senderLabel,
+  onOpenLightbox,
+  onOpenDocument,
 }: {
   group: MessageGroup
   messageIndex: number
   senderLabel: string
+  onOpenLightbox: (attachment: MessageAttachmentItem) => void
+  onOpenDocument: (attachment: MessageAttachmentItem) => void
 }) {
   const { t } = useTranslation()
   const isMe = group.fromMe
@@ -97,6 +104,8 @@ function MessageRowView({
   const isFirst = messageIndex === 0
   const isLast = messageIndex === total - 1
   const authorName = group.sender ?? senderLabel
+  const hasAttachments = Boolean(msg.attachments && msg.attachments.length > 0)
+
   return (
     <div
       data-message-id={msg.id}
@@ -127,14 +136,35 @@ function MessageRowView({
           {isFirst && !isMe && group.sender && (
             <span className="mb-0.5 block text-xs font-bold text-brand-ink">{group.sender}</span>
           )}
-          {msg.kind === 'text' ? (
-            msg.text
-          ) : (
+
+          {/* Render Attachments if present */}
+          {hasAttachments && (
+            <div className="flex flex-col gap-1.5 mb-1">
+              {msg.attachments!.map((att) => (
+                <AttachmentBubble
+                  key={att.id}
+                  attachment={att}
+                  onOpenLightbox={onOpenLightbox}
+                  onOpenDocument={onOpenDocument}
+                  isMe={isMe}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Render Text Body if present */}
+          {msg.text && (
+            <span>{msg.text}</span>
+          )}
+
+          {/* Legacy fallback for media without attachments */}
+          {!hasAttachments && msg.kind !== 'text' && (
             <span className="flex flex-col gap-1.5">
               <MediaBubble label={msg.photoLabel ?? t('chat.attachment')} kind={msg.kind} />
               {msg.text && <span>{msg.text}</span>}
             </span>
           )}
+
           {msg.reactions && msg.reactions.length > 0 && (
             <span className="mt-1.5 flex gap-1" aria-label={t('chat.reactions')}>
               {msg.reactions.map((r) => (
@@ -182,6 +212,9 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
   'use no memo'
 
   const didInitialScroll = useRef(false)
+  const [lightboxAttachment, setLightboxAttachment] = useState<MessageAttachmentItem | null>(null)
+  const [documentAttachment, setDocumentAttachment] = useState<MessageAttachmentItem | null>(null)
+
   const rows = useMemo(() => {
     const result: MessageListRow[] = []
     for (const day of groups) {
@@ -225,7 +258,8 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
   }, [rows.length, virtualizer])
 
   return (
-    <div className="relative w-full" style={{ height: virtualizer.getTotalSize() }}>
+    <>
+      <div className="relative w-full" style={{ height: virtualizer.getTotalSize() }}>
       {virtualizer.getVirtualItems().map((virtualRow) => {
         const row = rows[virtualRow.index]
         return (
@@ -250,6 +284,8 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
                   group={row.group}
                   messageIndex={row.messageIndex}
                   senderLabel={senderLabel}
+                  onOpenLightbox={setLightboxAttachment}
+                  onOpenDocument={setDocumentAttachment}
                 />
               </div>
             )}
@@ -257,5 +293,14 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
         )
       })}
     </div>
+    <ImageLightboxModal
+      attachment={lightboxAttachment}
+      onClose={() => setLightboxAttachment(null)}
+    />
+    <DocumentPreviewModal
+      attachment={documentAttachment}
+      onClose={() => setDocumentAttachment(null)}
+    />
+  </>
   )
 })

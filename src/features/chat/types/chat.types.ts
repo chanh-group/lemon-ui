@@ -50,13 +50,27 @@ export interface Conversation {
   partnerAvatar?: string | null
 }
 
+export interface MessageAttachmentItem {
+  id: string
+  kind: 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE'
+  fileName: string
+  mimeType: string
+  sizeBytes: number
+  width?: number | null
+  height?: number | null
+  durationMs?: number | null
+  previewUrl: string
+  downloadUrl: string
+}
+
 export interface ChatMessage {
   id: string
   fromMe: boolean
   sender?: string
   text?: string
-  kind: 'text' | 'photo' | 'gif' | 'sticker'
+  kind: 'text' | 'photo' | 'video' | 'audio' | 'file' | 'gif' | 'sticker'
   photoLabel?: string
+  attachments?: MessageAttachmentItem[]
   time: string
   status?: 'sent' | 'read'
   reactions?: string[]
@@ -119,6 +133,7 @@ export interface MessageResponse {
   body: string | null
   replyToId: string | null
   clientMsgId?: string | null
+  attachments?: MessageAttachmentItem[]
   createdAt: string
   editedAt: string | null
   deletedAt: string | null
@@ -130,11 +145,24 @@ export interface MessageTimelineResponse {
   hasMore: boolean
 }
 
+export interface MessageAttachmentInput {
+  objectKey: string
+  fileName: string
+  mimeType: string
+  sizeBytes: number
+  kind?: 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE'
+  width?: number
+  height?: number
+  durationMs?: number
+  checksum?: string
+}
+
 export interface SendMessageDto {
-  body: string
+  body?: string
   clientMsgId: string
   replyToId?: string | null
-  kind?: 'TEXT'
+  kind?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE' | 'SYSTEM'
+  attachments?: MessageAttachmentInput[]
 }
 
 export interface TypingEventPayload {

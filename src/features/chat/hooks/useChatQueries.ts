@@ -17,6 +17,7 @@ import type {
   ConversationResponse,
   MessageResponse,
   MessageTimelineResponse,
+  SendMessageDto,
 } from '../types/chat.types'
 
 export const CHAT_QUERY_KEYS = queryKeys.chat
@@ -130,19 +131,29 @@ export function useConversationMessagesQuery(conversationId: string | null) {
   return { ...query, liveMessages: liveMessagesQuery.data }
 }
 
+export type SendMessageArg = string | {
+  body?: string
+  kind?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE' | 'SYSTEM'
+  attachments?: import('../types/chat.types').MessageAttachmentInput[]
+}
+
 /** Hook gửi tin nhắn mới */
 export function useSendMessageMutation(conversationId: string | null) {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (text: string) => {
+    mutationFn: async (arg: SendMessageArg) => {
       if (!conversationId) throw new Error('No conversation selected')
       const clientMsgId = crypto.randomUUID()
-      return sendMessage(conversationId, {
-        body: text,
-        clientMsgId,
-        kind: 'TEXT',
-      })
+      const payload: SendMessageDto = typeof arg === 'string'
+        ? { body: arg, clientMsgId, kind: 'TEXT' }
+        : {
+            body: arg.body,
+            clientMsgId,
+            kind: arg.kind ?? (arg.attachments && arg.attachments.length > 0 ? (arg.attachments[0].kind as any) : 'TEXT'),
+            attachments: arg.attachments,
+          }
+      return sendMessage(conversationId, payload)
     },
     onSuccess: (newMessage: MessageResponse) => {
       if (!conversationId) return
@@ -173,9 +184,10 @@ export function useSendMessageMutation(conversationId: string | null) {
           if (!old) return old
           return old.map((conv) => {
             if (conv.id === conversationId) {
+              const preview = newMessage.body || (newMessage.attachments?.[0]?.fileName ?? 'Đính kèm tệp')
               return {
                 ...conv,
-                lastMessagePreview: newMessage.body,
+                lastMessagePreview: preview,
                 lastMessageAt: newMessage.createdAt,
               }
             }

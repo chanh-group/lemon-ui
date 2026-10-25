@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils'
 import { ROUTES } from '@/config/constants'
 import { emitTypingStart, emitTypingStop } from '@/lib/socket'
 import { MOCK_CALLS } from '../data/mockData'
-import type { ChatTab, StoryEntry } from '../types/chat.types'
+import type { ChatTab, MessageAttachmentInput, StoryEntry } from '../types/chat.types'
 import {
   useConversationsQuery,
   useConversationMessagesQuery,
@@ -142,10 +142,13 @@ export function ChatShell() {
     markRead({ conversationId: selectedId, lastReadMessageId: lastMessageId })
   }, [selectedId, selectedUnread, lastMessageId, lastMessageConversationId, markRead])
 
-  const handleSend = async (text: string): Promise<boolean> => {
+  const handleSend = async (text: string, attachments?: MessageAttachmentInput[]): Promise<boolean> => {
     if (!selectedId) return false
     try {
-      await sendMessageMutation.mutateAsync(text)
+      await sendMessageMutation.mutateAsync({
+        body: text,
+        attachments,
+      })
       return true
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : t('chat.sendMessageError'))

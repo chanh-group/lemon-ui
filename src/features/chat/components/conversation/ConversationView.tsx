@@ -4,7 +4,7 @@ import { toast } from 'sonner'
 import { ArrowDown01Icon as ArrowDownData } from '@hugeicons/core-free-icons'
 import { createIcon } from '@/components/icons/hugeIcon'
 const ArrowDown = createIcon(ArrowDownData)
-import type { Conversation, DayGroup } from '../../types/chat.types'
+import type { Conversation, DayGroup, MessageAttachmentInput } from '../../types/chat.types'
 import { ConversationHeader } from './ConversationHeader'
 import { MessageList, type MessageListHandle } from './MessageList'
 import { MessageComposer } from './MessageComposer'
@@ -21,7 +21,7 @@ interface ConversationViewProps {
   hasNewerMessages: boolean
   isLoadingNewerMessages: boolean
   onLoadNewerMessages: () => Promise<unknown>
-  onSend: (text: string) => Promise<boolean>
+  onSend: (text: string, attachments?: MessageAttachmentInput[]) => Promise<boolean>
   isSending: boolean
   onBack?: () => void
   showBack: boolean
@@ -104,10 +104,9 @@ export function ConversationView({
     ) loadNewerMessages()
   }
 
-  const submit = async () => {
-    const text = draft.trim()
-    if (!text || isSending) return
-    const sent = await onSend(text)
+  const submit = async (text: string, attachments?: MessageAttachmentInput[]) => {
+    if ((!text && (!attachments || attachments.length === 0)) || isSending) return
+    const sent = await onSend(text, attachments)
     if (!sent) return
     setDraft('')
     setShowJump(false)
@@ -167,6 +166,7 @@ export function ConversationView({
         onDraftChange={setDraft}
         onSubmit={submit}
         disabled={isSending || messagesLoading || Boolean(messagesError)}
+        conversationId={conversation.id}
         onTypingStart={onTypingStart}
         onTypingStop={onTypingStop}
       />
