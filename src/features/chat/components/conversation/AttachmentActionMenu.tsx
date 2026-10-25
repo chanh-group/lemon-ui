@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next'
 import {
   Download01Icon as DownloadData,
   EyeIcon as ViewPreviewData,
-  Copy01Icon as CopyLinkData,
   MoreVerticalIcon as DotsData,
 } from '@hugeicons/core-free-icons'
 import { createIcon } from '@/components/icons/hugeIcon'
@@ -12,7 +11,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
@@ -22,7 +20,6 @@ import { isPreviewable } from '../../utils/fileTypes'
 const Dots = createIcon(DotsData)
 const DownloadIcon = createIcon(DownloadData)
 const ViewPreviewIcon = createIcon(ViewPreviewData)
-const CopyLinkIcon = createIcon(CopyLinkData)
 
 interface AttachmentActionMenuProps {
   attachment: MessageAttachmentItem
@@ -60,15 +57,6 @@ export function AttachmentActionMenu({
     toast.success(`${t('chat.downloading', 'Đang tải')} ${attachment.fileName}`)
   }
 
-  const handleCopyLink = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    const targetUrl = attachment.previewUrl || attachment.downloadUrl
-    if (targetUrl) {
-      navigator.clipboard.writeText(targetUrl)
-      toast.success(t('chat.linkCopied', 'Đã sao chép liên kết'))
-    }
-  }
-
   const handlePreview = (e: React.MouseEvent) => {
     e.stopPropagation()
     onPreview?.(attachment)
@@ -89,7 +77,7 @@ export function AttachmentActionMenu({
           <Dots className="size-4" aria-hidden="true" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align={align} className="w-48 z-50">
+      <DropdownMenuContent align={align} className="w-44 z-50">
         {canPreview && onPreview && (
           <DropdownMenuItem onClick={handlePreview} className="cursor-pointer gap-2">
             <ViewPreviewIcon className="size-4" />
@@ -99,11 +87,6 @@ export function AttachmentActionMenu({
         <DropdownMenuItem onClick={handleDownload} className="cursor-pointer gap-2">
           <DownloadIcon className="size-4" />
           <span>{t('chat.download', 'Tải xuống')}</span>
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={handleCopyLink} className="cursor-pointer gap-2">
-          <CopyLinkIcon className="size-4" />
-          <span>{t('chat.copyLink', 'Sao chép liên kết')}</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
