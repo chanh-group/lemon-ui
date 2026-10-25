@@ -177,3 +177,21 @@ export async function uploadBinaryToUrl(
     throw new Error(`Upload lên máy chủ lưu trữ thất bại (${response.status})`)
   }
 }
+
+/** Upload file thông qua backend (fallback an toàn khi Cloudflare R2 direct upload bị chặn CORS hoặc mạng). */
+export async function uploadFileViaBackend(
+  file: File | Blob,
+  kind: PresignFileRequest['kind'],
+  conversationId?: string,
+  fileName?: string,
+): Promise<{ objectKey: string }> {
+  const formData = new FormData()
+  formData.append('file', file, fileName || (file instanceof File ? file.name : 'attachment'))
+  formData.append('kind', kind)
+  if (conversationId) formData.append('conversationId', conversationId)
+
+  const res = await api.post<{ objectKey: string }>('/files/upload', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+  return res.data
+}

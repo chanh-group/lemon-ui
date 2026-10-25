@@ -9,7 +9,7 @@ import {
 import { createIcon } from '@/components/icons/hugeIcon'
 import { toast } from 'sonner'
 import type { MessageAttachmentInput } from '../../types/chat.types'
-import { presignFile, uploadBinaryToUrl } from '../../api/chat.api'
+import { presignFile, uploadBinaryToUrl, uploadFileViaBackend } from '../../api/chat.api'
 import { formatBytes, getKindFromMime, isImage } from '../../utils/fileTypes'
 import { compressVideoIfNeeded } from '../../utils/videoCompressor'
 
@@ -156,17 +156,24 @@ export function MessageComposer({
         const mimeType = file.type || 'application/octet-stream'
         const kind = getKindFromMime(mimeType, file.name)
 
-        // 1. Lấy presigned upload URL
-        const { uploadUrl, objectKey } = await presignFile({
-          kind,
-          sizeBytes: file.size,
-          mimeType,
-          fileName: file.name,
-          conversationId,
-        })
-
-        // 2. Upload trực tiếp binary lên Cloudflare R2
-        await uploadBinaryToUrl(uploadUrl, file, mimeType)
+        let objectKey: string
+        try {
+          // 1. Thử presigned upload trực tiếp lên Cloudflare R2
+          const presignRes = await presignFile({
+            kind,
+            sizeBytes: file.size,
+            mimeType,
+            fileName: file.name,
+            conversationId,
+          })
+          await uploadBinaryToUrl(presignRes.uploadUrl, file, mimeType)
+          objectKey = presignRes.objectKey
+        } catch (r2Err) {
+          // 2. Nếu R2 trực tiếp lỗi CORS hoặc mạng (Failed to fetch), tự động fallback qua backend
+          console.warn('R2 direct upload encountered an error, falling back to backend upload proxy:', r2Err)
+          const fallbackRes = await uploadFileViaBackend(file, kind, conversationId, file.name)
+          objectKey = fallbackRes.objectKey
+        }
 
         // 3. Gom attachment metadata
         attachments.push({
