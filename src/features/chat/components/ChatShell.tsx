@@ -96,6 +96,9 @@ export function ChatShell() {
     [rawConversations],
   )
 
+  // Khi ở tab stories, nếu chưa bấm story nào thì tự động hiển thị story đầu tiên
+  const currentStory = tab === 'stories' ? (viewingStory ?? stories[0] ?? null) : null
+
   const selected = rawConversations.find((c) => c.id === selectedId) ?? null
 
   const messageItems = useMemo(() => {
@@ -125,45 +128,42 @@ export function ChatShell() {
   const selectedUnread = selected?.unread
   const lastMessageId = lastMessage?.id
   const lastMessageConversationId = lastMessage?.conversationId
-  const markRead = markReadMutation.mutate
-  useEffect(() => {
-    const attemptKey = selectedId && lastMessageId ? `${selectedId}:${lastMessageId}` : null
-    if (
-      !selectedId ||
-      !selectedUnread ||
-      !lastMessageId ||
-      lastMessageConversationId !== selectedId ||
-      !attemptKey ||
-      lastReadAttempt.current === attemptKey
-    ) {
-      return
-    }
-    lastReadAttempt.current = attemptKey
-    markRead({ conversationId: selectedId, lastReadMessageId: lastMessageId })
-  }, [selectedId, selectedUnread, lastMessageId, lastMessageConversationId, markRead])
+  const markReadMutate = markReadMutation.mutate
 
-  const handleSend = async (text: string): Promise<boolean> => {
-    if (!selectedId) return false
-    try {
-      await sendMessageMutation.mutateAsync(text)
-      return true
-    } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : t('chat.sendMessageError'))
-      return false
-    }
-  }
+  // Tự động mark as read khi mở hội thoại và có tin nhắn chưa đọc
+  useEffect(() => {
+    if (!selectedId || !lastMessageId || !selectedUnread || selectedUnread <= 0) return
+    if (lastMessageConversationId !== selectedId) return
+    if (lastReadAttempt.current === lastMessageId) return
+
+    lastReadAttempt.current = lastMessageId
+    markReadMutate({ conversationId: selectedId, lastReadMessageId: lastMessageId })
+  }, [selectedId, lastMessageId, lastMessageConversationId, selectedUnread, markReadMutate])
 
   const handleTypingStart = () => {
+    if (!selectedId) return
     const now = Date.now()
-    if (selectedId && now - lastTypingSentAt.current >= TYPING_HEARTBEAT_MS) {
-      lastTypingSentAt.current = now
-      emitTypingStart(selectedId)
-    }
+    if (now - lastTypingSentAt.current < TYPING_HEARTBEAT_MS) return
+    lastTypingSentAt.current = now
+    emitTypingStart(selectedId)
   }
 
   const handleTypingStop = () => {
+    if (!selectedId) return
     lastTypingSentAt.current = 0
-    if (selectedId) emitTypingStop(selectedId)
+    emitTypingStop(selectedId)
+  }
+
+  const handleSend = async (text: string): Promise<boolean> => {
+    if (!text.trim() || !selectedId) return false
+    try {
+      handleTypingStop()
+      await sendMessageMutation.mutateAsync(text)
+      return true
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t('chat.sendMessageError'))
+      return false
+    }
   }
 
   const userName = user?.fullName ?? 'Lemon User'
@@ -189,6 +189,9 @@ export function ChatShell() {
         onChange={(t) => {
           setTab(t)
           setQuery('')
+          if (t === 'stories' && !viewingStory && stories.length > 0) {
+            setViewingStory(stories[0])
+          }
           // Persist the active tab in this history entry so reload does not
           // restore a stale tab value from an earlier navigation.
           navigate(ROUTES.messages, {
@@ -206,10 +209,12 @@ export function ChatShell() {
         mobileBarVisible={!selectedId}
       />
 
-      {/* Panel B — danh sách hội thoại */}
+      {/* Panel B — danh sách (tin nhắn / cuộc gọi / story) */}
       <div
         className={cn(
-          selectedId ? 'hidden h-full min-h-0 md:flex md:h-full md:min-w-0' : 'flex h-full min-h-0 min-w-0 flex-1 md:flex-none',
+          (selectedId || (tab === 'stories' && viewingStory))
+            ? 'hidden h-full min-h-0 md:flex md:h-full md:min-w-0'
+            : 'flex h-full min-h-0 min-w-0 flex-1 md:flex-none',
           !sidebarOpen && 'hidden md:hidden',
         )}
       >
@@ -220,19 +225,51 @@ export function ChatShell() {
           calls={calls}
           stories={stories}
           selectedId={selectedId}
+          activeStoryId={tab === 'stories' ? currentStory?.id : null}
           query={query}
           onQuery={setQuery}
           onSelectConversation={handleSelect}
-          onOpenStory={setViewingStory}
+          onOpenStory={(s) => setViewingStory(s)}
           onCall={() => navigate(ROUTES.calls)}
           onNewCall={() => navigate(ROUTES.newCall)}
           onNewChat={() => navigate(ROUTES.newChat)}
         />
       </div>
 
-      {/* Panel C — hội thoại, kéo dài full layout */}
-      <div className={selectedId ? 'flex h-full min-h-0 w-full min-w-0 flex-1' : 'hidden h-full min-h-0 w-full min-w-0 flex-1 md:flex'}>
-        {selected ? (
+      {/* Panel C — Hội thoại hoặc Story Viewer trực tiếp trên màn hình chính */}
+      <div
+        className={
+          (selectedId || (tab === 'stories' && viewingStory))
+            ? 'flex h-full min-h-0 w-full min-w-0 flex-1'
+            : 'hidden h-full min-h-0 w-full min-w-0 flex-1 md:flex'
+        }
+      >
+        {tab === 'stories' ? (
+          currentStory ? (
+            <StoryViewer
+              story={currentStory}
+              stories={stories}
+              embedded={true}
+              onSelectStory={setViewingStory}
+              onClose={() => setViewingStory(null)}
+            />
+          ) : (
+            <section
+              className="hidden h-full min-h-0 w-full min-w-0 flex-1 flex-col items-center justify-center gap-4 bg-background p-8 text-center md:flex"
+              aria-label="Chọn tin để xem"
+            >
+              <span className="grid size-20 place-items-center rounded-[28px] bg-primary/20 text-primary shadow-md">
+                <BrandMark animated className="size-12" />
+              </span>
+              <div>
+                <h2 className="text-lg font-bold">Chọn một tin để xem</h2>
+                <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
+                  Chọn tin của bạn bè ở danh sách bên trái để xem nội dung và tương tác.
+                </p>
+              </div>
+            </section>
+          )
+        ) : selected ? (
           <ConversationView
             key={selected.id}
             conversation={selected}
@@ -263,7 +300,10 @@ export function ChatShell() {
             onTypingStop={handleTypingStop}
           />
         ) : (
-          <section className="hidden h-full min-h-0 w-full min-w-0 flex-1 flex-col items-center justify-center gap-4 bg-background p-8 text-center md:flex" aria-label={t('chat.noConversationSelected')}>
+          <section
+            className="hidden h-full min-h-0 w-full min-w-0 flex-1 flex-col items-center justify-center gap-4 bg-background p-8 text-center md:flex"
+            aria-label={t('chat.noConversationSelected')}
+          >
             <span className="grid size-20 place-items-center rounded-[28px] bg-primary shadow-md">
               <BrandMark animated className="size-12" />
             </span>
@@ -279,9 +319,6 @@ export function ChatShell() {
           </section>
         )}
       </div>
-
-      {/* Story viewer — tách thành component riêng */}
-      {viewingStory && <StoryViewer story={viewingStory} onClose={() => setViewingStory(null)} />}
     </main>
   )
 }

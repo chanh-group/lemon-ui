@@ -81,6 +81,27 @@ function MediaBubble({ label, kind }: { label: string; kind: ChatMessage['kind']
   )
 }
 
+function StoryReplyQuote({ preview, defaultAuthor }: { preview: NonNullable<ChatMessage['storyPreview']>; defaultAuthor: string }) {
+  const { t } = useTranslation()
+  const author = preview.authorName || defaultAuthor
+  return (
+    <div className="mb-2 flex items-center gap-2.5 rounded-xl border border-border/80 bg-muted/70 p-2 text-xs shadow-xs">
+      <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-linear-to-br from-primary via-secondary to-ring text-xs font-bold shadow-xs">
+        🍋
+      </div>
+      <div className="min-w-0 flex-1 text-left">
+        <p className="flex items-center gap-1 text-[11px] font-semibold text-brand-ink">
+          <span>{t('chat.replyToStory')}</span>
+          <span className="font-normal text-muted-foreground">· {author}</span>
+        </p>
+        <p className="truncate text-xs text-muted-foreground">
+          {preview.caption || t('chat.unnamedStory')}
+        </p>
+      </div>
+    </div>
+  )
+}
+
 function MessageRowView({
   group,
   messageIndex,
@@ -90,6 +111,7 @@ function MessageRowView({
   messageIndex: number
   senderLabel: string
 }) {
+
   const { t } = useTranslation()
   const isMe = group.fromMe
   const total = group.messages.length
@@ -117,6 +139,7 @@ function MessageRowView({
       )}
       {!isMe && !isLast && <span aria-hidden="true" className="size-7 shrink-0" />}
       <div className={cn('flex max-w-[78%] flex-col sm:max-w-[65%]', isMe ? 'items-end' : 'items-start')}>
+
         <div
           className={cn(
             'w-fit max-w-full px-3.5 py-2 text-sm leading-relaxed wrap-break-word whitespace-pre-wrap',
@@ -126,6 +149,9 @@ function MessageRowView({
         >
           {isFirst && !isMe && group.sender && (
             <span className="mb-0.5 block text-xs font-bold text-brand-ink">{group.sender}</span>
+          )}
+          {msg.storyPreview && (
+            <StoryReplyQuote preview={msg.storyPreview} defaultAuthor={authorName} />
           )}
           {msg.kind === 'text' ? (
             msg.text
@@ -151,6 +177,7 @@ function MessageRowView({
             {isMe &&
               (msg.status === 'read' ? (
                 <CheckCheck className="size-3.5 text-brand-ink" aria-label={t('chat.read')} />
+
               ) : (
                 <Check className="size-3.5" aria-label={t('chat.sent')} />
               ))}
