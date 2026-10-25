@@ -24,6 +24,7 @@ export function MessageComposer({
 }: MessageComposerProps) {
   const { t } = useTranslation()
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     return () => {
@@ -46,13 +47,14 @@ export function MessageComposer({
     }
   }
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (typingTimer.current) {
       clearTimeout(typingTimer.current)
       typingTimer.current = null
     }
     onTypingStop?.()
-    onSubmit()
+    await onSubmit()
+    requestAnimationFrame(() => inputRef.current?.focus())
   }
   return (
     <footer className="shrink-0 border-t border-border bg-card px-3 py-2.5 sm:px-5">
@@ -60,6 +62,7 @@ export function MessageComposer({
         <label className="chat-composer flex min-h-11 min-w-0 flex-1 items-center gap-1 rounded-full border border-border bg-muted px-4 transition-all duration-150 focus-within:border-ring focus-within:bg-card">
           <span className="sr-only">{t('chat.sendMessage')}</span>
           <input
+            ref={inputRef}
             value={draft}
             disabled={disabled}
             onChange={(e) => handleChange(e.target.value)}
