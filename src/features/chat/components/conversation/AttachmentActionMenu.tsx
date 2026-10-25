@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import {
   Download01Icon as DownloadData,
   EyeIcon as ViewPreviewData,
-  MoreVerticalIcon as DotsData,
+  MoreHorizontalIcon as DotsData,
 } from '@hugeicons/core-free-icons'
 import { createIcon } from '@/components/icons/hugeIcon'
 import { toast } from 'sonner'
@@ -69,10 +69,11 @@ export function AttachmentActionMenu({
           type="button"
           onClick={(e) => e.stopPropagation()}
           className={cn(
-            'grid size-7 place-items-center rounded-full bg-background/80 text-foreground shadow-xs backdrop-blur-xs transition-colors hover:bg-background hover:text-primary focus:outline-none focus:ring-1 focus:ring-ring',
+            'grid size-7 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground transition-colors focus:outline-none',
             className,
           )}
-          aria-label="Tác vụ tệp tin"
+          title="Tùy chọn khác"
+          aria-label="Tùy chọn khác"
         >
           <Dots className="size-4" aria-hidden="true" />
         </button>

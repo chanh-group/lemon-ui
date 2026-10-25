@@ -311,7 +311,16 @@
     "uploadingFiles": "Uploading attachments…",
     "uploadFailed": "Failed to upload file. Please try again.",
     "fileTooLarge": "File “{{fileName}}” exceeds 25MB limit ({{fileSize}}).",
-    "optimizingVideo": "Optimizing video “{{name}}”…"
+    "optimizingVideo": "Optimizing video “{{name}}”…",
+    "replyStoryPlaceholder": "Reply to {{name}}…",
+    "replyStorySuccess": "Reply sent to 1:1 conversation",
+    "replyStoryError": "Failed to send reply",
+    "reactStorySuccess": "Reaction added",
+    "unreactStorySuccess": "Reaction removed",
+    "unreactStory": "Remove reaction",
+    "replyToStory": "Replied to story",
+    "storyViewsCount": "{{count}} views",
+    "storyReactionsCount": "{{count}} reactions"
   },
   "theme": {
     "toLight": "Switch to light mode",

@@ -311,7 +311,16 @@
     "uploadingFiles": "Đang gửi tệp đính kèm…",
     "uploadFailed": "Tải tệp lên thất bại. Vui lòng thử lại.",
     "fileTooLarge": "Tệp “{{fileName}}” vượt quá giới hạn 25MB ({{fileSize}}).",
-    "optimizingVideo": "Đang tối ưu dung lượng video “{{name}}”…"
+    "optimizingVideo": "Đang tối ưu dung lượng video “{{name}}”…",
+    "replyStoryPlaceholder": "Nhắn tin cho {{name}}…",
+    "replyStorySuccess": "Đã gửi phản hồi vào cuộc trò chuyện 1:1",
+    "replyStoryError": "Không thể gửi phản hồi",
+    "reactStorySuccess": "Đã thả cảm xúc",
+    "unreactStorySuccess": "Đã gỡ cảm xúc",
+    "unreactStory": "Gỡ cảm xúc",
+    "replyToStory": "Trả lời tin",
+    "storyViewsCount": "{{count}} người xem",
+    "storyReactionsCount": "{{count}} tương tác"
   },
   "theme": {
     "toLight": "Chuyển sang chế độ sáng",

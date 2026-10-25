@@ -49,6 +49,7 @@ export function MessageComposer({
   const { t } = useTranslation()
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([])
   const [isUploading, setIsUploading] = useState(false)
 
@@ -168,7 +169,8 @@ export function MessageComposer({
     onTypingStop?.()
 
     if (pendingFiles.length === 0) {
-      onSubmit(text)
+      await onSubmit(text)
+      requestAnimationFrame(() => inputRef.current?.focus())
       return
     }
 
@@ -213,6 +215,7 @@ export function MessageComposer({
 
       // 4. Gửi tin nhắn kèm danh sách attachments
       await onSubmit(text, attachments)
+      requestAnimationFrame(() => inputRef.current?.focus())
 
       // Xóa danh sách pending files sau khi gửi thành công
       pendingFiles.forEach((p) => {
@@ -290,6 +293,7 @@ export function MessageComposer({
         <label className="chat-composer flex min-h-11 min-w-0 flex-1 items-center gap-1 rounded-full border border-border bg-muted px-4 transition-all duration-150 focus-within:border-ring focus-within:bg-card">
           <span className="sr-only">{t('chat.sendMessage')}</span>
           <input
+            ref={inputRef}
             value={draft}
             disabled={disabled || isUploading}
             onChange={(e) => handleChange(e.target.value)}

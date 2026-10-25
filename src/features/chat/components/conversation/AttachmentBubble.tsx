@@ -4,7 +4,6 @@ import { createIcon } from '@/components/icons/hugeIcon'
 import { cn } from '@/lib/utils'
 import type { MessageAttachmentItem } from '../../types/chat.types'
 import { formatBytes, isImage, isPdf, isText, isVideo } from '../../utils/fileTypes'
-import { AttachmentActionMenu } from './AttachmentActionMenu'
 
 const FileIcon = createIcon(FileData)
 
@@ -12,14 +11,14 @@ interface AttachmentBubbleProps {
   attachment: MessageAttachmentItem
   onOpenLightbox?: (attachment: MessageAttachmentItem) => void
   onOpenDocument?: (attachment: MessageAttachmentItem) => void
-  isMe?: boolean
+  hasCaption?: boolean
 }
 
 export function AttachmentBubble({
   attachment,
   onOpenLightbox,
   onOpenDocument,
-  isMe = false,
+  hasCaption = false,
 }: AttachmentBubbleProps) {
   const isImg = isImage(attachment.mimeType, attachment.fileName)
   const isVid = isVideo(attachment.mimeType, attachment.fileName)
@@ -44,34 +43,29 @@ export function AttachmentBubble({
     }
   }
 
-  const handleMenuPreview = () => {
-    if (isImg) onOpenLightbox?.(attachment)
-    else onOpenDocument?.(attachment)
-  }
-
   if (isImg) {
     return (
-      <div className="group relative my-1 max-w-xs sm:max-w-sm overflow-hidden rounded-xl border border-border shadow-xs bg-muted">
+      <div className={cn(
+        'group relative max-w-xs sm:max-w-sm overflow-hidden bg-muted/40 cursor-pointer',
+        hasCaption ? 'rounded-t-xl mb-1.5' : 'rounded-xl'
+      )}>
         <img
           src={attachment.previewUrl || attachment.downloadUrl}
           alt={attachment.fileName}
           onClick={handleCardClick}
           loading="lazy"
-          className="max-h-72 w-full object-cover transition-transform duration-200 cursor-pointer hover:scale-[1.02]"
+          className="max-h-72 w-full object-cover transition-transform duration-200 hover:scale-[1.01]"
         />
-        <div className="absolute top-2 right-2 opacity-90 transition-opacity duration-150 group-hover:opacity-100">
-          <AttachmentActionMenu
-            attachment={attachment}
-            onPreview={handleMenuPreview}
-          />
-        </div>
       </div>
     )
   }
 
   if (isVid) {
     return (
-      <div className="group relative my-1 max-w-xs sm:max-w-sm overflow-hidden rounded-xl border border-border bg-black shadow-xs">
+      <div className={cn(
+        'group relative max-w-xs sm:max-w-sm overflow-hidden bg-black',
+        hasCaption ? 'rounded-t-xl mb-1.5' : 'rounded-xl'
+      )}>
         <video
           src={attachment.previewUrl || attachment.downloadUrl}
           controls
@@ -79,43 +73,34 @@ export function AttachmentBubble({
           preload="metadata"
           className="max-h-72 w-full rounded-xl"
         />
-        <div className="absolute top-2 right-2 z-10 opacity-90 transition-opacity duration-150 group-hover:opacity-100">
-          <AttachmentActionMenu
-            attachment={attachment}
-            onPreview={handleMenuPreview}
-          />
-        </div>
       </div>
     )
   }
 
-  // Document / Other File Card
+  const ext = attachment.fileName.includes('.')
+    ? attachment.fileName.split('.').pop()?.toLowerCase()
+    : 'file'
+
+  // Document / File row (integrated smoothly in single bubble, matching Messenger)
   return (
     <div
       onClick={handleCardClick}
       className={cn(
-        'group relative my-1 flex w-64 max-w-full items-center gap-3 rounded-xl p-3 border shadow-xs transition-all cursor-pointer hover:shadow-md select-none',
-        isMe
-          ? 'bg-secondary/90 hover:bg-secondary text-foreground border-border/80'
-          : 'bg-card hover:bg-muted/70 text-foreground border-border',
+        'flex items-center gap-3 p-1 transition-opacity cursor-pointer hover:opacity-90 select-none min-w-[200px] max-w-xs sm:max-w-sm',
+        hasCaption && 'pb-2 border-b border-border/20 mb-1.5'
       )}
     >
-      <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
-        <FileIcon className="size-5" />
+      {/* File Badge Icon */}
+      <div className="relative flex size-10 shrink-0 items-center justify-center rounded-xl bg-card text-foreground shadow-xs border border-border/50 font-bold text-[10px] uppercase tracking-wider">
+        {ext ? ext.slice(0, 4) : <FileIcon className="size-5 text-primary" />}
       </div>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-xs font-semibold leading-tight text-foreground">
+        <p className="truncate text-xs font-semibold leading-tight text-foreground hover:underline">
           {attachment.fileName}
         </p>
         <p className="mt-0.5 text-[11px] text-muted-foreground">
           {formatBytes(attachment.sizeBytes)}
         </p>
-      </div>
-      <div onClick={(e) => e.stopPropagation()} className="shrink-0">
-        <AttachmentActionMenu
-          attachment={attachment}
-          onPreview={handleMenuPreview}
-        />
       </div>
     </div>
   )
