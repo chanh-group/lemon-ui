@@ -9,9 +9,10 @@ const PhoneX = createIcon(PhoneXData)
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
+import { UserAvatar } from '@/components/common/UserAvatar'
 import { ROUTES } from '@/config/constants'
 import { cn } from '@/lib/utils'
-import { avatarColor, initials, MOCK_CALLS } from '../data/mockData'
+import { MOCK_CALLS } from '../data/mockData'
 import { useConversationsQuery } from '../hooks/useChatQueries'
 import type { CallEntry } from '../types/chat.types'
 import { SideNav } from './SideNav'
@@ -31,13 +32,7 @@ function CallRow({ call }: { call: CallEntry }) {
       title={t('chat.callBack', { name: call.name })}
       className="chat-item group flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-all duration-150 hover:translate-x-0.5 hover:bg-muted"
     >
-      <span
-        aria-hidden="true"
-        className="grid size-11 shrink-0 place-items-center rounded-full text-[13px] font-bold text-foreground ring-1 ring-border"
-        style={{ backgroundColor: avatarColor(call.name) }}
-      >
-        {initials(call.name)}
-      </span>
+      <UserAvatar name={call.name} className="size-11" />
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-semibold text-foreground">{call.name}</span>
         <span className={cn('flex items-center gap-1 truncate text-[13px]', isMissed ? 'font-semibold text-destructive' : 'text-muted-foreground')}>

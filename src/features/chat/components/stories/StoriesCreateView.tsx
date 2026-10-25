@@ -7,10 +7,9 @@ import { createIcon } from '@/components/icons/hugeIcon'
 const Back = createIcon(BackData)
 const Gear = createIcon(GearData)
 const ChevronRight = createIcon(ChevronRightData)
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { UserAvatar } from '@/components/common/UserAvatar'
 import { ROUTES } from '@/config/constants'
 import { useAuth } from '@/features/auth/api'
-import { avatarColor, initials } from '../../data/mockData'
 import type { StoryEntry } from '../../types/chat.types'
 import type { CreateMediaStoryPayload, CreateTextStoryPayload } from '../../api/stories.api'
 import { useCreateMediaStory, useCreateTextStory, useStoriesList } from '../../hooks/useStories'
@@ -33,7 +32,7 @@ export function StoriesCreateView() {
   const createText = useCreateTextStory()
   const createMedia = useCreateMediaStory()
 
-  const userName = user?.fullName ?? 'Nguyên Đào Trọng'
+  const userName = user?.fullName ?? user?.username ?? 'Lemon User'
   const backToStories = () => navigate(ROUTES.messages, { state: { tab: 'stories' } })
   const stories = useStoriesList().data ?? []
   const myStories = stories.filter((s) => s.mine)
@@ -86,14 +85,12 @@ export function StoriesCreateView() {
 
         {/* Tài khoản đích */}
         <div className="flex items-center gap-3 border-b border-border px-4 py-3">
-          <Avatar className="ring-none size-14">
-            <AvatarFallback
-              className="text-base font-bold text-foreground"
-              style={{ backgroundColor: avatarColor(userName) }}
-            >
-              {initials(userName)}
-            </AvatarFallback>
-          </Avatar>
+          <UserAvatar
+            name={userName}
+            src={user?.avatarUrl}
+            className="size-14"
+            fallbackClassName="text-base font-bold text-foreground"
+          />
           <div className="min-w-0">
             <p className="truncate text-sm font-bold text-foreground">{userName}</p>
             <p className="truncate text-xs text-muted-foreground">{t('chat.addToStoryHint')}</p>
@@ -122,13 +119,11 @@ export function StoriesCreateView() {
                     aria-label={`${t('chat.yourStory')}, ${storyTime(s, t('chat.now'))}`}
                     className="flex w-full items-center gap-3 rounded-2xl px-2 py-2 text-left transition-colors hover:bg-muted"
                   >
-                    <span
-                      aria-hidden="true"
-                      className="grid size-11 shrink-0 place-items-center rounded-full text-[13px] font-bold text-foreground ring-1 ring-border"
-                      style={{ backgroundColor: avatarColor(s.name || userName) }}
-                    >
-                      {initials(s.name || userName)}
-                    </span>
+                    <UserAvatar
+                      name={s.name || userName}
+                      src={s.avatarUrl ?? user?.avatarUrl}
+                      className="size-11"
+                    />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-semibold text-foreground">{storyDisplayName(s, t)}</span>
                       <span className="mt-0.5 block truncate text-xs text-muted-foreground">{storyTime(s, t('chat.now'))}</span>

@@ -3,9 +3,11 @@ import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { ROUTES } from '@/config/constants'
 import {
+  useChangePassword as useChangePasswordBase,
   useForgotOtp,
   useLogin as useLoginBase,
   useLogout as useLogoutBase,
+  type ChangePasswordPayload,
 } from '@/features/auth/api'
 import type { ApiError } from '@/infrastructure/api/errors'
 import type { AuthUser, LoginInput } from '@/domain/auth'
@@ -114,6 +116,35 @@ export function useLogout() {
         onSettled: () => {
           navigate(ROUTES.login, { replace: true })
           options?.onSettled?.()
+        },
+      })
+    },
+  }
+}
+
+export function useChangePassword() {
+  const navigate = useNavigate()
+  const { t } = useTranslation()
+  const mutation = useChangePasswordBase()
+
+  return {
+    ...mutation,
+    mutate: (
+      payload: ChangePasswordPayload,
+      options?: {
+        onSuccess?: () => void
+        onError?: (error: ApiError) => void
+      },
+    ) => {
+      mutation.mutate(payload, {
+        onSuccess: () => {
+          toast.success(t('auth.changePasswordSuccess'))
+          navigate(ROUTES.login, { replace: true })
+          options?.onSuccess?.()
+        },
+        onError: (error) => {
+          toast.error(error.message || t('auth.errorChangePassword'))
+          options?.onError?.(error)
         },
       })
     },

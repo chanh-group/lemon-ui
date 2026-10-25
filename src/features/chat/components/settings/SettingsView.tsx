@@ -1,26 +1,28 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft01Icon as ArrowLeftData, BellIcon as BellData, PaletteIcon as PaletteData, User02Icon as UserIconData } from '@hugeicons/core-free-icons'
+import { ArrowLeft01Icon as ArrowLeftData, BellIcon as BellData, LockPasswordIcon as LockData, PaletteIcon as PaletteData, User02Icon as UserIconData } from '@hugeicons/core-free-icons'
 import { createIcon } from '@/components/icons/hugeIcon'
 const ArrowLeft = createIcon(ArrowLeftData)
 const Bell = createIcon(BellData)
+const Lock = createIcon(LockData)
 const Palette = createIcon(PaletteData)
 const UserIcon = createIcon(UserIconData)
+import { UserAvatar } from '@/components/common/UserAvatar'
 import { useAuth } from '@/features/auth/api'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { ROUTES } from '@/config/constants'
 import { cn } from '@/lib/utils'
-import { avatarColor, initials } from '../../data/mockData'
 import { useConversationsQuery } from '../../hooks/useChatQueries'
 import type { SettingsSection } from '../../types/settings.types'
 import { SideNav } from '../SideNav'
 import { ProfileSettings } from './ProfileSettings'
 import { AppearanceSettings } from './AppearanceSettings'
+import { ChangePasswordSettings } from './ChangePasswordSettings'
 import { NotificationsSettings } from './NotificationsSettings'
 
 const SECTIONS: Array<{ id: SettingsSection; labelKey: string; icon: typeof UserIcon }> = [
   { id: 'profile', labelKey: 'chat.profileAccount', icon: UserIcon },
+  { id: 'security', labelKey: 'chat.profileSecurity', icon: Lock },
   { id: 'appearance', labelKey: 'chat.profileAppearance', icon: Palette },
   { id: 'notifications', labelKey: 'chat.profileNotifications', icon: Bell },
 ]
@@ -31,11 +33,9 @@ export function SettingsView() {
   const navigate = useNavigate()
   const [activeSection, setActiveSection] = useState<SettingsSection>('profile')
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false)
-  const [displayName, setDisplayName] = useState(user?.fullName ?? '')
-  const [aboutText, setAboutText] = useState('')
 
-  const userName = displayName || (user?.fullName ?? 'Minh Anh')
-  const userEmail = user?.email ?? 'nguyen10t2lhp@gmail.com'
+  const userName = user?.fullName?.trim() || user?.username || t('common.loading')
+  const userEmail = user?.email ?? ''
 
   const conversationsQuery = useConversationsQuery()
   const totalUnread = (conversationsQuery.data ?? []).reduce((n, conversation) => n + conversation.unread, 0)
@@ -95,17 +95,19 @@ export function SettingsView() {
                 : 'text-foreground hover:bg-muted/70',
             )}
           >
-            <Avatar className="size-12 shrink-0 ring-2 ring-border">
-              <AvatarFallback
-                className="text-base font-bold text-foreground"
-                style={{ backgroundColor: avatarColor(userName) }}
-              >
-                {initials(userName)}
-              </AvatarFallback>
-            </Avatar>
+            {user ? (
+              <UserAvatar
+                name={userName}
+                src={user.avatarUrl}
+                className="size-12 ring-2 ring-border"
+                fallbackClassName="text-base font-bold text-foreground"
+              />
+            ) : (
+              <span className="size-12 shrink-0 animate-pulse rounded-full bg-muted" aria-hidden="true" />
+            )}
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-bold text-foreground">{userName}</p>
-              <p className="truncate text-xs text-muted-foreground">{userEmail}</p>
+              <p className="truncate text-xs text-muted-foreground">{userEmail || t('common.loading')}</p>
             </div>
           </button>
         </div>
@@ -153,16 +155,8 @@ export function SettingsView() {
         </div>
 
         <div className="mx-auto w-full max-w-xl flex-1 px-4 py-6 sm:px-6 md:py-12">
-          {activeSection === 'profile' && (
-            <ProfileSettings
-              userName={userName}
-              userEmail={userEmail}
-              displayName={displayName}
-              aboutText={aboutText}
-              onNameChange={setDisplayName}
-              onAboutChange={setAboutText}
-            />
-          )}
+          {activeSection === 'profile' && <ProfileSettings />}
+          {activeSection === 'security' && <ChangePasswordSettings />}
           {activeSection === 'appearance' && <AppearanceSettings />}
           {activeSection === 'notifications' && <NotificationsSettings />}
         </div>

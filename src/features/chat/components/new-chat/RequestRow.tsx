@@ -5,7 +5,7 @@ import { createIcon } from '@/components/icons/hugeIcon'
 const Check = createIcon(CheckData)
 const X = createIcon(XData)
 import { toast } from 'sonner'
-import { ROUTES } from '@/config/constants'
+import { conversationPath } from '@/config/constants'
 import { useAcceptFriendRequest, useBlockUser, useCancelFriendRequest, useDeclineFriendRequest } from '../../hooks/useFriends'
 import type { FriendRequest } from '../../types/chat.types'
 import { Avatar } from './kit'
@@ -24,7 +24,7 @@ export function RequestRow({ request }: { request: FriendRequest }) {
     accept.mutate(request.id, {
       onSuccess: (conversation) => {
         toast.success(t('chat.friendRequestAccepted'))
-        navigate(ROUTES.messages, { state: { tab: 'messages', select: conversation.id } })
+        navigate(conversationPath(conversation.id))
       },
       onError,
     })
@@ -46,7 +46,7 @@ export function RequestRow({ request }: { request: FriendRequest }) {
 
   return (
     <li className="chat-item flex w-full items-center gap-3 rounded-2xl px-3 py-2.5">
-      <Avatar name={request.user.name} />
+      <Avatar name={request.user.name} src={request.user.avatarUrl} />
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-semibold text-foreground">{request.user.name}</p>
         <p className="truncate text-xs text-muted-foreground">@{request.user.username}</p>

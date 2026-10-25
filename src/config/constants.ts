@@ -6,12 +6,19 @@ export const ROUTES = {
   register: '/signup',
   forgotPassword: '/forgot-password',
   messages: '/messages',
+  /** Route pattern cho hội thoại đang mở — F5 giữ nguyên URL. */
+  conversation: '/messages/:conversationId',
   calls: '/calls',
   newCall: '/calls/new',
   newChat: '/new-chat',
   storiesCreate: '/stories/create',
   settings: '/settings',
 } as const
+
+/** URL của một hội thoại cụ thể, dùng cho điều hướng và reload. */
+export function conversationPath(conversationId: string): string {
+  return `${ROUTES.messages}/${encodeURIComponent(conversationId)}`
+}
 
 export const PASSWORD_MIN_LENGTH = 8
 

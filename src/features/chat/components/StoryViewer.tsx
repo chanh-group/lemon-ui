@@ -4,7 +4,7 @@ import { CancelCircleIcon as XData } from '@hugeicons/core-free-icons'
 import { createIcon } from '@/components/icons/hugeIcon'
 const X = createIcon(XData)
 import { BrandMark } from '@/components/common/BrandMark'
-import { avatarColor, initials } from '../data/mockData'
+import { UserAvatar } from '@/components/common/UserAvatar'
 import { storyDisplayName } from '../data/storiesData'
 import type { StoryEntry } from '../types/chat.types'
 
@@ -50,13 +50,7 @@ export function StoryViewer({ story, onClose }: StoryViewerProps) {
           </div>
         </div>
         <div className="flex items-center gap-3 px-4 pt-3">
-          <span
-            aria-hidden="true"
-            className="grid size-10 place-items-center rounded-full text-[13px] font-bold ring-1 ring-border"
-            style={{ backgroundColor: avatarColor(story.name) }}
-          >
-            {initials(story.name)}
-          </span>
+          <UserAvatar name={story.name} src={story.avatarUrl} className="size-10" />
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-bold">{storyDisplayName(story, t)}</p>
             <p className="text-xs text-muted-foreground">{story.time || t('chat.now')}</p>

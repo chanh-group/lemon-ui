@@ -8,8 +8,8 @@ const CheckCheck = createIcon(CheckCheckData)
 const Film = createIcon(FilmData)
 const ImageIcon = createIcon(ImageIconData)
 const Sticker = createIcon(StickerData)
+import { UserAvatar } from '@/components/common/UserAvatar'
 import { cn } from '@/lib/utils'
-import { avatarColor, initials } from '../../data/mockData'
 import type { ChatMessage, DayGroup } from '../../types/chat.types'
 
 // ---------------- logics tách cụm tin ----------------
@@ -85,10 +85,12 @@ function MessageRowView({
   group,
   messageIndex,
   senderLabel,
+  senderAvatarUrl,
 }: {
   group: MessageGroup
   messageIndex: number
   senderLabel: string
+  senderAvatarUrl?: string | null
 }) {
   const { t } = useTranslation()
   const isMe = group.fromMe
@@ -107,13 +109,12 @@ function MessageRowView({
       )}
     >
       {!isMe && isLast && (
-        <span
-          aria-hidden="true"
-          className="mt-auto mb-4 grid size-7 shrink-0 place-items-center rounded-full text-[10px] font-bold text-foreground ring-1 ring-border"
-          style={{ backgroundColor: avatarColor(authorName) }}
-        >
-          {initials(authorName)}
-        </span>
+        <UserAvatar
+          name={authorName}
+          src={senderAvatarUrl}
+          className="mt-auto mb-4 size-7"
+          fallbackClassName="text-[10px]"
+        />
       )}
       {!isMe && !isLast && <span aria-hidden="true" className="size-7 shrink-0" />}
       <div className={cn('flex max-w-[78%] flex-col sm:max-w-[65%]', isMe ? 'items-end' : 'items-start')}>
@@ -164,6 +165,7 @@ function MessageRowView({
 interface MessageListProps {
   groups: DayGroup[]
   senderLabel: string
+  senderAvatarUrl?: string | null
   scrollRef: RefObject<HTMLDivElement | null>
 }
 
@@ -176,7 +178,7 @@ type MessageListRow =
   | { kind: 'message'; key: string; group: MessageGroup; messageIndex: number }
 
 export const MessageList = forwardRef<MessageListHandle, MessageListProps>(function MessageList(
-  { groups, senderLabel, scrollRef },
+  { groups, senderLabel, senderAvatarUrl, scrollRef },
   ref,
 ) {
   'use no memo'
@@ -250,6 +252,7 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
                   group={row.group}
                   messageIndex={row.messageIndex}
                   senderLabel={senderLabel}
+                  senderAvatarUrl={senderAvatarUrl}
                 />
               </div>
             )}

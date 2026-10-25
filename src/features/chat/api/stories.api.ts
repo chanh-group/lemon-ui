@@ -39,7 +39,7 @@ export async function listStories(): Promise<StoryEntry[]> {
     id: string
     caption?: string | null
     createdAt?: string | Date
-    user?: { fullName?: string; username?: string }
+    user?: { fullName?: string; username?: string; avatarUrl?: string | null }
     isOnline?: boolean
     hasViewed?: boolean
   }>>('/stories/feed')
@@ -49,6 +49,7 @@ export async function listStories(): Promise<StoryEntry[]> {
     time: story.createdAt ? String(story.createdAt) : '',
     viewed: Boolean(story.hasViewed),
     online: Boolean(story.isOnline),
+    avatarUrl: story.user?.avatarUrl ?? null,
   }))
 }
 

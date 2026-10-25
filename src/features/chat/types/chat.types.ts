@@ -87,6 +87,7 @@ export interface StoryEntry {
   /** Tin của chính ta — dành riêng cho hàng "Tin của bạn". */
   mine?: boolean
   online: boolean
+  avatarUrl?: string | null
 }
 
 /* ------------------------------------------------------------------ */

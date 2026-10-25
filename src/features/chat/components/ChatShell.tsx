@@ -1,17 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { BrandMark } from '@/components/common/BrandMark'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { cn } from '@/lib/utils'
-import { ROUTES } from '@/config/constants'
+import { conversationPath, ROUTES } from '@/config/constants'
 import { emitTypingStart, emitTypingStop } from '@/lib/socket'
 import { MOCK_CALLS } from '../data/mockData'
 import type { ChatTab, StoryEntry } from '../types/chat.types'
 import {
   useConversationsQuery,
   useConversationMessagesQuery,
+  useConversationQuery,
   useMarkReadMutation,
   useSendMessageMutation,
 } from '../hooks/useChatQueries'
@@ -31,17 +32,25 @@ export function ChatShell() {
   const { user } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
+  const { conversationId } = useParams<{ conversationId: string }>()
 
+  // Hội thoại đang mở được lấy từ URL để F5/reload không mất màn chat.
+  const selectedId = conversationId ?? null
   const initialTab = (location.state as { tab?: ChatTab } | null)?.tab ?? 'messages'
-  const initialSelect = (location.state as { select?: string } | null)?.select ?? null
+  const legacySelect = (location.state as { select?: string } | null)?.select ?? null
   const isMdDown = useMediaQuery('(max-width: 48rem)') // Breakpoint md của Tailwind (768px)
   const [tab, setTab] = useState<ChatTab>(initialTab)
   const [query, setQuery] = useState('')
-  // Mặc định chọn theo location.state nếu có
-  const [selectedId, setSelectedId] = useState<string | null>(initialSelect)
   const [viewingStory, setViewingStory] = useState<StoryEntry | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const todayLabel = t('chat.today')
+
+  // Tương thích với các entry cũ còn truyền `state.select` — chuyển sang URL.
+  useEffect(() => {
+    if (!selectedId && legacySelect) {
+      navigate(conversationPath(legacySelect), { replace: true, state: { tab } })
+    }
+  }, [legacySelect, navigate, selectedId, tab])
 
   // Realtime Socket.IO sync
   const { isPartnerTyping, connectionStatus } = useChatRealtime(selectedId)
@@ -53,13 +62,6 @@ export function ChatShell() {
   const markReadMutation = useMarkReadMutation()
   const lastTypingSentAt = useRef(0)
   const lastReadAttempt = useRef<string | null>(null)
-
-  const [prevInitialSelect, setPrevInitialSelect] = useState(initialSelect)
-  if (initialSelect !== prevInitialSelect) {
-    setPrevInitialSelect(initialSelect)
-    setSelectedId(initialSelect)
-    if (initialSelect) setTab('messages')
-  }
 
   const rawConversations = useMemo(
     () => conversationsQuery.data ?? [],
@@ -96,7 +98,22 @@ export function ChatShell() {
     [rawConversations],
   )
 
-  const selected = rawConversations.find((c) => c.id === selectedId) ?? null
+  // Fallback khi URL trỏ tới hội thoại không có trong trang inbox đầu tiên.
+  const selectedFromList = rawConversations.find((c) => c.id === selectedId) ?? null
+  const needsConversationDetail = Boolean(selectedId) && !selectedFromList && !conversationsQuery.isPending
+  const conversationDetailQuery = useConversationQuery(selectedId, needsConversationDetail)
+  const selected = selectedFromList ?? conversationDetailQuery.data ?? null
+
+  const restoringConversation =
+    Boolean(selectedId) &&
+    !selected &&
+    (conversationsQuery.isPending || conversationDetailQuery.isPending)
+  const restoreFailed =
+    Boolean(selectedId) &&
+    !selected &&
+    !restoringConversation &&
+    (conversationsQuery.isError || conversationDetailQuery.isError)
+  const restoreListError = conversationsQuery.isError && !conversationDetailQuery.isSuccess
 
   const messageItems = useMemo(() => {
     const messages = [
@@ -117,8 +134,9 @@ export function ChatShell() {
   }, [selected, messageItems, user?.id, todayLabel])
 
   const handleSelect = (id: string) => {
-    setSelectedId(id)
     setTab('messages')
+    setQuery('')
+    navigate(conversationPath(id))
   }
 
   const lastMessage = messageItems.at(-1)
@@ -166,7 +184,7 @@ export function ChatShell() {
     if (selectedId) emitTypingStop(selectedId)
   }
 
-  const userName = user?.fullName ?? 'Lemon User'
+  const userName = user?.fullName ?? user?.username ?? 'Lemon User'
 
   return (
     <main
@@ -186,17 +204,12 @@ export function ChatShell() {
       )}
       <SideNav
         active={tab}
-        onChange={(t) => {
-          setTab(t)
+        onChange={(nextTab) => {
+          setTab(nextTab)
           setQuery('')
-          // Persist the active tab in this history entry so reload does not
-          // restore a stale tab value from an earlier navigation.
-          navigate(ROUTES.messages, {
-            replace: true,
-            state: { tab: t, ...(!isMdDown && selectedId ? { select: selectedId } : {}) },
-          })
-          // Mobile: quay về danh sách để chuyển tab/đổi hội thoại dễ dàng; desktop giữ phiên đang mở
-          if (isMdDown) setSelectedId(null)
+          // Desktop giữ hội thoại đang mở trên URL; mobile quay về danh sách.
+          const targetPath = !isMdDown && selectedId ? conversationPath(selectedId) : ROUTES.messages
+          navigate(targetPath, { replace: true, state: { tab: nextTab } })
         }}
         totalUnread={totalUnread}
         onOpenSettings={() => navigate(ROUTES.settings)}
@@ -257,11 +270,51 @@ export function ChatShell() {
             onSend={handleSend}
             isSending={sendMessageMutation.isPending}
             showBack
-            onBack={() => setSelectedId(null)}
+            onBack={() => navigate(ROUTES.messages, { state: { tab } })}
             isTyping={isPartnerTyping}
             onTypingStart={handleTypingStart}
             onTypingStop={handleTypingStop}
           />
+        ) : selectedId ? (
+          <section
+            className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col items-center justify-center gap-3 bg-background p-8 text-center"
+            aria-busy={restoringConversation}
+            aria-label={t('chat.loadingConversation')}
+          >
+            {restoringConversation ? (
+              <>
+                <span className="size-8 animate-spin rounded-full border-2 border-border border-t-brand-ink" aria-hidden="true" />
+                <p className="text-sm text-muted-foreground">{t('chat.loadingConversation')}</p>
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-semibold text-foreground">
+                  {restoreListError ? t('chat.conversationsLoadError') : t('chat.conversationNotFound')}
+                </p>
+                <div className="flex items-center gap-2">
+                  {restoreFailed && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void conversationsQuery.refetch()
+                        void conversationDetailQuery.refetch()
+                      }}
+                      className="rounded-full border border-border bg-card px-4 py-2 text-xs font-semibold text-foreground hover:bg-muted"
+                    >
+                      {t('common.retry')}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => navigate(ROUTES.messages)}
+                    className="rounded-full bg-primary px-4 py-2 text-xs font-bold text-primary-foreground"
+                  >
+                    {t('chat.backToList')}
+                  </button>
+                </div>
+              </>
+            )}
+          </section>
         ) : (
           <section className="hidden h-full min-h-0 w-full min-w-0 flex-1 flex-col items-center justify-center gap-4 bg-background p-8 text-center md:flex" aria-label={t('chat.noConversationSelected')}>
             <span className="grid size-20 place-items-center rounded-[28px] bg-primary shadow-md">
