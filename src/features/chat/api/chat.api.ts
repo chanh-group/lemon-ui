@@ -136,3 +136,62 @@ export async function revokeMessage(messageId: string): Promise<MessageResponse>
   const res = await api.delete<MessageResponse>(`/messages/${messageId}`)
   return res.data
 }
+
+/* ------------------------------------------------------------------ */
+/* File & Media Upload (Cloudflare R2 / S3)                           */
+/* ------------------------------------------------------------------ */
+
+export interface PresignFileRequest {
+  kind: 'STORY_IMAGE' | 'STORY_VIDEO' | 'CHAT_IMAGE' | 'CHAT_VIDEO' | 'CHAT_AUDIO' | 'CHAT_FILE'
+  sizeBytes: number
+  mimeType: string
+  fileName?: string
+  conversationId?: string
+}
+
+export interface PresignFileResponse {
+  uploadUrl: string
+  objectKey: string
+}
+
+/** Cấp Presigned URL để upload trực tiếp lên Cloudflare R2. */
+export async function presignFile(payload: PresignFileRequest): Promise<PresignFileResponse> {
+  const res = await api.post<PresignFileResponse>('/files/presign', payload)
+  return res.data
+}
+
+/** Upload binary trực tiếp lên R2 thông qua presigned URL. */
+export async function uploadBinaryToUrl(
+  uploadUrl: string,
+  file: Blob | File,
+  mimeType: string,
+): Promise<void> {
+  const response = await fetch(uploadUrl, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': mimeType,
+    },
+    body: file,
+  })
+  if (!response.ok) {
+    throw new Error(`Upload lên máy chủ lưu trữ thất bại (${response.status})`)
+  }
+}
+
+/** Upload file thông qua backend (fallback an toàn khi Cloudflare R2 direct upload bị chặn CORS hoặc mạng). */
+export async function uploadFileViaBackend(
+  file: File | Blob,
+  kind: PresignFileRequest['kind'],
+  conversationId?: string,
+  fileName?: string,
+): Promise<{ objectKey: string }> {
+  const formData = new FormData()
+  formData.append('file', file, fileName || (file instanceof File ? file.name : 'attachment'))
+  formData.append('kind', kind)
+  if (conversationId) formData.append('conversationId', conversationId)
+
+  const res = await api.post<{ objectKey: string }>('/files/upload', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+  return res.data
+}

@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils'
 import { ROUTES } from '@/config/constants'
 import { emitTypingStart, emitTypingStop } from '@/lib/socket'
 import { MOCK_CALLS } from '../data/mockData'
-import type { ChatTab, StoryEntry } from '../types/chat.types'
+import type { ChatTab, MessageAttachmentInput, StoryEntry } from '../types/chat.types'
 import {
   useConversationsQuery,
   useConversationMessagesQuery,
@@ -140,6 +140,21 @@ export function ChatShell() {
     markReadMutate({ conversationId: selectedId, lastReadMessageId: lastMessageId })
   }, [selectedId, lastMessageId, lastMessageConversationId, selectedUnread, markReadMutate])
 
+  const handleSend = async (text: string, attachments?: MessageAttachmentInput[]): Promise<boolean> => {
+    if (!selectedId) return false
+    try {
+      handleTypingStop()
+      await sendMessageMutation.mutateAsync({
+        body: text,
+        attachments,
+      })
+      return true
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : t('chat.sendMessageError'))
+      return false
+    }
+  }
+
   const handleTypingStart = () => {
     if (!selectedId) return
     const now = Date.now()
@@ -152,18 +167,6 @@ export function ChatShell() {
     if (!selectedId) return
     lastTypingSentAt.current = 0
     emitTypingStop(selectedId)
-  }
-
-  const handleSend = async (text: string): Promise<boolean> => {
-    if (!text.trim() || !selectedId) return false
-    try {
-      handleTypingStop()
-      await sendMessageMutation.mutateAsync(text)
-      return true
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : t('chat.sendMessageError'))
-      return false
-    }
   }
 
   const userName = user?.fullName ?? 'Lemon User'
