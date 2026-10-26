@@ -12,6 +12,7 @@ export const ROUTES = {
   newCall: '/calls/new',
   newChat: '/new-chat',
   storiesCreate: '/stories/create',
+  storiesArchive: '/stories/archive',
   settings: '/settings',
 } as const
 

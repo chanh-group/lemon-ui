@@ -50,16 +50,68 @@ export interface Conversation {
   partnerAvatar?: string | null
 }
 
+export interface MessageAttachmentItem {
+  id: string
+  kind: 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE'
+  fileName: string
+  mimeType: string
+  sizeBytes: number
+  width?: number | null
+  height?: number | null
+  durationMs?: number | null
+  previewUrl: string
+  downloadUrl: string
+}
+
+export type StoryReactionType = '👍' | '❤️' | '🥰' | '😆' | '😂' | '😮' | '😢' | '😡' | '🔥' | '👏'
+
+export interface StoryPreview {
+  id: string
+  kind: 'TEXT' | 'MEDIA' | 'text' | 'media'
+  caption?: string | null
+  mediaUrl?: string | null
+  background?: string | null
+  authorName?: string | null
+}
+
+export interface StoryReactionItem {
+  id: string
+  storyId: string
+  userId: string
+  reaction: string
+  createdAt: string
+  user: {
+    id: string
+    fullName: string
+    avatarUrl?: string | null
+  }
+}
+
+export interface StoryViewerItem {
+  id: string
+  storyId: string
+  userId: string
+  viewedAt: string
+  user: {
+    id: string
+    fullName: string
+    avatarUrl?: string | null
+  }
+}
+
 export interface ChatMessage {
   id: string
   fromMe: boolean
   sender?: string
   text?: string
-  kind: 'text' | 'photo' | 'gif' | 'sticker'
+  kind: 'text' | 'photo' | 'video' | 'audio' | 'file' | 'gif' | 'sticker'
   photoLabel?: string
+  attachments?: MessageAttachmentItem[]
   time: string
   status?: 'sent' | 'read'
   reactions?: string[]
+  storyId?: string | null
+  storyPreview?: StoryPreview | null
   createdAt?: string
   editedAt?: string | null
   deletedAt?: string | null
@@ -87,8 +139,23 @@ export interface StoryEntry {
   /** Tin của chính ta — dành riêng cho hàng "Tin của bạn". */
   mine?: boolean
   online: boolean
-  avatarUrl?: string | null
+  authorId?: string
+  authorAvatar?: string | null
+  kind?: 'text' | 'media' | 'TEXT' | 'MEDIA'
+  caption?: string | null
+  mediaUrl?: string | null
+  background?: string | null
+  viewsCount?: number
+  reactionsCount?: number
+  viewerReaction?: string | null
+  viewerHasViewed?: boolean
+  reactionsSummary?: { reaction: string; count: number }[]
+  allowReplies?: boolean
+  allowReactions?: boolean
+  audienceMode?: 'ALL_FRIENDS' | 'CUSTOM' | 'EXCLUDE'
+  myReactionKind?: 'REACTION' | 'LIKE' | null
 }
+
 
 /* ------------------------------------------------------------------ */
 /* Backend DTOs & Realtime Payloads (API_CHAT_1_1.md)                */
@@ -120,6 +187,7 @@ export interface MessageResponse {
   body: string | null
   replyToId: string | null
   clientMsgId?: string | null
+  attachments?: MessageAttachmentItem[]
   createdAt: string
   editedAt: string | null
   deletedAt: string | null
@@ -131,11 +199,24 @@ export interface MessageTimelineResponse {
   hasMore: boolean
 }
 
+export interface MessageAttachmentInput {
+  objectKey: string
+  fileName: string
+  mimeType: string
+  sizeBytes: number
+  kind?: 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE'
+  width?: number
+  height?: number
+  durationMs?: number
+  checksum?: string
+}
+
 export interface SendMessageDto {
-  body: string
+  body?: string
   clientMsgId: string
   replyToId?: string | null
-  kind?: 'TEXT'
+  kind?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE' | 'SYSTEM'
+  attachments?: MessageAttachmentInput[]
 }
 
 export interface TypingEventPayload {

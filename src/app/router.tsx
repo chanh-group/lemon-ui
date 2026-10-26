@@ -11,6 +11,7 @@ import { NewCallPage } from '@/pages/NewCallPage'
 import { NewChatPage } from '@/pages/NewChatPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { StoriesCreatePage } from '@/pages/StoriesCreatePage'
+import { StoriesArchivePage } from '@/pages/StoriesArchivePage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
 
 function RequireAuth({ children }: { children: ReactNode }) {
@@ -113,6 +114,14 @@ export const router = createBrowserRouter(
       element: (
         <RequireAuth>
           <StoriesCreatePage />
+        </RequireAuth>
+      ),
+    },
+    {
+      path: ROUTES.storiesArchive,
+      element: (
+        <RequireAuth>
+          <StoriesArchivePage />
         </RequireAuth>
       ),
     },

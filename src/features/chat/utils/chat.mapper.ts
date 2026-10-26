@@ -79,12 +79,27 @@ export function mapMessageResponse(
   const isRevoked = Boolean(raw.deletedAt)
   const isMe = currentUserId ? raw.senderId === currentUserId : false
 
+  let uiKind: ChatMessage['kind'] = 'text'
+  if (raw.kind === 'IMAGE') uiKind = 'photo'
+  else if (raw.kind === 'VIDEO') uiKind = 'video'
+  else if (raw.kind === 'AUDIO') uiKind = 'audio'
+  else if (raw.kind === 'FILE') uiKind = 'file'
+  else if (raw.attachments && raw.attachments.length > 0) {
+    const firstKind = raw.attachments[0].kind
+    if (firstKind === 'IMAGE') uiKind = 'photo'
+    else if (firstKind === 'VIDEO') uiKind = 'video'
+    else if (firstKind === 'AUDIO') uiKind = 'audio'
+    else uiKind = 'file'
+  }
+
   return {
     id: raw.id,
     fromMe: isMe,
     sender: undefined,
     text: isRevoked ? 'Tin nhắn đã bị thu hồi' : raw.body || '',
-    kind: raw.kind === 'IMAGE' ? 'photo' : 'text',
+    kind: uiKind,
+    attachments: raw.attachments,
+    photoLabel: raw.attachments?.[0]?.fileName,
     time: formatTimeHHmm(raw.createdAt),
     status: isMe ? 'sent' : undefined,
     createdAt: typeof raw.createdAt === 'string' ? raw.createdAt : new Date(raw.createdAt).toISOString(),

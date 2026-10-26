@@ -31,9 +31,12 @@ interface MiddlePanelProps {
   tab: ChatTab
   conversations: Conversation[]
   conversationsLoading: boolean
+  conversationsError?: string
+  onRetryConversations: () => void
   calls: CallEntry[]
   stories: StoryEntry[]
   selectedId: string | null
+  activeStoryId?: string | null
   query: string
   onQuery: (q: string) => void
   onSelectConversation: (id: string) => void
@@ -93,9 +96,12 @@ export function MiddlePanel({
   tab,
   conversations,
   conversationsLoading,
+  conversationsError,
+  onRetryConversations,
   calls,
   stories,
   selectedId,
+  activeStoryId,
   query,
   onQuery,
   onSelectConversation,
@@ -205,6 +211,14 @@ export function MiddlePanel({
           <>
             {conversationsLoading ? (
               <p className="px-4 py-5 text-sm text-muted-foreground">{t('common.loading')}</p>
+            ) : conversationsError ? (
+              <div className="px-4 py-5 text-sm">
+                <p className="font-semibold text-destructive">{t('chat.conversationsLoadError')}</p>
+                <p className="mt-1 text-muted-foreground">{conversationsError}</p>
+                <button type="button" onClick={onRetryConversations} className="mt-3 font-semibold text-brand-ink hover:underline">
+                  {t('common.retry')}
+                </button>
+              </div>
             ) : conversations.length === 0 ? (
               <div className="px-2 pt-4">
                 <EmptyState
@@ -340,7 +354,7 @@ export function MiddlePanel({
           </>
         )}
 
-        {tab === 'stories' && <StoriesTab stories={stories} onOpenStory={onOpenStory} onOpenCreate={() => navigate(ROUTES.storiesCreate)} />}
+        {tab === 'stories' && <StoriesTab stories={stories} activeStoryId={activeStoryId} onOpenStory={onOpenStory} onOpenCreate={() => navigate(ROUTES.storiesCreate)} />}
       </div>
     </section>
   )
@@ -348,12 +362,13 @@ export function MiddlePanel({
 
 interface StoriesTabProps {
   stories: StoryEntry[]
+  activeStoryId?: string | null
   onOpenStory: (story: StoryEntry) => void
   onOpenCreate: () => void
 }
 
 /** Tab Stories — danh sách DỌC kiểu Messenger/FB: hàng "Tin của bạn" + từng hàng tin của bạn bè. */
-function StoriesTab({ stories, onOpenStory, onOpenCreate }: StoriesTabProps) {
+function StoriesTab({ stories, activeStoryId, onOpenStory, onOpenCreate }: StoriesTabProps) {
   const { t } = useTranslation()
   const { user } = useAuth()
   const userName = user?.fullName ?? user?.username ?? 'Lemon User'
@@ -369,7 +384,12 @@ function StoriesTab({ stories, onOpenStory, onOpenCreate }: StoriesTabProps) {
           type="button"
           onClick={myStory ? () => onOpenStory(myStory) : onOpenCreate}
           aria-label={myStory ? t('chat.yourStory') : t('chat.createStoryTitle')}
-          className="chat-item group flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-all duration-150 hover:translate-x-0.5 hover:bg-muted"
+          className={cn(
+            'chat-item group flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-all duration-150',
+            myStory && myStory.id === activeStoryId
+              ? 'bg-muted ring-1 ring-border shadow-xs'
+              : 'hover:translate-x-0.5 hover:bg-muted',
+          )}
         >
           <UserAvatar name={userName} src={user?.avatarUrl} className="size-11" />
           <span className="min-w-0 flex-1">
@@ -406,17 +426,24 @@ function StoriesTab({ stories, onOpenStory, onOpenCreate }: StoriesTabProps) {
           <EmptyState title={t('chat.noStories')} message={t('chat.storiesEmpty')} />
         </li>
       ) : (
-        friendStories.map((s) => (
-          <li key={s.id}>
-            <button
-              type="button"
-              onClick={() => onOpenStory(s)}
-              aria-label={`${t('chat.storyOf', { name: s.name })}, ${storyTime(s, t('chat.now'))}`}
-              className="chat-item group flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-all duration-150 hover:translate-x-0.5 hover:bg-muted"
-            >
+        friendStories.map((s) => {
+          const isSelected = s.id === activeStoryId
+          return (
+            <li key={s.id}>
+              <button
+                type="button"
+                onClick={() => onOpenStory(s)}
+                aria-label={`${t('chat.storyOf', { name: s.name })}, ${storyTime(s, t('chat.now'))}`}
+                className={cn(
+                  'chat-item group flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-all duration-150',
+                  isSelected
+                    ? 'bg-muted ring-1 ring-border shadow-xs'
+                    : 'hover:translate-x-0.5 hover:bg-muted',
+                )}
+              >
               <UserAvatar
                 name={s.name}
-                src={s.avatarUrl}
+                src={s.authorAvatar}
                 className={cn(
                   'size-11',
                   s.viewed ? 'ring-2 ring-border ring-offset-2 ring-offset-card' : 'chat-story-ring',
@@ -428,7 +455,8 @@ function StoriesTab({ stories, onOpenStory, onOpenCreate }: StoriesTabProps) {
               </span>
             </button>
           </li>
-        ))
+          )
+        })
       )}
     </ul>
   )
