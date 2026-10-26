@@ -5,8 +5,8 @@ const ChevronLeft = createIcon(ChevronLeftData)
 const MoreVertical = createIcon(MoreVerticalData)
 const Phone = createIcon(PhoneData)
 const Video = createIcon(VideoData)
+import { UserAvatar } from '@/components/common/UserAvatar'
 import { cn } from '@/lib/utils'
-import { avatarColor, initials } from '../../data/mockData'
 import type { Conversation } from '../../types/chat.types'
 
 interface ConversationHeaderProps {
@@ -14,6 +14,29 @@ interface ConversationHeaderProps {
   showBack: boolean
   onBack?: () => void
   isTyping?: boolean
+}
+
+/** Pill "..." gọn thay cho chữ “Typing…” — vẫn có nhãn cho screen reader. */
+function TypingIndicator() {
+  const { t } = useTranslation()
+  return (
+    <span
+      role="status"
+      aria-label={t('chat.typing')}
+      title={t('chat.typing')}
+      className="inline-flex w-fit items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5"
+    >
+      {[0, 0.15, 0.3].map((delay) => (
+        <span
+          key={delay}
+          aria-hidden="true"
+          className="size-1.5 rounded-full bg-brand-ink animate-typing-dot"
+          style={{ animationDelay: `${delay}s` }}
+        />
+      ))}
+      <span className="sr-only">{t('chat.typing')}</span>
+    </span>
+  )
 }
 
 export function ConversationHeader({ conversation, showBack, onBack, isTyping }: ConversationHeaderProps) {
@@ -37,28 +60,31 @@ export function ConversationHeader({ conversation, showBack, onBack, isTyping }:
         </button>
       )}
       <span className="relative shrink-0">
-        <span
-          aria-hidden="true"
-          className="grid size-10 place-items-center rounded-full text-[13px] font-bold text-foreground ring-1 ring-border"
-          style={{ backgroundColor: avatarColor(conversation.name) }}
-        >
-          {initials(conversation.name)}
-        </span>
+        <UserAvatar
+          name={conversation.name}
+          src={conversation.partnerAvatar}
+          square={conversation.isGroup}
+          className="size-10"
+        />
         {conversation.online && (
           <span className="absolute right-0 bottom-0 size-2.5 rounded-full bg-success ring-2 ring-card" title={t('chat.online')} aria-hidden="true" />
         )}
       </span>
       <div className="min-w-0 flex-1">
         <h2 className="truncate text-[15px] font-bold text-foreground">{conversation.name}</h2>
-        <p className={cn('truncate text-xs', isTyping ? 'font-medium text-primary animate-pulse' : 'text-muted-foreground')}>
-          {isTyping
-            ? t('chat.typing')
-            : conversation.isGroup
+        {isTyping ? (
+          <span className="mt-0.5 block">
+            <TypingIndicator />
+          </span>
+        ) : (
+          <p className={cn('truncate text-xs text-muted-foreground')}>
+            {conversation.isGroup
               ? conversation.members
               : conversation.online
                 ? t('chat.online')
                 : (conversation.lastActive ?? t('chat.offline'))}
-        </p>
+          </p>
+        )}
       </div>
       <div className="flex shrink-0 items-center gap-0.5">
         {headerActions.map(({ label, icon: Icon }) => (

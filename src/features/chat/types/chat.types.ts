@@ -237,4 +237,3 @@ export interface MessageRevokedPayload {
   conversationId: string
   deletedAt: string
 }
-

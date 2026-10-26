@@ -2,22 +2,10 @@ import { ArrowLeft01Icon as ArrowLeftData, Search01Icon as SearchData } from '@h
 import { createIcon } from '@/components/icons/hugeIcon'
 const ArrowLeft = createIcon(ArrowLeftData)
 const Search = createIcon(SearchData)
-import { cn } from '@/lib/utils'
-import { avatarColor, initials } from '../../data/mockData'
+import { UserAvatar } from '@/components/common/UserAvatar'
 
-export function Avatar({ name, square = false }: { name: string; square?: boolean }) {
-  return (
-    <span
-      aria-hidden="true"
-      className={cn(
-        'grid size-11 shrink-0 place-items-center rounded-full text-[13px] font-bold text-foreground ring-1 ring-border',
-        square && 'rounded-2xl',
-      )}
-      style={{ backgroundColor: avatarColor(name) }}
-    >
-      {initials(name)}
-    </span>
-  )
+export function Avatar({ name, src, square = false }: { name: string; src?: string | null; square?: boolean }) {
+  return <UserAvatar name={name} src={src} square={square} className="size-11" />
 }
 
 export function PaneHeader({ title, onBack }: { title: string; onBack: () => void }) {

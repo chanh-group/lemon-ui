@@ -19,9 +19,9 @@ import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { EmptyState } from '@/components/common/EmptyState'
+import { UserAvatar } from '@/components/common/UserAvatar'
 import { ROUTES } from '@/config/constants'
 import { useAuth } from '@/features/auth/api'
-import { avatarColor, initials } from '../data/mockData'
 import { useFriendRequests } from '../hooks/useFriends'
 import { storyDisplayName, storyTime } from '../data/storiesData'
 import type { CallEntry, ChatTab, Conversation, StoryEntry } from '../types/chat.types'
@@ -55,12 +55,14 @@ function PreviewIcon({ kind }: { kind: Conversation['previewKind'] }) {
 
 function ConversationAvatar({
   name,
+  avatarUrl,
   online,
   onlineLabel,
   isGroup,
   story,
 }: {
   name: string
+  avatarUrl?: string | null
   online: boolean
   onlineLabel: string
   isGroup?: boolean
@@ -69,18 +71,16 @@ function ConversationAvatar({
 }) {
   return (
     <span className="relative shrink-0">
-      <span
-        aria-hidden="true"
+      <UserAvatar
+        name={name}
+        src={avatarUrl}
+        square={isGroup}
         className={cn(
-          'grid size-11 place-items-center rounded-full text-[13px] font-bold text-foreground',
+          'size-11',
           // Có story: bọc vòng kiểu Messenger (xanh chưa xem / xám đã xem)
           story ? (story.viewed ? 'ring-2 ring-border ring-offset-2 ring-offset-card' : 'chat-story-ring') : 'ring-1 ring-border',
-          isGroup && 'rounded-2xl',
         )}
-        style={{ backgroundColor: avatarColor(name) }}
-      >
-        {initials(name)}
-      </span>
+      />
       {online && (
         <span
           className="absolute right-0 bottom-0 size-3 rounded-full bg-success ring-2 ring-card"
@@ -210,7 +210,7 @@ export function MiddlePanel({
         {tab === 'messages' && (
           <>
             {conversationsLoading ? (
-              <p className="px-4 py-5 text-sm text-muted-foreground">{t('chat.pending')}</p>
+              <p className="px-4 py-5 text-sm text-muted-foreground">{t('common.loading')}</p>
             ) : conversationsError ? (
               <div className="px-4 py-5 text-sm">
                 <p className="font-semibold text-destructive">{t('chat.conversationsLoadError')}</p>
@@ -251,6 +251,7 @@ export function MiddlePanel({
                       >
                         <ConversationAvatar
                           name={c.name}
+                          avatarUrl={c.partnerAvatar}
                           online={c.online}
                           onlineLabel={t('chat.online')}
                           isGroup={c.isGroup}
@@ -316,13 +317,7 @@ export function MiddlePanel({
                 {calls.map((call) => (
                   <li key={call.id}>
                     <div className="chat-item flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 transition-colors duration-150 hover:bg-muted">
-                      <span
-                        aria-hidden="true"
-                        className="grid size-11 shrink-0 place-items-center rounded-full text-[13px] font-bold text-foreground ring-1 ring-border"
-                        style={{ backgroundColor: avatarColor(call.name) }}
-                      >
-                        {initials(call.name)}
-                      </span>
+                      <UserAvatar name={call.name} className="size-11" />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-semibold text-foreground">{call.name}</p>
                         <p
@@ -376,7 +371,7 @@ interface StoriesTabProps {
 function StoriesTab({ stories, activeStoryId, onOpenStory, onOpenCreate }: StoriesTabProps) {
   const { t } = useTranslation()
   const { user } = useAuth()
-  const userName = user?.fullName ?? 'Nguyên Đào Trọng'
+  const userName = user?.fullName ?? user?.username ?? 'Lemon User'
   // Tin của mình riêng — buộc nút +, hàng bấm là xem tin mới nhất của mình
   const myStory = stories.find((s) => s.mine)
   const friendStories = stories.filter((s) => !s.mine)
@@ -396,13 +391,7 @@ function StoriesTab({ stories, activeStoryId, onOpenStory, onOpenCreate }: Stori
               : 'hover:translate-x-0.5 hover:bg-muted',
           )}
         >
-          <span
-            aria-hidden="true"
-            className="grid size-11 shrink-0 place-items-center rounded-full text-[13px] font-bold text-foreground ring-1 ring-border"
-            style={{ backgroundColor: avatarColor(userName) }}
-          >
-            {initials(userName)}
-          </span>
+          <UserAvatar name={userName} src={user?.avatarUrl} className="size-11" />
           <span className="min-w-0 flex-1">
             <span className="flex items-center gap-0.5 text-sm font-bold text-foreground">
               <span className="truncate">{t('chat.myStories')}</span>
@@ -452,16 +441,14 @@ function StoriesTab({ stories, activeStoryId, onOpenStory, onOpenCreate }: Stori
                     : 'hover:translate-x-0.5 hover:bg-muted',
                 )}
               >
-              <span
-                aria-hidden="true"
+              <UserAvatar
+                name={s.name}
+                src={s.authorAvatar}
                 className={cn(
-                  'grid size-11 shrink-0 place-items-center rounded-full text-[13px] font-bold text-foreground',
+                  'size-11',
                   s.viewed ? 'ring-2 ring-border ring-offset-2 ring-offset-card' : 'chat-story-ring',
                 )}
-                style={{ backgroundColor: avatarColor(s.name) }}
-              >
-                {initials(s.name)}
-              </span>
+              />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-semibold text-foreground">{storyDisplayName(s, t)}</span>
                 <span className="mt-0.5 block truncate text-xs text-muted-foreground">{storyTime(s, t('chat.now'))}</span>

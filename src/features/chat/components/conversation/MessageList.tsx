@@ -14,9 +14,9 @@ const CheckCheck = createIcon(CheckCheckData)
 const Film = createIcon(FilmData)
 const ImageIcon = createIcon(ImageIconData)
 const Sticker = createIcon(StickerData)
+import { UserAvatar } from '@/components/common/UserAvatar'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import { avatarColor, initials } from '../../data/mockData'
 import type { ChatMessage, DayGroup, MessageAttachmentItem } from '../../types/chat.types'
 import { isImage, isVideo } from '../../utils/fileTypes'
 import { useRevokeMessageMutation } from '../../hooks/useChatQueries'
@@ -119,6 +119,7 @@ function MessageRowView({
   group,
   messageIndex,
   senderLabel,
+  senderAvatarUrl,
   onOpenLightbox,
   onOpenDocument,
   onRevoke,
@@ -126,6 +127,7 @@ function MessageRowView({
   group: MessageGroup
   messageIndex: number
   senderLabel: string
+  senderAvatarUrl?: string | null
   onOpenLightbox: (attachment: MessageAttachmentItem) => void
   onOpenDocument: (attachment: MessageAttachmentItem) => void
   onRevoke?: (messageId: string) => void
@@ -214,13 +216,12 @@ function MessageRowView({
       )}
     >
       {!isMe && isLast && (
-        <span
-          aria-hidden="true"
-          className="mt-auto mb-4 grid size-7 shrink-0 place-items-center rounded-full text-[10px] font-bold text-foreground ring-1 ring-border"
-          style={{ backgroundColor: avatarColor(authorName) }}
-        >
-          {initials(authorName)}
-        </span>
+        <UserAvatar
+          name={authorName}
+          src={senderAvatarUrl}
+          className="mt-auto mb-4 size-7"
+          fallbackClassName="text-[10px]"
+        />
       )}
       {!isMe && !isLast && <span aria-hidden="true" className="size-7 shrink-0" />}
 
@@ -326,6 +327,7 @@ function MessageRowView({
 interface MessageListProps {
   groups: DayGroup[]
   senderLabel: string
+  senderAvatarUrl?: string | null
   scrollRef: RefObject<HTMLDivElement | null>
   conversationId?: string
 }
@@ -339,7 +341,7 @@ type MessageListRow =
   | { kind: 'message'; key: string; group: MessageGroup; messageIndex: number }
 
 export const MessageList = forwardRef<MessageListHandle, MessageListProps>(function MessageList(
-  { groups, senderLabel, scrollRef, conversationId },
+  { groups, senderLabel, senderAvatarUrl, scrollRef, conversationId },
   ref,
 ) {
   'use no memo'
@@ -422,6 +424,7 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
         group={row.group}
         messageIndex={row.messageIndex}
         senderLabel={senderLabel}
+        senderAvatarUrl={senderAvatarUrl}
         onOpenLightbox={setLightboxAttachment}
         onOpenDocument={setDocumentAttachment}
         onRevoke={handleRevokeMessage}

@@ -92,3 +92,24 @@ export const resetPasswordSchema = z
     path: ['confirmPassword'],
   })
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>
+
+export const changePasswordSchema = z
+  .object({
+    oldPassword: z.string().min(1, 'errors.required'),
+    newPassword: z
+      .string()
+      .min(1, 'errors.required')
+      .min(PASSWORD_MIN_LENGTH, 'errors.passwordMinLength')
+      .regex(/[A-Za-z]/, 'errors.passwordLetter')
+      .regex(/[0-9]/, 'errors.passwordDigit'),
+    confirmPassword: z.string().min(1, 'errors.required'),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: 'errors.passwordMismatch',
+    path: ['confirmPassword'],
+  })
+  .refine((data) => data.newPassword !== data.oldPassword, {
+    message: 'errors.passwordSameAsOld',
+    path: ['newPassword'],
+  })
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>

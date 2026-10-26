@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { useFindUserByEmail, useFindUserByUsername } from '../../hooks/useFriends'
 import { useCreateDirectChatMutation } from '../../hooks/useChatQueries'
-import { ROUTES } from '@/config/constants'
+import { conversationPath } from '@/config/constants'
 import { PaneHeader } from './kit'
 import { SearchResultCard } from './SearchResultCard'
 
@@ -36,7 +36,7 @@ export function FindUserPane({
   const handleStartChat = async (userId: string) => {
     try {
       const conv = await createDirectChat.mutateAsync(userId)
-      navigate(ROUTES.messages, { state: { select: conv.id } })
+      navigate(conversationPath(conv.id))
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : t('common.error')
       toast.error(msg)

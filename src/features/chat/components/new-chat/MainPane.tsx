@@ -7,7 +7,7 @@ const At = createIcon(AtData)
 const Mail = createIcon(MailData)
 const UserPlus = createIcon(UserPlusData)
 const UsersGroup = createIcon(UsersGroupData)
-import { ROUTES } from '@/config/constants'
+import { conversationPath, ROUTES } from '@/config/constants'
 import { toast } from 'sonner'
 import { useCreateDirectChatMutation, useConversationsQuery } from '../../hooks/useChatQueries'
 import { useFriendRequests, useFriends } from '../../hooks/useFriends'
@@ -43,8 +43,13 @@ export function MainPane({ onOpenPane }: { onOpenPane: (pane: Exclude<NewChatPan
     [conversationsQuery.data, q],
   )
 
-  const openMessages = (selectId?: string) =>
-    navigate(ROUTES.messages, { state: selectId ? { select: selectId } : { tab: 'messages' } })
+  const openMessages = (selectId?: string) => {
+    if (selectId) {
+      navigate(conversationPath(selectId))
+      return
+    }
+    navigate(ROUTES.messages, { state: { tab: 'messages' } })
+  }
 
   const openConversationWith = (friendId: string) => {
     createDirectChat.mutate(friendId, {
@@ -121,7 +126,7 @@ export function MainPane({ onOpenPane }: { onOpenPane: (pane: Exclude<NewChatPan
                   }}
                   className="chat-item group flex w-full cursor-pointer items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-all duration-150 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                 >
-                  <Avatar name={friend.name} />
+                  <Avatar name={friend.name} src={friend.avatarUrl} />
                   <span className="flex min-w-0 flex-1 items-center gap-1.5">
                     <span className="truncate text-sm font-semibold text-foreground">{friend.name}</span>
                     <span className="truncate text-xs text-muted-foreground">@{friend.username}</span>

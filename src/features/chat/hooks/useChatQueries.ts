@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { queryKeys } from '@/infrastructure/query/keys'
 import {
+  getConversationById,
   getConversations,
   getConversationMessages,
   getOrCreateDirectConversation,
@@ -36,6 +37,23 @@ export function useConversationsQuery() {
     queryFn: () => getConversations(50),
     select: (data) => data.map((item) => mapConversationResponse(item)),
     staleTime: 1000 * 30, // 30s
+  })
+}
+
+/**
+ * Lấy chi tiết hội thoại khi mở trực tiếp bằng URL nhưng không nằm trong
+ * trang inbox đầu tiên (ví dụ hội thoại cũ hoặc danh sách đang lỗi).
+ */
+export function useConversationQuery(conversationId: string | null, enabled = true) {
+  return useQuery<ConversationResponse, Error, Conversation>({
+    queryKey: CHAT_QUERY_KEYS.conversation(conversationId ?? 'none'),
+    queryFn: () => {
+      if (!conversationId) throw new Error('No conversation selected')
+      return getConversationById(conversationId)
+    },
+    select: (data) => mapConversationResponse(data),
+    enabled: Boolean(conversationId) && enabled,
+    staleTime: 1000 * 30,
   })
 }
 

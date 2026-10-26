@@ -7,7 +7,7 @@ import type { ApiError } from '@/infrastructure/api/errors'
 import { useAuthStore } from '@/infrastructure/auth/auth-store'
 import { signOutEverywhere } from '@/infrastructure/auth/session'
 import { queryKeys } from '@/infrastructure/query/keys'
-import { getItem, setItem } from '@/lib/storage'
+import { getItem, removeItem, setItem } from '@/lib/storage'
 import type {
   AuthUser,
   ForgotOtpInput,
@@ -178,6 +178,36 @@ export function useResetPassword() {
           otp: input.otp,
           newPassword: input.newPassword,
         })
+        queryClient.clear()
+        useAuthStore.getState().reset()
+      } catch (error) {
+        throw toApiError(error)
+      }
+    },
+  })
+}
+
+export type ChangePasswordPayload = {
+  oldPassword: string
+  newPassword: string
+}
+
+/**
+ * Đổi mật khẩu — backend thu hồi toàn bộ refresh session và xóa cookie.
+ * Client phải xóa token/cache local và quay về trang đăng nhập.
+ */
+export function useChangePassword() {
+  const queryClient = useQueryClient()
+  return useMutation<void, ApiError, ChangePasswordPayload>({
+    mutationFn: async (input) => {
+      if (isAuthBypass()) {
+        queryClient.clear()
+        removeItem(DEV_SESSION_KEY)
+        useAuthStore.getState().reset()
+        return
+      }
+      try {
+        await api.post(authEndpoints.changePassword, input)
         queryClient.clear()
         useAuthStore.getState().reset()
       } catch (error) {

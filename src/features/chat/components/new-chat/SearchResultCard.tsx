@@ -20,7 +20,7 @@ export function SearchResultCard({ user, onMessage }: { user: ChatUser; onMessag
 
   return (
     <div className="mx-2 flex items-center gap-3 rounded-2xl border border-border bg-card p-3 shadow-sm">
-      <Avatar name={displayName} />
+      <Avatar name={displayName} src={user.avatarUrl} />
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-semibold text-foreground">{displayName}</p>
         <p className="truncate text-xs text-muted-foreground">@{user.username}</p>

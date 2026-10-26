@@ -78,6 +78,14 @@ export const router = createBrowserRouter(
       ),
     },
     {
+      path: ROUTES.conversation,
+      element: (
+        <RequireAuth>
+          <DashboardPage />
+        </RequireAuth>
+      ),
+    },
+    {
       path: ROUTES.calls,
       element: (
         <RequireAuth>

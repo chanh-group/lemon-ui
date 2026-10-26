@@ -159,6 +159,7 @@ export function ConversationView({
             ref={messageListRef}
             groups={groups}
             senderLabel={conversation.name}
+            senderAvatarUrl={conversation.partnerAvatar}
             scrollRef={scrollRef}
             conversationId={conversation.id}
           />

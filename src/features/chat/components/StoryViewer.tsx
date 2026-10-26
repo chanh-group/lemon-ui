@@ -21,11 +21,11 @@ import {
 } from '@hugeicons/core-free-icons'
 import { createIcon } from '@/components/icons/hugeIcon'
 import { BrandMark } from '@/components/common/BrandMark'
+import { UserAvatar } from '@/components/common/UserAvatar'
 import { ROUTES } from '@/config/constants'
 import { useAuth } from '@/features/auth/api'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
-import { avatarColor, initials } from '../data/mockData'
 import { storyDisplayName, TEXT_STORY_BG } from '../data/storiesData'
 import {
   DropdownMenu,
@@ -442,13 +442,11 @@ export function StoryViewer({
               {/* Thông tin tác giả & Thẻ nhạc Facebook style */}
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <span
-                    aria-hidden="true"
-                    className="grid size-10 shrink-0 place-items-center rounded-full text-[13px] font-bold text-foreground ring-2 ring-white/40 shadow-md"
-                    style={{ backgroundColor: avatarColor(story.name) }}
-                  >
-                    {initials(story.name)}
-                  </span>
+                  <UserAvatar
+                    name={story.name}
+                    src={story.authorAvatar}
+                    className="size-10 ring-2 ring-white/40 shadow-md"
+                  />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
                       <p className="truncate text-sm font-bold text-white drop-shadow-sm leading-tight">
@@ -767,12 +765,11 @@ export function StoryViewer({
                   story.id === myStory.id ? 'bg-[#3a3b3c]' : 'hover:bg-[#252728]',
                 )}
               >
-                <span
-                  className="grid size-12 shrink-0 place-items-center rounded-full text-sm font-bold text-foreground ring-2 ring-[#2e89ff] ring-offset-2 ring-offset-[#18191a]"
-                  style={{ backgroundColor: avatarColor(myStory.name) }}
-                >
-                  {initials(myStory.name)}
-                </span>
+                <UserAvatar
+                  name={myStory.name}
+                  src={myStory.authorAvatar}
+                  className="size-12 ring-2 ring-[#2e89ff] ring-offset-2 ring-offset-[#18191a]"
+                />
                 <div className="min-w-0 flex-1">
                   <p className="text-[15px] font-semibold text-white truncate">{myStory.name}</p>
                   <p className="text-xs text-[#b0b3b8] truncate flex items-center gap-1.5">
@@ -810,17 +807,16 @@ export function StoryViewer({
                         isSelected ? 'bg-[#3a3b3c]' : 'hover:bg-[#252728]',
                       )}
                     >
-                      <span
+                      <UserAvatar
+                        name={s.name}
+                        src={s.authorAvatar}
                         className={cn(
-                          'grid size-13 shrink-0 place-items-center rounded-full text-sm font-bold text-foreground',
+                          'size-13',
                           s.viewed
                             ? 'ring-2 ring-[#4e4f50] ring-offset-2 ring-offset-[#18191a]'
                             : 'ring-2 ring-[#2e89ff] ring-offset-2 ring-offset-[#18191a]',
                         )}
-                        style={{ backgroundColor: avatarColor(s.name) }}
-                      >
-                        {initials(s.name)}
-                      </span>
+                      />
                       <div className="min-w-0 flex-1">
                         <p className="text-[15px] font-semibold text-white truncate leading-snug">
                           {s.name}
@@ -877,13 +873,11 @@ export function StoryViewer({
             </button>
 
             {user && (
-              <span
-                className="grid size-10 shrink-0 place-items-center rounded-full text-xs font-bold text-foreground ring-1 ring-white/20 ml-1"
-                style={{ backgroundColor: avatarColor(user.fullName) }}
-                title={user.fullName}
-              >
-                {initials(user.fullName)}
-              </span>
+              <UserAvatar
+                name={user.fullName}
+                src={user.avatarUrl}
+                className="ml-1 size-10 ring-1 ring-white/20"
+              />
             )}
           </div>
         </div>
@@ -997,13 +991,11 @@ export function StoryViewer({
               {/* Thông tin tác giả & Thẻ nhạc Facebook style */}
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <span
-                    aria-hidden="true"
-                    className="grid size-10 shrink-0 place-items-center rounded-full text-[13px] font-bold text-foreground ring-2 ring-white/40 shadow-md"
-                    style={{ backgroundColor: avatarColor(story.name) }}
-                  >
-                    {initials(story.name)}
-                  </span>
+                  <UserAvatar
+                    name={story.name}
+                    src={story.authorAvatar}
+                    className="size-10 ring-2 ring-white/40 shadow-md"
+                  />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
                       <p className="truncate text-sm sm:text-base font-bold text-white drop-shadow-sm leading-tight">

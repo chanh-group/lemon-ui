@@ -171,7 +171,7 @@ export async function listStories(currentUserId?: string): Promise<StoryEntry[]>
     await delay(150)
     return storyStore.map((s) => ({ ...s }))
   }
-try {
+  try {
     const res = await api.get<any[]>('/stories/feed')
     const raw = res.data ?? []
     const flattened: StoryEntry[] = []
