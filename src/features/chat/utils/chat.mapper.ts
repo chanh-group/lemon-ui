@@ -6,6 +6,8 @@ import type {
   MessageResponse,
 } from '../types/chat.types'
 
+const MESSAGE_REVOKED_PREVIEW_TOKEN = '[message-revoked]'
+
 /** Định dạng giờ HH:mm */
 export function formatTimeHHmm(dateStrOrObj?: string | Date | null): string {
   if (!dateStrOrObj) return ''
@@ -60,7 +62,7 @@ export function mapConversationResponse(
   return {
     id: raw.id,
     name,
-    preview: raw.lastMessagePreview || '',
+    preview: raw.lastMessagePreview === MESSAGE_REVOKED_PREVIEW_TOKEN ? 'Tin nhắn đã bị thu hồi' : (raw.lastMessagePreview || ''),
     previewKind: 'text',
     time: formatTimeHHmm(dateToUse),
     unread: raw.unreadCount || 0,

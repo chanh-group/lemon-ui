@@ -91,7 +91,7 @@ export function useChatRealtime(activeConversationId: string | null) {
               const isCurrentActive = convId === activeConversationId
               return {
                 ...conversation,
-                lastMessagePreview: msg.deletedAt ? 'Tin nhắn đã bị thu hồi' : (msg.body ?? ''),
+                lastMessagePreview: msg.deletedAt ? '[message-revoked]' : (msg.body ?? ''),
                 lastMessageAt: msg.createdAt,
                 unreadCount:
                   isCurrentActive || msg.senderId === userId
