@@ -8,7 +8,7 @@ import { conversationPath } from '@/config/constants'
 import { PaneHeader } from './kit'
 import { SearchResultCard } from './SearchResultCard'
 
-/** Tìm user theo username / email. */
+/** Tìm user theo tên/username hoặc email. */
 export function FindUserPane({
   mode,
   hint,
@@ -51,7 +51,7 @@ export function FindUserPane({
           <input
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            placeholder={mode === 'username' ? t('chat.newChatByUsername') : t('chat.searchByEmailHint')}
+            placeholder={mode === 'username' ? t('chat.searchPeopleHint') : t('chat.searchByEmailHint')}
             aria-label={hint}
             type={mode === 'email' ? 'email' : 'text'}
             inputMode="email"
