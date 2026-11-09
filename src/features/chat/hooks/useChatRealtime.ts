@@ -18,7 +18,6 @@ import type {
   MessageResponse,
   MessageRevokedPayload,
   MessageTimelineResponse,
-  ReadUpdatedPayload,
   TypingEventPayload,
 } from '../types/chat.types'
 
@@ -97,7 +96,8 @@ export function useChatRealtime(activeConversationId: string | null) {
           (old) => mergeMessagesByTime(old ?? [], missed),
         )
       }
-      void queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.messages(conversationId) })
+      // Không invalidate timeline: missed đã nằm trong liveMessages, còn refetch
+      // infinite query sẽ tải lại mọi trang đã load và presign lại toàn bộ media.
     }
     const handleConnect = () => {
       setConnectionStatus('connected')
@@ -277,11 +277,8 @@ export function useChatRealtime(activeConversationId: string | null) {
       }))
     }
 
-    // E. Đối phương đã đọc tin nhắn
-    const handleReadUpdated = (data: ReadUpdatedPayload) => {
-      // Khi đối phương đọc, invalidate messages của conversation để cập nhật trạng thái read
-      queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.messages(data.conversationId) })
-    }
+    // E. read:updated: không refetch timeline. UI chưa hiển thị read receipt, còn
+    // invalidate infinite query sẽ tải lại toàn bộ trang (cursor) + presign lại media.
 
     // F. Cập nhật cảm xúc tin nhắn (Điểm A)
     const handleMessageReaction = (payload: MessageReactionPayload) => {
@@ -310,7 +307,6 @@ export function useChatRealtime(activeConversationId: string | null) {
     socket.on('message:updated', handleMessageUpdated)
     socket.on('message:revoked', handleMessageRevoked)
     socket.on('typing', handleTyping)
-    socket.on('read:updated', handleReadUpdated)
     socket.on('message:reaction', handleMessageReaction)
 
     return () => {
@@ -322,7 +318,6 @@ export function useChatRealtime(activeConversationId: string | null) {
       socket.off('message:updated', handleMessageUpdated)
       socket.off('message:revoked', handleMessageRevoked)
       socket.off('typing', handleTyping)
-      socket.off('read:updated', handleReadUpdated)
       socket.off('message:reaction', handleMessageReaction)
     }
   }, [status, activeConversationId, userId, queryClient, t])

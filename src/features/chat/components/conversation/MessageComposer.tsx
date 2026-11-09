@@ -41,6 +41,7 @@ interface MessageComposerProps {
     attachments?: MessageAttachmentInput[],
   ) => boolean | void | Promise<boolean | void>
   disabled?: boolean
+  isSending?: boolean
   conversationId?: string
   onTypingStart?: () => void
   onTypingStop?: () => void
@@ -51,6 +52,7 @@ export function MessageComposer({
   onDraftChange,
   onSubmit,
   disabled = false,
+  isSending = false,
   conversationId,
   onTypingStart,
   onTypingStop,
@@ -328,7 +330,7 @@ export function MessageComposer({
   const handleSubmit = async () => {
     const text = draft.trim()
     if (!text && pendingFiles.length === 0) return
-    if (disabled || isUploading) return
+    if (disabled || isUploading || isSending) return
 
     if (typingTimer.current) {
       clearTimeout(typingTimer.current)
@@ -416,7 +418,7 @@ export function MessageComposer({
   }
 
   const canSubmit =
-    (draft.trim().length > 0 || pendingFiles.length > 0) && !disabled && !isUploading
+    (draft.trim().length > 0 || pendingFiles.length > 0) && !disabled && !isUploading && !isSending
 
   return (
     <footer
@@ -443,7 +445,7 @@ export function MessageComposer({
                   <FileIcon className="size-4" />
                 </div>
               )}
-              <div className="max-w-[130px] min-w-0">
+              <div className="max-w-32.5 min-w-0">
                 <p className="truncate font-medium text-foreground">{p.file.name}</p>
                 <p className="text-[10px] text-muted-foreground">{formatBytes(p.file.size)}</p>
               </div>
@@ -502,7 +504,7 @@ export function MessageComposer({
             <button
               type="button"
               onClick={handleStopAndSendRecording}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium bg-brand-ink text-primary-foreground shadow-sm hover:opacity-90 active:scale-95 transition-all"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium bg-primary text-primary-foreground shadow-sm hover:opacity-90 active:scale-95 transition-all"
               title={t('chat.sendVoiceNote', 'Gửi tin nhắn thoại')}
             >
               <Send className="size-3.5" />
@@ -537,7 +539,7 @@ export function MessageComposer({
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              disabled={disabled || isUploading}
+              disabled={disabled || isUploading || isSending}
               aria-label={t('chat.attachFile')}
               title="Đính kèm tệp tin / ảnh (< 25MB)"
               className="grid size-9 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-border hover:text-foreground disabled:opacity-50"
@@ -549,7 +551,7 @@ export function MessageComposer({
             <button
               type="button"
               onClick={handleStartRecording}
-              disabled={disabled || isUploading}
+              disabled={disabled || isUploading || isSending}
               aria-label={t('chat.recordVoiceNote', 'Ghi âm')}
               title={t('chat.recordVoiceNote', 'Ghi âm tin nhắn thoại')}
               className="grid size-9 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-border hover:text-foreground disabled:opacity-50"
@@ -563,7 +565,7 @@ export function MessageComposer({
             disabled={!canSubmit}
             aria-label={t('chat.sendMessage')}
             title={t('chat.sendMessage')}
-            className="chat-send grid size-11 min-h-11 min-w-11 shrink-0 place-items-center rounded-full bg-brand-ink text-primary-foreground shadow-md transition-all duration-150 hover:shadow-lg active:scale-90 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none"
+            className="chat-send grid size-11 min-h-11 min-w-11 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground shadow-md transition-all duration-150 hover:shadow-lg active:scale-90 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none"
           >
             <Send className="size-5.5" aria-hidden="true" />
           </button>

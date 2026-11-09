@@ -1,5 +1,7 @@
 import {
   forwardRef,
+  memo,
+  useCallback,
   useImperativeHandle,
   useLayoutEffect,
   useMemo,
@@ -29,7 +31,7 @@ import { useAuth } from '@/features/auth/api'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import type { ChatMessage, DayGroup, MessageAttachmentItem } from '../../types/chat.types'
-import { isImage, isVideo } from '../../utils/fileTypes'
+import { isAudio, isImage, isVideo } from '../../utils/fileTypes'
 import { useReactMessageMutation, useRevokeMessageMutation } from '../../hooks/useChatQueries'
 import { MessageActionPill } from './AttachmentActionMenu'
 import { AttachmentBubble } from './AttachmentBubble'
@@ -137,7 +139,7 @@ function StoryReplyQuote({
   )
 }
 
-function MessageRowView({
+const MessageRowView = memo(function MessageRowView({
   group,
   messageIndex,
   senderLabel,
@@ -240,7 +242,7 @@ function MessageRowView({
       onTouchEnd={handleTouchEnd}
       onTouchCancel={handleTouchEnd}
       className={cn(
-        'group msg-in flex w-full items-center',
+        'group flex w-full items-center',
         isMe ? 'justify-end' : 'justify-start gap-2.5',
         messageIndex > 0 && 'mt-0.5',
       )}
@@ -401,7 +403,7 @@ function MessageRowView({
       {!isMe && actionBar}
     </div>
   )
-}
+})
 
 interface MessageListProps {
   groups: DayGroup[]
@@ -409,6 +411,8 @@ interface MessageListProps {
   senderAvatarUrl?: string | null
   scrollRef: RefObject<HTMLDivElement | null>
   conversationId?: string
+  /** Còn đang ở cuối danh sách thì tự bám tin mới nhất; cuộn lên thì thôi. */
+  followBottom?: boolean
 }
 
 export interface MessageListHandle {
@@ -419,8 +423,26 @@ type MessageListRow =
   | { kind: 'date'; key: string; date: string }
   | { kind: 'message'; key: string; group: MessageGroup; messageIndex: number }
 
+/** Ước lượng chiều cao theo loại tin để scrollbar và anchor ổn định khi cuộn lịch sử. */
+function estimateRowHeight(row: MessageListRow | undefined): number {
+  if (!row) return 80
+  if (row.kind === 'date') return 48
+  const msg = row.group.messages[row.messageIndex]
+  if (!msg) return 80
+  if (msg.deletedAt) return 64
+  const attachment = msg.attachments?.[0]
+  if (attachment) {
+    if (isImage(attachment.mimeType, attachment.fileName)) return 300
+    if (isVideo(attachment.mimeType, attachment.fileName)) return 300
+    if (isAudio(attachment.mimeType, attachment.fileName)) return 64
+    return 80
+  }
+  if (msg.text) return Math.min(140, 44 + Math.ceil(msg.text.length / 38) * 20)
+  return 80
+}
+
 export const MessageList = forwardRef<MessageListHandle, MessageListProps>(function MessageList(
-  { groups, senderLabel, senderAvatarUrl, scrollRef, conversationId },
+  { groups, senderLabel, senderAvatarUrl, scrollRef, conversationId, followBottom = true },
   ref,
 ) {
   'use no memo'
@@ -428,13 +450,6 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
   const { t } = useTranslation()
   const { user } = useAuth()
   const currentUserId = user?.id
-  const didInitialScroll = useRef(false)
-  const lastConversationId = useRef(conversationId)
-
-  if (lastConversationId.current !== conversationId) {
-    lastConversationId.current = conversationId
-    didInitialScroll.current = false
-  }
 
   const [lightboxAttachment, setLightboxAttachment] = useState<MessageAttachmentItem | null>(null)
   const [documentAttachment, setDocumentAttachment] = useState<MessageAttachmentItem | null>(null)
@@ -442,21 +457,34 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
 
   const revokeMutation = useRevokeMessageMutation(conversationId ?? null)
   const reactMutation = useReactMessageMutation(conversationId ?? null)
+  const revokeMessage = revokeMutation.mutate
+  const reactMessage = reactMutation.mutate
 
-  const handleRevokeMessage = (messageId: string) => {
-    revokeMutation.mutate(messageId, {
-      onSuccess: () => {
-        toast.success(t('chat.messageRevoked', 'Đã gỡ tin nhắn'))
-      },
-      onError: () => {
-        toast.error(t('chat.messageRevokeFailed', 'Không thể gỡ tin nhắn'))
-      },
-    })
-  }
+  // Callback ổn định để memo của từng row không bị phá khi list re-render lúc cuộn.
+  const handleRevokeMessage = useCallback(
+    (messageId: string) => {
+      revokeMessage(messageId, {
+        onSuccess: () => {
+          toast.success(t('chat.messageRevoked', 'Đã gỡ tin nhắn'))
+        },
+        onError: () => {
+          toast.error(t('chat.messageRevokeFailed', 'Không thể gỡ tin nhắn'))
+        },
+      })
+    },
+    [revokeMessage, t],
+  )
 
-  const handleReactMessage = (messageId: string, emoji: string) => {
-    reactMutation.mutate({ messageId, emoji })
-  }
+  const handleReactMessage = useCallback(
+    (messageId: string, emoji: string) => {
+      reactMessage({ messageId, emoji })
+    },
+    [reactMessage],
+  )
+
+  const handleForwardMessage = useCallback((message: ChatMessage) => {
+    setForwardingMessage(message)
+  }, [])
 
   const rows = useMemo(() => {
     const result: MessageListRow[] = []
@@ -483,7 +511,7 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
     count: rows.length,
     getScrollElement: () => scrollRef.current,
     getItemKey: (index) => rows[index]?.key ?? index,
-    estimateSize: (index) => (rows[index]?.kind === 'date' ? 48 : 80),
+    estimateSize: (index) => estimateRowHeight(rows[index]),
     overscan: 10,
     anchorTo: 'end',
     followOnAppend: true,
@@ -498,24 +526,14 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
     [virtualizer],
   )
 
+  // Mở chat hoặc có tin/trang mới trong lúc còn ở cuối: bám xuống tin mới nhất.
+  // Khi người dùng đã cuộn lên, bỏ qua để virtualizer neo đúng tin đang đọc.
   useLayoutEffect(() => {
-    if (rows.length === 0 || didInitialScroll.current) return
-
-    const scrollToBottomNow = () => {
-      const el = scrollRef.current
-      if (el) {
-        el.scrollTop = el.scrollHeight
-      }
-      virtualizer.scrollToIndex(rows.length - 1, { align: 'end', behavior: 'auto' })
-    }
-
-    scrollToBottomNow()
-    const frame = requestAnimationFrame(() => {
-      scrollToBottomNow()
-      didInitialScroll.current = true
-    })
-    return () => cancelAnimationFrame(frame)
-  }, [rows.length, virtualizer, conversationId, scrollRef])
+    if (rows.length === 0 || !followBottom) return
+    const el = scrollRef.current
+    if (el) el.scrollTop = el.scrollHeight
+    virtualizer.scrollToEnd({ behavior: 'auto' })
+  }, [rows.length, followBottom, virtualizer, scrollRef])
 
   const virtualRows = virtualizer.getVirtualItems()
   const renderRow = (row: MessageListRow) =>
@@ -538,7 +556,7 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
         onOpenDocument={setDocumentAttachment}
         onRevoke={handleRevokeMessage}
         onReact={handleReactMessage}
-        onForward={(m) => setForwardingMessage(m)}
+        onForward={handleForwardMessage}
       />
     )
 

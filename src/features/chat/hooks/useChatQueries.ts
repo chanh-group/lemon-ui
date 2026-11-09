@@ -32,7 +32,10 @@ import type {
 
 export const CHAT_QUERY_KEYS = queryKeys.chat
 const MESSAGE_PAGE_SIZE = 30
-const INITIAL_MESSAGE_BUFFER_PAGES = 1
+/** Cửa sổ 3 trang: -1 (mới hơn), 0 (đang đọc), +1 (cũ hơn). */
+const MAX_MESSAGE_PAGES = 3
+/** Mở hội thoại tải sẵn trang hiện tại + 2 trang cũ để cuộn không chạm mép. */
+const INITIAL_MESSAGE_BUFFER_PAGES = 3
 
 export interface MessagePageParam {
   cursor?: string
@@ -66,7 +69,7 @@ export function useConversationQuery(conversationId: string | null, enabled = tr
   })
 }
 
-/** Giữ tối đa 5 trang quanh vùng đang đọc và tải sẵn 2 trang lịch sử gần nhất. */
+/** Giữ cửa sổ 3 trang (-1, 0, +1) quanh vùng đang đọc và tải sẵn 2 trang cũ. */
 export function useConversationMessagesQuery(conversationId: string | null) {
   const queryClient = useQueryClient()
   const { t } = useTranslation()
@@ -76,7 +79,7 @@ export function useConversationMessagesQuery(conversationId: string | null) {
     queryKey: CHAT_QUERY_KEYS.messages(conversationId ?? 'none'),
     queryFn: ({ pageParam }: { pageParam: MessagePageParam }) => {
       if (!conversationId) {
-        return Promise.resolve({ items: [], hasMore: false })
+        return Promise.resolve<MessageTimelineResponse>({ items: [], hasMore: false })
       }
       return getConversationMessages(
         conversationId,
@@ -97,7 +100,7 @@ export function useConversationMessagesQuery(conversationId: string | null) {
       }
       return firstPage.items[0]?.id ? { after: firstPage.items[0].id } : undefined
     },
-    maxPages: 5,
+    maxPages: MAX_MESSAGE_PAGES,
     enabled: Boolean(conversationId),
     staleTime: 1000 * 60, // 1 phút
   })
@@ -176,6 +179,22 @@ export function useConversationMessagesQuery(conversationId: string | null) {
         ),
     )
   }, [conversationId, data, queryClient])
+
+  // maxPages cắt trang mới nhất khi cuộn lên. Rời hội thoại lúc cửa sổ không
+  // còn neo ở trang mới nhất thì reset để lần mở sau vào đúng tin mới nhất.
+  useEffect(() => {
+    const prefetched = initialPrefetches.current
+    return () => {
+      if (!conversationId) return
+      const key = CHAT_QUERY_KEYS.messages(conversationId)
+      const cached =
+        queryClient.getQueryData<InfiniteData<MessageTimelineResponse, MessagePageParam>>(key)
+      const firstParam = cached?.pageParams[0]
+      if (!firstParam?.cursor && !firstParam?.after) return
+      prefetched.delete(conversationId)
+      void queryClient.resetQueries({ queryKey: key, exact: true })
+    }
+  }, [conversationId, queryClient])
 
   return { ...query, liveMessages: liveMessagesQuery.data }
 }

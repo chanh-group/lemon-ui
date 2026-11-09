@@ -3,17 +3,6 @@
    Dùng semantic tokens từ globals.css (light + dark).
    ============================================================ */
 
-@keyframes msg-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
 @keyframes story-in {
   from {
     opacity: 0;
@@ -32,10 +21,6 @@
   to {
     width: 100%;
   }
-}
-
-.msg-in {
-  animation: msg-in 0.2s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 /* Icon nav: scale nhẹ khi active, nền chuyển mượt */
@@ -104,7 +89,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .msg-in,
   .story-overlay,
   .story-overlay .story-card,
   .story-progress {

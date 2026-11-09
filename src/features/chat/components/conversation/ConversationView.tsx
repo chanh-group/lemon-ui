@@ -55,6 +55,8 @@ export function ConversationView({
   const scrollRef = useRef<HTMLDivElement>(null)
   const messageListRef = useRef<MessageListHandle>(null)
   const [showJump, setShowJump] = useState(false)
+  const [atBottom, setAtBottom] = useState(true)
+  const atBottomRef = useRef(true)
   const olderRequestPending = useRef(false)
   const newerRequestPending = useRef(false)
   const latestMessage = groups.at(-1)?.messages.at(-1)
@@ -112,16 +114,33 @@ export function ConversationView({
       })
   }
 
+  const lastScrollTop = useRef(0)
+
   const handleScroll = () => {
     const el = scrollRef.current
     if (!el) return
+    const previousScrollTop = lastScrollTop.current
+    lastScrollTop.current = el.scrollTop
+    const scrollingUp = el.scrollTop < previousScrollTop
+    const scrollingDown = el.scrollTop > previousScrollTop
     const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120
     if (nearBottom) setShowJump(false)
+    if (atBottomRef.current !== nearBottom) {
+      atBottomRef.current = nearBottom
+      setAtBottom(nearBottom)
+    }
 
-    if (el.scrollTop < 250) loadOlderMessages()
+    // Tải trước khi còn cách mép ~1.5 màn hình để trang kế tiếp về kịp,
+    // tránh khựng khi người dùng cuộn tới cuối lịch sử đã có.
+    const edgeThreshold = el.clientHeight * 1.5
+    // Chỉ tải lịch sử khi người dùng thực sự cuộn lên. Nếu không, scroll
+    // chương trình lúc mở chat (scrollTop = 0 khi nội dung ngắn hơn khung)
+    // sẽ kích hoạt tải trang cũ liên tục và giữ viewport ở đầu lịch sử.
+    if (scrollingUp && el.scrollTop < edgeThreshold) loadOlderMessages()
 
     if (
-      el.scrollHeight - el.scrollTop - el.clientHeight < 250 &&
+      scrollingDown &&
+      el.scrollHeight - el.scrollTop - el.clientHeight < edgeThreshold &&
       hasNewerMessages &&
       !isLoadingNewerMessages
     )
@@ -132,7 +151,8 @@ export function ConversationView({
     if ((!text && (!attachments || attachments.length === 0)) || isSending) return false
     const sent = await onSend(text, attachments)
     if (!sent) return false
-    setDraft('')
+    // Giữ text người dùng gõ thêm trong lúc tin trước đang gửi.
+    setDraft((current) => (current === text ? '' : current))
     setShowJump(false)
     scrollToBottom()
     return true
@@ -193,6 +213,7 @@ export function ConversationView({
             senderAvatarUrl={conversation.partnerAvatar}
             scrollRef={scrollRef}
             conversationId={conversation.id}
+            followBottom={atBottom}
           />
         )}
 
@@ -216,7 +237,8 @@ export function ConversationView({
         draft={draft}
         onDraftChange={setDraft}
         onSubmit={submit}
-        disabled={isSending || messagesLoading || Boolean(messagesError)}
+        disabled={messagesLoading || Boolean(messagesError)}
+        isSending={isSending}
         conversationId={conversation.id}
         onTypingStart={onTypingStart}
         onTypingStop={onTypingStop}
