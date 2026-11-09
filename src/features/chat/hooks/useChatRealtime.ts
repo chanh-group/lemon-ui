@@ -5,9 +5,10 @@ import { toast } from 'sonner'
 import { useAuth } from '@/features/auth/api'
 import { connectChatSocket, disconnectChatSocket, getChatSocket, type SocketConnectionStatus } from '@/lib/socket'
 import { CHAT_QUERY_KEYS, type MessagePageParam } from './useChatQueries'
-import { markConversationRead } from '../api/chat.api'
+import { getConversationMessages, markConversationRead } from '../api/chat.api'
 import type {
   ConversationResponse,
+  MessageReactionPayload,
   MessageResponse,
   MessageRevokedPayload,
   MessageTimelineResponse,
@@ -42,7 +43,42 @@ export function useChatRealtime(activeConversationId: string | null) {
     if (status !== 'authenticated') return
 
     const socket = getChatSocket()
-    const handleConnect = () => setConnectionStatus('connected')
+    const handleConnect = () => {
+      setConnectionStatus('connected')
+      // Điểm B: Đồng bộ tin nhắn bị lỡ khi reconnect
+      if (activeConversationId) {
+        const live = queryClient.getQueryData<MessageResponse[]>(
+          CHAT_QUERY_KEYS.liveMessages(activeConversationId),
+        )
+        const timeline = queryClient.getQueryData<InfiniteData<MessageTimelineResponse, MessagePageParam>>(
+          CHAT_QUERY_KEYS.messages(activeConversationId),
+        )
+        const lastMsg =
+          live && live.length > 0
+            ? live[live.length - 1]
+            : timeline?.pages[0]?.items[timeline.pages[0].items.length - 1]
+
+        if (lastMsg?.id) {
+          getConversationMessages(activeConversationId, undefined, 100, lastMsg.id)
+            .then((res) => {
+              if (res.items.length > 0) {
+                queryClient.setQueryData<MessageResponse[]>(
+                  CHAT_QUERY_KEYS.liveMessages(activeConversationId),
+                  (old) => {
+                    const existingIds = new Set((old ?? []).map((m) => m.id))
+                    const newItems = res.items.filter((m) => !existingIds.has(m.id))
+                    return [...(old ?? []), ...newItems]
+                  },
+                )
+                void queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.conversations })
+              }
+            })
+            .catch(() => {
+              // Best-effort reconnect sync
+            })
+        }
+      }
+    }
     const handleDisconnect = () => setConnectionStatus('disconnected')
     const handleConnectError = () => setConnectionStatus('error')
     const handleReconnectAttempt = () => setConnectionStatus('connecting')
@@ -191,11 +227,39 @@ export function useChatRealtime(activeConversationId: string | null) {
       queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.messages(data.conversationId) })
     }
 
+    // F. Cập nhật cảm xúc tin nhắn (Điểm A)
+    const handleMessageReaction = (payload: MessageReactionPayload) => {
+      const convId = payload.conversationId
+      queryClient.setQueryData<InfiniteData<MessageTimelineResponse, MessagePageParam>>(
+        CHAT_QUERY_KEYS.messages(convId),
+        (old) => {
+          if (!old) return old
+          return {
+            ...old,
+            pages: old.pages.map((page) => ({
+              ...page,
+              items: page.items.map((m) =>
+                m.id === payload.messageId ? { ...m, reactions: payload.reactions } : m,
+              ),
+            })),
+          }
+        },
+      )
+      queryClient.setQueryData<MessageResponse[]>(
+        CHAT_QUERY_KEYS.liveMessages(convId),
+        (old) =>
+          old?.map((m) =>
+            m.id === payload.messageId ? { ...m, reactions: payload.reactions } : m,
+          ),
+      )
+    }
+
     socket.on('message:new', handleNewMessage)
     socket.on('message:updated', handleMessageUpdated)
     socket.on('message:revoked', handleMessageRevoked)
     socket.on('typing', handleTyping)
     socket.on('read:updated', handleReadUpdated)
+    socket.on('message:reaction', handleMessageReaction)
 
     return () => {
       socket.off('connect', handleConnect)
@@ -207,6 +271,7 @@ export function useChatRealtime(activeConversationId: string | null) {
       socket.off('message:revoked', handleMessageRevoked)
       socket.off('typing', handleTyping)
       socket.off('read:updated', handleReadUpdated)
+      socket.off('message:reaction', handleMessageReaction)
     }
   }, [status, activeConversationId, userId, queryClient, t])
 
