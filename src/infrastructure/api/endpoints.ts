@@ -15,6 +15,13 @@ export const authEndpoints = {
   changePassword: '/auth/change-password',
 } as const
 
+/**
+ * Path builders user — khớp LemonCore `@Controller('users')`.
+ */
+export const userEndpoints = {
+  me: '/users/me',
+} as const
+
 /** 401 trên các path này là lỗi credential — KHÔNG silent refresh. */
 export const NO_SILENT_REFRESH_PATHS: readonly string[] = [
   authEndpoints.login,

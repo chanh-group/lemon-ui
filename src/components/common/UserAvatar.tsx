@@ -33,7 +33,7 @@ export function UserAvatar({
   const radius = square ? 'rounded-2xl' : undefined
 
   return (
-    <Avatar className={cn('size-11 ring-1 ring-border', radius, className)}>
+    <Avatar key={src || 'no-avatar'} className={cn('size-11 ring-1 ring-border', radius, className)}>
       {src ? (
         <AvatarImage
           src={src}
@@ -42,7 +42,7 @@ export function UserAvatar({
         />
       ) : null}
       <AvatarFallback
-        delayMs={fallbackDelayMs ?? (src ? 300 : 0)}
+        delayMs={fallbackDelayMs ?? (src ? 300 : undefined)}
         className={cn('text-[13px] font-bold text-foreground', radius, fallbackClassName)}
         style={{ backgroundColor: avatarColor(safeName), ...fallbackStyle }}
       >

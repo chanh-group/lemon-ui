@@ -31,7 +31,9 @@ export {
   useForgotPassword,
   useResetPassword,
   useLogout,
+  useUpdateProfile,
 } from './hooks/useAuth'
+export { updateProfile, type UpdateProfileInput } from './api'
 export { useOtpCountdown, formatCountdown } from './hooks/useOtpCountdown'
 export { LoginForm } from './components/LoginForm'
 export { SignupWizard, EmailStep, OtpStep, InfoStep } from './components/signup'

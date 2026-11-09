@@ -21,6 +21,7 @@ export {
   useSignup,
   useForgotOtp,
   useResetPassword,
+  useUpdateProfile,
 } from '@/features/auth/api'
 
 export function useLogin() {
