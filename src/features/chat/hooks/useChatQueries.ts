@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
+import { generateUUID } from '@/lib/utils'
 import { queryKeys } from '@/infrastructure/query/keys'
 import {
   getConversationById,
@@ -24,7 +25,7 @@ import type {
 
 export const CHAT_QUERY_KEYS = queryKeys.chat
 const MESSAGE_PAGE_SIZE = 30
-const INITIAL_MESSAGE_BUFFER_PAGES = 3
+const INITIAL_MESSAGE_BUFFER_PAGES = 1
 
 export interface MessagePageParam {
   cursor?: string
@@ -164,7 +165,7 @@ export function useSendMessageMutation(conversationId: string | null) {
   return useMutation({
     mutationFn: async (arg: SendMessageArg) => {
       if (!conversationId) throw new Error('No conversation selected')
-      const clientMsgId = crypto.randomUUID()
+      const clientMsgId = generateUUID()
       const payload: SendMessageDto = typeof arg === 'string'
         ? { body: arg, clientMsgId, kind: 'TEXT' }
         : {

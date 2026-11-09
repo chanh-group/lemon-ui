@@ -1,9 +1,134 @@
-import React from 'react'
+import React, { useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { useTranslation } from 'react-i18next'
+import { PauseIcon, PlayIcon } from '@hugeicons/core-free-icons'
+import { createIcon } from '@/components/icons/hugeIcon'
 import { cn } from '@/lib/utils'
 import type { MessageAttachmentItem } from '../../types/chat.types'
-import { formatBytes, isImage, isPdf, isPreviewable, isText, isVideo } from '../../utils/fileTypes'
+import { formatBytes, isAudio, isImage, isPdf, isPreviewable, isText, isVideo } from '../../utils/fileTypes'
+
+const Play = createIcon(PlayIcon)
+const Pause = createIcon(PauseIcon)
+
+export function AudioPlayerBubble({
+  src,
+  fileName,
+  sizeBytes,
+}: {
+  src: string
+  fileName?: string
+  sizeBytes?: number
+}) {
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [currentTime, setCurrentTime] = useState(0)
+  const [duration, setDuration] = useState(0)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+
+  const togglePlay = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    const audio = audioRef.current
+    if (!audio) return
+    if (isPlaying) {
+      audio.pause()
+    } else {
+      audio.play().catch(() => {})
+    }
+  }
+
+  const handleTimeUpdate = () => {
+    const audio = audioRef.current
+    if (audio) {
+      setCurrentTime(audio.currentTime)
+    }
+  }
+
+  const handleLoadedMetadata = () => {
+    const audio = audioRef.current
+    if (audio && audio.duration && !isNaN(audio.duration) && isFinite(audio.duration)) {
+      setDuration(audio.duration)
+    }
+  }
+
+  const handleEnded = () => {
+    setIsPlaying(false)
+    setCurrentTime(0)
+  }
+
+  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+    e.stopPropagation()
+    const audio = audioRef.current
+    if (!audio) return
+    const target = Number(e.target.value)
+    audio.currentTime = target
+    setCurrentTime(target)
+  }
+
+  const formatSec = (sec: number) => {
+    if (!sec || isNaN(sec)) return '0:00'
+    const m = Math.floor(sec / 60)
+    const s = Math.floor(sec % 60)
+    return `${m}:${s < 10 ? '0' : ''}${s}`
+  }
+
+  const isVoiceNote = fileName?.startsWith('voice-note')
+
+  return (
+    <div
+      onClick={(e) => e.stopPropagation()}
+      className="flex items-center gap-3 py-1.5 px-0.5 min-w-[210px] sm:min-w-[250px] max-w-xs sm:max-w-sm select-none"
+    >
+      <audio
+        ref={audioRef}
+        src={src}
+        preload="metadata"
+        onPlay={() => setIsPlaying(true)}
+        onPause={() => setIsPlaying(false)}
+        onTimeUpdate={handleTimeUpdate}
+        onLoadedMetadata={handleLoadedMetadata}
+        onEnded={handleEnded}
+        className="hidden"
+      />
+
+      {/* Play / Pause button */}
+      <button
+        type="button"
+        onClick={togglePlay}
+        className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xs transition-transform active:scale-90 hover:opacity-95 cursor-pointer"
+        aria-label={isPlaying ? 'Tạm dừng' : 'Phát âm thanh'}
+      >
+        {isPlaying ? <Pause className="size-4 fill-current" /> : <Play className="size-4 ml-0.5 fill-current" />}
+      </button>
+
+      {/* Track & Time */}
+      <div className="flex-1 min-w-0 flex flex-col justify-center">
+        {!isVoiceNote && fileName && (
+          <div className="flex items-center justify-between text-xs leading-none mb-1">
+            <span className="truncate font-medium text-foreground/90">
+              {fileName}
+            </span>
+            {sizeBytes ? <span className="ml-1 text-[10px] opacity-70">({formatBytes(sizeBytes)})</span> : null}
+          </div>
+        )}
+
+        <div className="flex items-center gap-2.5">
+          {/* Progress bar */}
+          <input
+            type="range"
+            min={0}
+            max={duration || 1}
+            step={0.1}
+            value={currentTime}
+            onChange={handleSeek}
+            className="w-full h-1.5 bg-foreground/15 rounded-full appearance-none cursor-pointer accent-primary"
+          />
+          <span className="tabular-nums font-mono text-[11px] text-foreground/80 shrink-0 min-w-[28px] text-right">
+            {formatSec(isPlaying ? currentTime : (duration || currentTime))}
+          </span>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export function DocumentBadge({ ext }: { ext: string }) {
   const label = ext ? ext.toLowerCase().slice(0, 4) : 'file'
@@ -34,6 +159,7 @@ export function AttachmentBubble({
   const { t } = useTranslation()
   const isImg = isImage(attachment.mimeType, attachment.fileName)
   const isVid = isVideo(attachment.mimeType, attachment.fileName)
+  const isAud = isAudio(attachment.mimeType, attachment.fileName)
   const canPreview = isPreviewable(attachment.mimeType, attachment.fileName)
 
   const handleCardClick = (e: React.MouseEvent) => {
@@ -74,6 +200,22 @@ export function AttachmentBubble({
           onClick={handleCardClick}
           loading="lazy"
           className="max-h-72 w-full object-cover transition-transform duration-200 hover:scale-[1.01]"
+        />
+      </div>
+    )
+  }
+
+  if (isAud) {
+    const src = attachment.previewUrl || attachment.downloadUrl
+    return (
+      <div className={cn(
+        'w-full max-w-xs sm:max-w-sm',
+        hasCaption && 'pb-2 border-b border-foreground/15 mb-1.5'
+      )}>
+        <AudioPlayerBubble
+          src={src}
+          fileName={attachment.fileName}
+          sizeBytes={attachment.sizeBytes}
         />
       </div>
     )

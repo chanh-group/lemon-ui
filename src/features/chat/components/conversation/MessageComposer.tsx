@@ -14,6 +14,7 @@ import type { MessageAttachmentInput } from '../../types/chat.types'
 import { presignFile, uploadBinaryToUrl, uploadFileViaBackend } from '../../api/chat.api'
 import { formatBytes, getKindFromMime, isImage } from '../../utils/fileTypes'
 import { compressVideoIfNeeded } from '../../utils/videoCompressor'
+import { generateUUID } from '@/lib/utils'
 
 const Paperclip = createIcon(PaperclipData)
 const Send = createIcon(SendData)
@@ -215,7 +216,7 @@ export function MessageComposer({
 
     for (const rawFile of files) {
       let fileToUse = rawFile
-      const fileId = crypto.randomUUID()
+      const fileId = generateUUID()
 
       // Kiểm tra file thực thi độc hại
       if (/\.(exe|bat|cmd|sh|msi|dll|scr|vbs)$/i.test(rawFile.name)) {

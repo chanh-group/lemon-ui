@@ -312,40 +312,47 @@ function MessageRowView({
               )}
             </>
           )}
-
-          {msg.reactions && msg.reactions.length > 0 && (
-            <div className="mt-1.5 flex flex-wrap gap-1 select-none" aria-label={t('chat.reactions')}>
-              {msg.reactions.map((r, i) => {
-                const isString = typeof r === 'string'
-                const emoji = isString ? r : r.emoji
-                const count = isString ? 1 : r.count
-                const userIds = isString ? [] : r.userIds
-                const myReaction = currentUserId ? userIds.includes(currentUserId) : false
-
-                return (
-                  <button
-                    key={`${emoji}-${i}`}
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onReact?.(msg.id, emoji)
-                    }}
-                    className={cn(
-                      'flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs shadow-xs transition-all active:scale-95 cursor-pointer',
-                      myReaction
-                        ? 'border-primary/50 bg-primary/10 text-primary font-semibold ring-1 ring-primary/20'
-                        : 'border-border/80 bg-card hover:bg-muted text-foreground',
-                    )}
-                    title={myReaction ? t('chat.removeReaction', 'Bỏ cảm xúc') : emoji}
-                  >
-                    <span>{emoji}</span>
-                    {count > 1 && <span className="text-[11px] font-medium">{count}</span>}
-                  </button>
-                )
-              })}
-            </div>
-          )}
         </div>
+
+        {/* Reactions floating independently outside the bubble, matching image 2 & Messenger */}
+        {msg.reactions && msg.reactions.length > 0 && (
+          <div
+            className={cn(
+              '-mt-2 z-10 flex flex-wrap gap-1 select-none',
+              isMe ? 'justify-end pr-1' : 'justify-start pl-1',
+            )}
+            aria-label={t('chat.reactions')}
+          >
+            {msg.reactions.map((r, i) => {
+              const isString = typeof r === 'string'
+              const emoji = isString ? r : r.emoji
+              const count = isString ? 1 : r.count
+              const userIds = isString ? [] : r.userIds
+              const myReaction = currentUserId ? userIds.includes(currentUserId) : false
+
+              return (
+                <button
+                  key={`${emoji}-${i}`}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onReact?.(msg.id, emoji)
+                  }}
+                  className={cn(
+                    'flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs shadow-xs transition-all active:scale-95 cursor-pointer',
+                    myReaction
+                      ? 'border-primary/50 bg-primary/10 text-primary font-semibold ring-1 ring-primary/20'
+                      : 'border-border/80 bg-card hover:bg-muted text-foreground',
+                  )}
+                  title={myReaction ? t('chat.removeReaction', 'Bỏ cảm xúc') : emoji}
+                >
+                  <span>{emoji}</span>
+                  {count > 1 && <span className="text-[11px] font-medium">{count}</span>}
+                </button>
+              )
+            })}
+          </div>
+        )}
 
         {isLast && (
           <span className={cn('mt-1 flex items-center gap-1 px-1 text-[11px] text-muted-foreground', isMe ? 'justify-end' : 'justify-start')}>
@@ -392,6 +399,13 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
   const { user } = useAuth()
   const currentUserId = user?.id
   const didInitialScroll = useRef(false)
+  const lastConversationId = useRef(conversationId)
+
+  if (lastConversationId.current !== conversationId) {
+    lastConversationId.current = conversationId
+    didInitialScroll.current = false
+  }
+
   const [lightboxAttachment, setLightboxAttachment] = useState<MessageAttachmentItem | null>(null)
   const [documentAttachment, setDocumentAttachment] = useState<MessageAttachmentItem | null>(null)
   const [forwardingMessage, setForwardingMessage] = useState<ChatMessage | null>(null)
@@ -452,12 +466,22 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
 
   useLayoutEffect(() => {
     if (rows.length === 0 || didInitialScroll.current) return
+
+    const scrollToBottomNow = () => {
+      const el = scrollRef.current
+      if (el) {
+        el.scrollTop = el.scrollHeight
+      }
+      virtualizer.scrollToIndex(rows.length - 1, { align: 'end', behavior: 'auto' })
+    }
+
+    scrollToBottomNow()
     const frame = requestAnimationFrame(() => {
-      virtualizer.scrollToEnd({ behavior: 'auto' })
+      scrollToBottomNow()
       didInitialScroll.current = true
     })
     return () => cancelAnimationFrame(frame)
-  }, [rows.length, virtualizer])
+  }, [rows.length, virtualizer, conversationId, scrollRef])
 
   const virtualRows = virtualizer.getVirtualItems()
   const renderRow = (row: MessageListRow) =>
