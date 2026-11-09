@@ -6,6 +6,7 @@ import {
   CheckIcon as CheckData,
   Film01Icon as FilmData,
   Image01Icon as ImageIconData,
+  Share01Icon as ForwardData,
   StickerIcon as StickerData,
 } from '@hugeicons/core-free-icons'
 import { createIcon } from '@/components/icons/hugeIcon'
@@ -14,16 +15,19 @@ const CheckCheck = createIcon(CheckCheckData)
 const Film = createIcon(FilmData)
 const ImageIcon = createIcon(ImageIconData)
 const Sticker = createIcon(StickerData)
+const ForwardIcon = createIcon(ForwardData)
 import { UserAvatar } from '@/components/common/UserAvatar'
+import { useAuth } from '@/features/auth/api'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import type { ChatMessage, DayGroup, MessageAttachmentItem } from '../../types/chat.types'
 import { isImage, isVideo } from '../../utils/fileTypes'
-import { useRevokeMessageMutation } from '../../hooks/useChatQueries'
+import { useReactMessageMutation, useRevokeMessageMutation } from '../../hooks/useChatQueries'
 import { MessageActionPill } from './AttachmentActionMenu'
 import { AttachmentBubble } from './AttachmentBubble'
 import { ImageLightboxModal } from './ImageLightboxModal'
 import { DocumentPreviewModal } from './DocumentPreviewModal'
+import { ForwardMessageModal } from './ForwardMessageModal'
 
 // ---------------- logics tách cụm tin ----------------
 
@@ -120,17 +124,23 @@ function MessageRowView({
   messageIndex,
   senderLabel,
   senderAvatarUrl,
+  currentUserId,
   onOpenLightbox,
   onOpenDocument,
   onRevoke,
+  onReact,
+  onForward,
 }: {
   group: MessageGroup
   messageIndex: number
   senderLabel: string
   senderAvatarUrl?: string | null
+  currentUserId?: string
   onOpenLightbox: (attachment: MessageAttachmentItem) => void
   onOpenDocument: (attachment: MessageAttachmentItem) => void
   onRevoke?: (messageId: string) => void
+  onReact?: (messageId: string, emoji: string) => void
+  onForward?: (message: ChatMessage) => void
 }) {
   const { t } = useTranslation()
   const isMe = group.fromMe
@@ -185,6 +195,8 @@ function MessageRowView({
         isMe={isMe}
         onPreview={handleQuickPreview}
         onRevoke={onRevoke}
+        onReact={onReact}
+        onForward={onForward}
         align={isMe ? 'end' : 'start'}
         onOpenChange={setIsMenuOpen}
       />
@@ -252,6 +264,13 @@ function MessageRowView({
             <span className="mb-1 block text-xs font-bold text-brand-ink">{group.sender}</span>
           )}
 
+          {msg.isForwarded && (
+            <div className="mb-1 flex items-center gap-1 text-[11px] font-medium text-muted-foreground/80 italic select-none">
+              <ForwardIcon className="size-3 text-primary" />
+              <span>{t('chat.forwarded', 'Đã chuyển tiếp')}</span>
+            </div>
+          )}
+
           {msg.storyPreview && (
             <StoryReplyQuote preview={msg.storyPreview} defaultAuthor={authorName} />
           )}
@@ -293,17 +312,47 @@ function MessageRowView({
               )}
             </>
           )}
-
-          {msg.reactions && msg.reactions.length > 0 && (
-            <span className="mt-1.5 flex gap-1" aria-label={t('chat.reactions')}>
-              {msg.reactions.map((r) => (
-                <span key={r} className="rounded-full border border-border bg-card px-1.5 py-0.5 text-xs shadow-sm">
-                  {r}
-                </span>
-              ))}
-            </span>
-          )}
         </div>
+
+        {/* Reactions floating independently outside the bubble, matching image 2 & Messenger */}
+        {msg.reactions && msg.reactions.length > 0 && (
+          <div
+            className={cn(
+              '-mt-2 z-10 flex flex-wrap gap-1 select-none',
+              isMe ? 'justify-end pr-1' : 'justify-start pl-1',
+            )}
+            aria-label={t('chat.reactions')}
+          >
+            {msg.reactions.map((r, i) => {
+              const isString = typeof r === 'string'
+              const emoji = isString ? r : r.emoji
+              const count = isString ? 1 : r.count
+              const userIds = isString ? [] : r.userIds
+              const myReaction = currentUserId ? userIds.includes(currentUserId) : false
+
+              return (
+                <button
+                  key={`${emoji}-${i}`}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onReact?.(msg.id, emoji)
+                  }}
+                  className={cn(
+                    'flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs shadow-xs transition-all active:scale-95 cursor-pointer',
+                    myReaction
+                      ? 'border-primary/50 bg-primary/10 text-primary font-semibold ring-1 ring-primary/20'
+                      : 'border-border/80 bg-card hover:bg-muted text-foreground',
+                  )}
+                  title={myReaction ? t('chat.removeReaction', 'Bỏ cảm xúc') : emoji}
+                >
+                  <span>{emoji}</span>
+                  {count > 1 && <span className="text-[11px] font-medium">{count}</span>}
+                </button>
+              )
+            })}
+          </div>
+        )}
 
         {isLast && (
           <span className={cn('mt-1 flex items-center gap-1 px-1 text-[11px] text-muted-foreground', isMe ? 'justify-end' : 'justify-start')}>
@@ -347,11 +396,22 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
   'use no memo'
 
   const { t } = useTranslation()
+  const { user } = useAuth()
+  const currentUserId = user?.id
   const didInitialScroll = useRef(false)
+  const lastConversationId = useRef(conversationId)
+
+  if (lastConversationId.current !== conversationId) {
+    lastConversationId.current = conversationId
+    didInitialScroll.current = false
+  }
+
   const [lightboxAttachment, setLightboxAttachment] = useState<MessageAttachmentItem | null>(null)
   const [documentAttachment, setDocumentAttachment] = useState<MessageAttachmentItem | null>(null)
+  const [forwardingMessage, setForwardingMessage] = useState<ChatMessage | null>(null)
 
   const revokeMutation = useRevokeMessageMutation(conversationId ?? null)
+  const reactMutation = useReactMessageMutation(conversationId ?? null)
 
   const handleRevokeMessage = (messageId: string) => {
     revokeMutation.mutate(messageId, {
@@ -362,6 +422,10 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
         toast.error(t('chat.messageRevokeFailed', 'Không thể gỡ tin nhắn'))
       },
     })
+  }
+
+  const handleReactMessage = (messageId: string, emoji: string) => {
+    reactMutation.mutate({ messageId, emoji })
   }
 
   const rows = useMemo(() => {
@@ -402,12 +466,22 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
 
   useLayoutEffect(() => {
     if (rows.length === 0 || didInitialScroll.current) return
+
+    const scrollToBottomNow = () => {
+      const el = scrollRef.current
+      if (el) {
+        el.scrollTop = el.scrollHeight
+      }
+      virtualizer.scrollToIndex(rows.length - 1, { align: 'end', behavior: 'auto' })
+    }
+
+    scrollToBottomNow()
     const frame = requestAnimationFrame(() => {
-      virtualizer.scrollToEnd({ behavior: 'auto' })
+      scrollToBottomNow()
       didInitialScroll.current = true
     })
     return () => cancelAnimationFrame(frame)
-  }, [rows.length, virtualizer])
+  }, [rows.length, virtualizer, conversationId, scrollRef])
 
   const virtualRows = virtualizer.getVirtualItems()
   const renderRow = (row: MessageListRow) =>
@@ -425,9 +499,12 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
         messageIndex={row.messageIndex}
         senderLabel={senderLabel}
         senderAvatarUrl={senderAvatarUrl}
+        currentUserId={currentUserId}
         onOpenLightbox={setLightboxAttachment}
         onOpenDocument={setDocumentAttachment}
         onRevoke={handleRevokeMessage}
+        onReact={handleReactMessage}
+        onForward={(m) => setForwardingMessage(m)}
       />
     )
 
@@ -464,6 +541,12 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
       <DocumentPreviewModal
         attachment={documentAttachment}
         onClose={() => setDocumentAttachment(null)}
+      />
+      <ForwardMessageModal
+        open={Boolean(forwardingMessage)}
+        onOpenChange={(open) => !open && setForwardingMessage(null)}
+        message={forwardingMessage}
+        currentConversationId={conversationId}
       />
     </>
   )

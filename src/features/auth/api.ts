@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { isAuthBypass } from '@/config/env'
 import { DEV_SESSION_KEY } from '@/config/constants'
 import { api, toApiError } from '@/infrastructure/api/client'
-import { authEndpoints } from '@/infrastructure/api/endpoints'
+import { authEndpoints, userEndpoints } from '@/infrastructure/api/endpoints'
 import type { ApiError } from '@/infrastructure/api/errors'
 import { useAuthStore } from '@/infrastructure/auth/auth-store'
 import { signOutEverywhere } from '@/infrastructure/auth/session'
@@ -213,6 +213,51 @@ export function useChangePassword() {
       } catch (error) {
         throw toApiError(error)
       }
+    },
+  })
+}
+
+export interface UpdateProfileInput {
+  fullName?: string
+  avatarUrl?: string | null
+  bio?: string | null
+  phone?: string | null
+}
+
+/** Cập nhật profile người dùng (PATCH /users/me). */
+export async function updateProfile(input: UpdateProfileInput): Promise<AuthUser> {
+  if (isAuthBypass()) {
+    const current = getItem<AuthUser>(DEV_SESSION_KEY) || createDevUser({})
+    const updated: AuthUser = {
+      ...current,
+      ...(input.fullName !== undefined ? { fullName: input.fullName } : {}),
+      ...(input.avatarUrl !== undefined ? { avatarUrl: input.avatarUrl } : {}),
+      ...(input.bio !== undefined ? { bio: input.bio } : {}),
+      ...(input.phone !== undefined ? { phone: input.phone } : {}),
+    }
+    setItem(DEV_SESSION_KEY, updated)
+    return updated
+  }
+  try {
+    const res = await api.patch<AuthUser>(userEndpoints.me, input)
+    return res.data
+  } catch (error) {
+    throw toApiError(error)
+  }
+}
+
+/** Hook cập nhật profile cá nhân và đồng bộ cache query 'me'. */
+export function useUpdateProfile() {
+  const queryClient = useQueryClient()
+  return useMutation<AuthUser, ApiError, UpdateProfileInput>({
+    mutationFn: async (input) => {
+      const updated = await updateProfile(input)
+      queryClient.setQueryData(queryKeys.me, updated)
+      return updated
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(queryKeys.me, data)
+      void queryClient.invalidateQueries({ queryKey: queryKeys.me })
     },
   })
 }

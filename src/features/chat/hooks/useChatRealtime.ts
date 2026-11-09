@@ -1,13 +1,15 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQueryClient, type InfiniteData } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { useAuth } from '@/features/auth/api'
 import { connectChatSocket, disconnectChatSocket, getChatSocket, type SocketConnectionStatus } from '@/lib/socket'
 import { CHAT_QUERY_KEYS, type MessagePageParam } from './useChatQueries'
-import { markConversationRead } from '../api/chat.api'
+import { getConversationMessages, markConversationRead } from '../api/chat.api'
+import { fetchMissedMessages } from '../utils/messageSync'
 import type {
   ConversationResponse,
+  MessageReactionPayload,
   MessageResponse,
   MessageRevokedPayload,
   MessageTimelineResponse,
@@ -15,11 +17,23 @@ import type {
   TypingEventPayload,
 } from '../types/chat.types'
 
+export function mergeMessagesByTime(
+  existing: MessageResponse[],
+  incoming: MessageResponse[],
+): MessageResponse[] {
+  const messages = new Map(existing.map((message) => [message.id, message]))
+  incoming.forEach((message) => messages.set(message.id, message))
+  return [...messages.values()].sort((left, right) =>
+    Date.parse(left.createdAt) - Date.parse(right.createdAt) || left.id.localeCompare(right.id),
+  )
+}
+
 export function useChatRealtime(activeConversationId: string | null) {
   const { user, status } = useAuth()
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const [partnerTypingMap, setPartnerTypingMap] = useState<Record<string, boolean>>({})
+  const refreshedInboxOnConnection = useRef(false)
   const [connectionStatus, setConnectionStatus] = useState<SocketConnectionStatus | null>(() => {
     if (status !== 'authenticated') return null
     const socket = getChatSocket()
@@ -42,8 +56,50 @@ export function useChatRealtime(activeConversationId: string | null) {
     if (status !== 'authenticated') return
 
     const socket = getChatSocket()
-    const handleConnect = () => setConnectionStatus('connected')
-    const handleDisconnect = () => setConnectionStatus('disconnected')
+    const refreshInbox = () => {
+      if (refreshedInboxOnConnection.current) return
+      refreshedInboxOnConnection.current = true
+      void queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.conversations })
+    }
+    const syncMissedMessages = async (conversationId: string) => {
+      const live = queryClient.getQueryData<MessageResponse[]>(
+        CHAT_QUERY_KEYS.liveMessages(conversationId),
+      ) ?? []
+      const timeline = queryClient.getQueryData<InfiniteData<MessageTimelineResponse, MessagePageParam>>(
+        CHAT_QUERY_KEYS.messages(conversationId),
+      )
+      const cached = [...(timeline?.pages.flatMap((page) => page.items) ?? []), ...live]
+      const lastMessage = cached.sort((left, right) =>
+        Date.parse(left.createdAt) - Date.parse(right.createdAt) || left.id.localeCompare(right.id),
+      ).at(-1)
+      if (!lastMessage) {
+        void queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.messages(conversationId) })
+        return
+      }
+
+      const missed = await fetchMissedMessages(lastMessage.id, (cursor) =>
+        getConversationMessages(conversationId, undefined, 100, cursor),
+      )
+
+      if (missed.length > 0) {
+        queryClient.setQueryData<MessageResponse[]>(
+          CHAT_QUERY_KEYS.liveMessages(conversationId),
+          (old) => mergeMessagesByTime(old ?? [], missed),
+        )
+      }
+      void queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.messages(conversationId) })
+    }
+    const handleConnect = () => {
+      setConnectionStatus('connected')
+      refreshInbox()
+      if (activeConversationId) {
+        void syncMissedMessages(activeConversationId).catch(() => toast.error(t('chat.messagesLoadError')))
+      }
+    }
+    const handleDisconnect = () => {
+      refreshedInboxOnConnection.current = false
+      setConnectionStatus('disconnected')
+    }
     const handleConnectError = () => setConnectionStatus('error')
     const handleReconnectAttempt = () => setConnectionStatus('connecting')
 
@@ -51,6 +107,12 @@ export function useChatRealtime(activeConversationId: string | null) {
     socket.on('disconnect', handleDisconnect)
     socket.on('connect_error', handleConnectError)
     socket.io.on('reconnect_attempt', handleReconnectAttempt)
+    if (socket.connected && activeConversationId) {
+      refreshInbox()
+      void syncMissedMessages(activeConversationId).catch(() => toast.error(t('chat.messagesLoadError')))
+    } else if (socket.connected) {
+      refreshInbox()
+    }
 
     // A. Nhận tin nhắn mới
     const handleNewMessage = (msg: MessageResponse) => {
@@ -89,9 +151,13 @@ export function useChatRealtime(activeConversationId: string | null) {
             old?.map((conversation) => {
               if (conversation.id !== convId) return conversation
               const isCurrentActive = convId === activeConversationId
+              const preview = msg.deletedAt
+                ? '[message-revoked]'
+                : (msg.body ?? (msg.attachments && msg.attachments.length > 0 ? '[attachment]' : ''))
               return {
                 ...conversation,
-                lastMessagePreview: msg.deletedAt ? '[message-revoked]' : (msg.body ?? ''),
+                lastMessagePreview: preview,
+                lastMessageSenderId: msg.senderId,
                 lastMessageAt: msg.createdAt,
                 unreadCount:
                   isCurrentActive || msg.senderId === userId
@@ -191,11 +257,39 @@ export function useChatRealtime(activeConversationId: string | null) {
       queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.messages(data.conversationId) })
     }
 
+    // F. Cập nhật cảm xúc tin nhắn (Điểm A)
+    const handleMessageReaction = (payload: MessageReactionPayload) => {
+      const convId = payload.conversationId
+      queryClient.setQueryData<InfiniteData<MessageTimelineResponse, MessagePageParam>>(
+        CHAT_QUERY_KEYS.messages(convId),
+        (old) => {
+          if (!old) return old
+          return {
+            ...old,
+            pages: old.pages.map((page) => ({
+              ...page,
+              items: page.items.map((m) =>
+                m.id === payload.messageId ? { ...m, reactions: payload.reactions } : m,
+              ),
+            })),
+          }
+        },
+      )
+      queryClient.setQueryData<MessageResponse[]>(
+        CHAT_QUERY_KEYS.liveMessages(convId),
+        (old) =>
+          old?.map((m) =>
+            m.id === payload.messageId ? { ...m, reactions: payload.reactions } : m,
+          ),
+      )
+    }
+
     socket.on('message:new', handleNewMessage)
     socket.on('message:updated', handleMessageUpdated)
     socket.on('message:revoked', handleMessageRevoked)
     socket.on('typing', handleTyping)
     socket.on('read:updated', handleReadUpdated)
+    socket.on('message:reaction', handleMessageReaction)
 
     return () => {
       socket.off('connect', handleConnect)
@@ -207,6 +301,7 @@ export function useChatRealtime(activeConversationId: string | null) {
       socket.off('message:revoked', handleMessageRevoked)
       socket.off('typing', handleTyping)
       socket.off('read:updated', handleReadUpdated)
+      socket.off('message:reaction', handleMessageReaction)
     }
   }, [status, activeConversationId, userId, queryClient, t])
 

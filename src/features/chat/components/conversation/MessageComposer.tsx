@@ -2,7 +2,9 @@ import React, { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Cancel01Icon as CancelData,
+  Delete02Icon as TrashData,
   File01Icon as FileData,
+  Mic01Icon as MicData,
   PaperclipIcon as PaperclipData,
   SentIcon as SendData,
 } from '@hugeicons/core-free-icons'
@@ -12,11 +14,14 @@ import type { MessageAttachmentInput } from '../../types/chat.types'
 import { presignFile, uploadBinaryToUrl, uploadFileViaBackend } from '../../api/chat.api'
 import { formatBytes, getKindFromMime, isImage } from '../../utils/fileTypes'
 import { compressVideoIfNeeded } from '../../utils/videoCompressor'
+import { generateUUID } from '@/lib/utils'
 
 const Paperclip = createIcon(PaperclipData)
 const Send = createIcon(SendData)
 const CancelIcon = createIcon(CancelData)
 const FileIcon = createIcon(FileData)
+const MicIcon = createIcon(MicData)
+const TrashIcon = createIcon(TrashData)
 
 const MAX_FILE_SIZE = 25 * 1024 * 1024 // 25MB
 
@@ -25,12 +30,13 @@ interface PendingFile {
   file: File
   previewUrl?: string
   isCompressing?: boolean
+  uploadedAttachment?: MessageAttachmentInput
 }
 
 interface MessageComposerProps {
   draft: string
   onDraftChange: (v: string) => void
-  onSubmit: (text: string, attachments?: MessageAttachmentInput[]) => void | Promise<void>
+  onSubmit: (text: string, attachments?: MessageAttachmentInput[]) => boolean | void | Promise<boolean | void>
   disabled?: boolean
   conversationId?: string
   onTypingStart?: () => void
@@ -51,16 +57,161 @@ export function MessageComposer({
   const fileInputRef = useRef<HTMLInputElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([])
+  const pendingFilesRef = useRef(pendingFiles)
   const [isUploading, setIsUploading] = useState(false)
+  const [isRecording, setIsRecording] = useState(false)
+  const [recordingSeconds, setRecordingSeconds] = useState(0)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const audioChunksRef = useRef<Blob[]>([])
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+
+  useEffect(() => {
+    pendingFilesRef.current = pendingFiles
+  }, [pendingFiles])
 
   useEffect(() => {
     return () => {
       if (typingTimer.current) clearTimeout(typingTimer.current)
-      pendingFiles.forEach((p) => {
+      pendingFilesRef.current.forEach((p) => {
         if (p.previewUrl) URL.revokeObjectURL(p.previewUrl)
       })
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current)
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop())
+      }
     }
-  }, [pendingFiles])
+  }, [])
+
+  const cleanupRecording = () => {
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current)
+      recordingTimerRef.current = null
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop())
+      streamRef.current = null
+    }
+    setIsRecording(false)
+    setRecordingSeconds(0)
+    audioChunksRef.current = []
+  }
+
+  const handleStartRecording = async () => {
+    if (disabled || isUploading) return
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      streamRef.current = stream
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : MediaRecorder.isTypeSupported('audio/webm')
+          ? 'audio/webm'
+          : 'audio/mp4'
+
+      const mediaRecorder = new MediaRecorder(stream, { mimeType })
+      mediaRecorderRef.current = mediaRecorder
+      audioChunksRef.current = []
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data)
+        }
+      }
+
+      mediaRecorder.start(200)
+      setIsRecording(true)
+      setRecordingSeconds(0)
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingSeconds((prev) => prev + 1)
+      }, 1000)
+    } catch {
+      cleanupRecording()
+      toast.error(t('chat.micPermissionDenied', 'Không thể truy cập microphone'))
+    }
+  }
+
+  const handleCancelRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.onstop = null
+      mediaRecorderRef.current.stop()
+    }
+    cleanupRecording()
+  }
+
+  const handleStopAndSendRecording = async () => {
+    const recorder = mediaRecorderRef.current
+    if (!recorder || !isRecording) return
+
+    const duration = recordingSeconds
+    recorder.onstop = async () => {
+      const mimeType = (recorder.mimeType || 'audio/webm').split(';', 1)[0]
+      const audioBlob = new Blob(audioChunksRef.current, { type: mimeType })
+      cleanupRecording()
+
+      if (audioBlob.size < 100 || duration < 1) {
+        toast.error(t('chat.recordingTooShort', 'Bản ghi âm quá ngắn'))
+        return
+      }
+
+      const ext = mimeType.includes('mp4') ? 'mp4' : mimeType.includes('ogg') ? 'ogg' : 'webm'
+      const file = new File([audioBlob], `voice-note-${Date.now()}.${ext}`, { type: mimeType })
+
+      setIsUploading(true)
+      try {
+        let objectKey = ''
+        try {
+          const presign = await presignFile({
+            kind: 'CHAT_AUDIO',
+            fileName: file.name,
+            mimeType: file.type || 'audio/webm',
+            sizeBytes: file.size,
+            conversationId,
+          })
+          await uploadBinaryToUrl(presign.uploadUrl, file, file.type || 'audio/webm')
+          objectKey = presign.objectKey
+        } catch {
+          const fallback = await uploadFileViaBackend(file, 'CHAT_AUDIO', conversationId)
+          objectKey = fallback.objectKey
+        }
+
+        const attachmentInput: MessageAttachmentInput = {
+          objectKey,
+          fileName: file.name,
+          mimeType: file.type || 'audio/webm',
+          sizeBytes: file.size,
+          kind: 'AUDIO',
+          durationMs: duration * 1000,
+        }
+
+        const sent = await onSubmit('', [attachmentInput])
+        if (sent === false) {
+          setPendingFiles((prev) => [...prev, {
+            id: generateUUID(),
+            file,
+            uploadedAttachment: attachmentInput,
+          }])
+          toast.error(t('chat.voiceNoteFailed', 'Gửi tin nhắn thoại thất bại'))
+          return
+        }
+        toast.success(t('chat.voiceNoteSent', 'Đã gửi tin nhắn thoại'))
+      } catch {
+        setPendingFiles((prev) => [...prev, { id: generateUUID(), file }])
+        toast.error(t('chat.voiceNoteFailed', 'Gửi tin nhắn thoại thất bại'))
+      } finally {
+        setIsUploading(false)
+      }
+    }
+
+    recorder.stop()
+  }
+
+  const formatTimer = (seconds: number) => {
+    const m = Math.floor(seconds / 60)
+      .toString()
+      .padStart(2, '0')
+    const s = (seconds % 60).toString().padStart(2, '0')
+    return `${m}:${s}`
+  }
 
   const handleChange = (val: string) => {
     onDraftChange(val)
@@ -82,7 +233,7 @@ export function MessageComposer({
 
     for (const rawFile of files) {
       let fileToUse = rawFile
-      const fileId = crypto.randomUUID()
+      const fileId = generateUUID()
 
       // Kiểm tra file thực thi độc hại
       if (/\.(exe|bat|cmd|sh|msi|dll|scr|vbs)$/i.test(rawFile.name)) {
@@ -169,8 +320,8 @@ export function MessageComposer({
     onTypingStop?.()
 
     if (pendingFiles.length === 0) {
-      await onSubmit(text)
-      requestAnimationFrame(() => inputRef.current?.focus())
+      const sent = await onSubmit(text)
+      if (sent !== false) requestAnimationFrame(() => inputRef.current?.focus())
       return
     }
 
@@ -181,6 +332,10 @@ export function MessageComposer({
     try {
       for (const item of pendingFiles) {
         const file = item.file
+        if (item.uploadedAttachment) {
+          attachments.push(item.uploadedAttachment)
+          continue
+        }
         const mimeType = file.type || 'application/octet-stream'
         const kind = getKindFromMime(mimeType, file.name)
 
@@ -204,17 +359,22 @@ export function MessageComposer({
         }
 
         // 3. Gom attachment metadata
-        attachments.push({
+        const attachment: MessageAttachmentInput = {
           objectKey,
           fileName: file.name,
           mimeType,
           sizeBytes: file.size,
           kind: kind.replace('CHAT_', '') as 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE',
-        })
+        }
+        attachments.push(attachment)
+        setPendingFiles((prev) => prev.map((pending) =>
+          pending.id === item.id ? { ...pending, uploadedAttachment: attachment } : pending,
+        ))
       }
 
       // 4. Gửi tin nhắn kèm danh sách attachments
-      await onSubmit(text, attachments)
+      const sent = await onSubmit(text, attachments)
+      if (sent === false) return
       requestAnimationFrame(() => inputRef.current?.focus())
 
       // Xóa danh sách pending files sau khi gửi thành công
@@ -289,51 +449,99 @@ export function MessageComposer({
         className="hidden"
       />
 
-      <div className="flex w-full items-center gap-1.5">
-        <label className="chat-composer flex min-h-11 min-w-0 flex-1 items-center gap-1 rounded-full border border-border bg-muted px-4 transition-all duration-150 focus-within:border-ring focus-within:bg-card">
-          <span className="sr-only">{t('chat.sendMessage')}</span>
-          <input
-            ref={inputRef}
-            value={draft}
-            disabled={disabled || isUploading}
-            onChange={(e) => handleChange(e.target.value)}
-            onPaste={handlePaste}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault()
-                handleSubmit()
+      {isRecording ? (
+        <div className="flex w-full items-center justify-between gap-3 min-h-11 rounded-full border border-red-500/30 bg-red-500/5 px-4 animate-in fade-in duration-200">
+          <div className="flex items-center gap-2.5">
+            <span className="size-2.5 rounded-full bg-red-500 animate-ping" />
+            <span className="text-xs font-semibold text-red-600 dark:text-red-400 font-mono">
+              {formatTimer(recordingSeconds)}
+            </span>
+            <span className="text-xs text-muted-foreground hidden sm:inline">
+              {t('chat.recordingVoiceNote', 'Đang ghi âm tin nhắn thoại...')}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleCancelRecording}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors"
+              title={t('chat.cancelRecording', 'Hủy')}
+            >
+              <TrashIcon className="size-4" />
+              <span>{t('chat.cancel', 'Hủy')}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleStopAndSendRecording}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium bg-brand-ink text-primary-foreground shadow-sm hover:opacity-90 active:scale-95 transition-all"
+              title={t('chat.sendVoiceNote', 'Gửi tin nhắn thoại')}
+            >
+              <Send className="size-3.5" />
+              <span>{t('chat.send', 'Gửi')}</span>
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex w-full items-center gap-1.5">
+          <label className="chat-composer flex min-h-11 min-w-0 flex-1 items-center gap-1 rounded-full border border-border bg-muted px-4 transition-all duration-150 focus-within:border-ring focus-within:bg-card">
+            <span className="sr-only">{t('chat.sendMessage')}</span>
+            <input
+              ref={inputRef}
+              value={draft}
+              disabled={disabled || isUploading}
+              onChange={(e) => handleChange(e.target.value)}
+              onPaste={handlePaste}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  handleSubmit()
+                }
+              }}
+              placeholder={
+                pendingFiles.length > 0
+                  ? 'Thêm tin nhắn hoặc bấm gửi tệp...'
+                  : t('chat.composeHint')
               }
-            }}
-            placeholder={
-              pendingFiles.length > 0
-                ? 'Thêm tin nhắn hoặc bấm gửi tệp...'
-                : t('chat.composeHint')
-            }
-            aria-label={t('chat.composeHint')}
-            className="h-11 min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
-          />
+              aria-label={t('chat.composeHint')}
+              className="h-11 min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={disabled || isUploading}
+              aria-label={t('chat.attachFile')}
+              title="Đính kèm tệp tin / ảnh (< 25MB)"
+              className="grid size-9 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-border hover:text-foreground disabled:opacity-50"
+            >
+              <Paperclip className="size-5" aria-hidden="true" />
+            </button>
+
+            {/* Mic button to record voice note */}
+            <button
+              type="button"
+              onClick={handleStartRecording}
+              disabled={disabled || isUploading}
+              aria-label={t('chat.recordVoiceNote', 'Ghi âm')}
+              title={t('chat.recordVoiceNote', 'Ghi âm tin nhắn thoại')}
+              className="grid size-9 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-border hover:text-foreground disabled:opacity-50"
+            >
+              <MicIcon className="size-5" aria-hidden="true" />
+            </button>
+          </label>
           <button
             type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={disabled || isUploading}
-            aria-label={t('chat.attachFile')}
-            title="Đính kèm tệp tin / ảnh (< 25MB)"
-            className="grid size-9 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-border hover:text-foreground disabled:opacity-50"
+            onClick={handleSubmit}
+            disabled={!canSubmit}
+            aria-label={t('chat.sendMessage')}
+            title={t('chat.sendMessage')}
+            className="chat-send grid size-11 min-h-11 min-w-11 shrink-0 place-items-center rounded-full bg-brand-ink text-primary-foreground shadow-md transition-all duration-150 hover:shadow-lg active:scale-90 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none"
           >
-            <Paperclip className="size-5" aria-hidden="true" />
+            <Send className="size-5.5" aria-hidden="true" />
           </button>
-        </label>
-        <button
-          type="button"
-          onClick={handleSubmit}
-          disabled={!canSubmit}
-          aria-label={t('chat.sendMessage')}
-          title={t('chat.sendMessage')}
-          className="chat-send grid size-11 min-h-11 min-w-11 shrink-0 place-items-center rounded-full bg-brand-ink text-primary-foreground shadow-md transition-all duration-150 hover:shadow-lg active:scale-90 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none"
-        >
-          <Send className="size-5.5" aria-hidden="true" />
-        </button>
-      </div>
+        </div>
+      )}
     </footer>
   )
 }

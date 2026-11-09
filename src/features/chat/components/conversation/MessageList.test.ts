@@ -1,0 +1,113 @@
+import { describe, expect, it } from 'bun:test'
+import { buildMessageGroups } from './MessageList'
+import type { ChatMessage } from '../../types/chat.types'
+
+describe('MessageList buildMessageGroups & interaction data', () => {
+  it('groups consecutive messages from the same sender within 5 minutes', () => {
+    const messages: ChatMessage[] = [
+      {
+        id: 'msg-1',
+        fromMe: true,
+        text: 'Hi there',
+        kind: 'text',
+        time: '10:00',
+        createdAt: '2026-11-09T10:00:00Z',
+      },
+      {
+        id: 'msg-2',
+        fromMe: true,
+        text: 'How are you?',
+        kind: 'text',
+        time: '10:02',
+        createdAt: '2026-11-09T10:02:00Z',
+      },
+    ]
+
+    const groups = buildMessageGroups(messages)
+    expect(groups).toHaveLength(1)
+    expect(groups[0].fromMe).toBe(true)
+    expect(groups[0].messages).toHaveLength(2)
+  })
+
+  it('splits group when time difference between consecutive messages exceeds 5 minutes', () => {
+    const messages: ChatMessage[] = [
+      {
+        id: 'msg-1',
+        fromMe: true,
+        text: 'First message',
+        kind: 'text',
+        time: '10:00',
+        createdAt: '2026-11-09T10:00:00Z',
+      },
+      {
+        id: 'msg-2',
+        fromMe: true,
+        text: 'Delayed message',
+        kind: 'text',
+        time: '10:10',
+        createdAt: '2026-11-09T10:10:00Z',
+      },
+    ]
+
+    const groups = buildMessageGroups(messages)
+    expect(groups).toHaveLength(2)
+    expect(groups[0].messages[0].id).toBe('msg-1')
+    expect(groups[1].messages[0].id).toBe('msg-2')
+  })
+
+  it('splits group when sender changes between me and partner', () => {
+    const messages: ChatMessage[] = [
+      {
+        id: 'msg-1',
+        fromMe: false,
+        sender: 'Alice',
+        text: 'Hello!',
+        kind: 'text',
+        time: '10:00',
+        createdAt: '2026-11-09T10:00:00Z',
+      },
+      {
+        id: 'msg-2',
+        fromMe: true,
+        text: 'Hi Alice!',
+        kind: 'text',
+        time: '10:01',
+        createdAt: '2026-11-09T10:01:00Z',
+      },
+    ]
+
+    const groups = buildMessageGroups(messages)
+    expect(groups).toHaveLength(2)
+    expect(groups[0].fromMe).toBe(false)
+    expect(groups[0].sender).toBe('Alice')
+    expect(groups[1].fromMe).toBe(true)
+  })
+
+  it('preserves isForwarded flag and reactions in grouped messages', () => {
+    const messages: ChatMessage[] = [
+      {
+        id: 'msg-fwd',
+        fromMe: true,
+        text: 'Forwarded content',
+        kind: 'text',
+        time: '11:00',
+        isForwarded: true,
+        reactions: [
+          { emoji: '👍', count: 3, userIds: ['u1', 'u2', 'u3'] },
+          { emoji: '❤️', count: 1, userIds: ['u1'] },
+        ],
+        createdAt: '2026-11-09T11:00:00Z',
+      },
+    ]
+
+    const groups = buildMessageGroups(messages)
+    expect(groups).toHaveLength(1)
+    const msg = groups[0].messages[0]
+    expect(msg.isForwarded).toBe(true)
+    expect(msg.reactions).toBeDefined()
+    expect(msg.reactions).toHaveLength(2)
+    expect(msg.reactions![0].emoji).toBe('👍')
+    expect(msg.reactions![0].count).toBe(3)
+    expect(msg.reactions![1].emoji).toBe('❤️')
+  })
+})

@@ -72,6 +72,13 @@ export function ConversationView({
     messageListRef.current?.scrollToEnd(smooth ? 'smooth' : 'auto')
   }
 
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    }
+    scrollToBottom(false)
+  }, [conversation.id])
+
   const loadOlderMessages = () => {
     const el = scrollRef.current
     if (!el || !hasOlderMessages || isLoadingOlderMessages || olderRequestPending.current) return
@@ -115,12 +122,13 @@ export function ConversationView({
   }
 
   const submit = async (text: string, attachments?: MessageAttachmentInput[]) => {
-    if ((!text && (!attachments || attachments.length === 0)) || isSending) return
+    if ((!text && (!attachments || attachments.length === 0)) || isSending) return false
     const sent = await onSend(text, attachments)
-    if (!sent) return
+    if (!sent) return false
     setDraft('')
     setShowJump(false)
     scrollToBottom()
+    return true
   }
 
   return (

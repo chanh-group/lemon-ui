@@ -14,13 +14,17 @@ export function isImage(mimeType = '', fileName = ''): boolean {
 }
 
 export function isVideo(mimeType = '', fileName = ''): boolean {
+  if (mimeType.startsWith('audio/')) return false
+  if (/^voice-note/i.test(fileName)) return false
   if (mimeType.startsWith('video/')) return true
   return /\.(mp4|webm|mov|mkv|avi|flv)$/i.test(fileName)
 }
 
 export function isAudio(mimeType = '', fileName = ''): boolean {
   if (mimeType.startsWith('audio/')) return true
-  return /\.(mp3|wav|ogg|m4a|aac|opus)$/i.test(fileName)
+  if (mimeType.startsWith('video/')) return false
+  if (/^voice-note/i.test(fileName)) return true
+  return /\.(mp3|wav|ogg|m4a|aac|opus|weba|flac)$/i.test(fileName)
 }
 
 export function isPdf(mimeType = '', fileName = ''): boolean {
@@ -44,6 +48,7 @@ export function isPreviewable(mimeType = '', fileName = ''): boolean {
   return (
     isImage(mimeType, fileName) ||
     isVideo(mimeType, fileName) ||
+    isAudio(mimeType, fileName) ||
     isPdf(mimeType, fileName) ||
     isText(mimeType, fileName)
   )

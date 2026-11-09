@@ -1,8 +1,5 @@
-import { Film01Icon as FilmData, Image01Icon as ImageIconData, StickerIcon as StickerData, CallIncoming01Icon as PhoneIncomingData, CallMissed01Icon as PhoneMissedData, CallOutgoing01Icon as PhoneOutgoingData, Search01Icon as SearchData, Search01Icon as SearchXData, Edit02Icon as SquarePenData, Add01Icon as PlusData, ChevronRightIcon as ChevronRightData, CallIcon as PhoneData, MultiplicationSignIcon as XData } from '@hugeicons/core-free-icons'
+import { CallIncoming01Icon as PhoneIncomingData, CallMissed01Icon as PhoneMissedData, CallOutgoing01Icon as PhoneOutgoingData, Search01Icon as SearchData, Search01Icon as SearchXData, Edit02Icon as SquarePenData, Add01Icon as PlusData, ChevronRightIcon as ChevronRightData, CallIcon as PhoneData, MultiplicationSignIcon as XData } from '@hugeicons/core-free-icons'
 import { createIcon } from '@/components/icons/hugeIcon'
-const Film = createIcon(FilmData)
-const ImageIcon = createIcon(ImageIconData)
-const Sticker = createIcon(StickerData)
 const PhoneIncoming = createIcon(PhoneIncomingData)
 const PhoneMissed = createIcon(PhoneMissedData)
 const PhoneOutgoing = createIcon(PhoneOutgoingData)
@@ -23,6 +20,7 @@ import { UserAvatar } from '@/components/common/UserAvatar'
 import { ROUTES } from '@/config/constants'
 import { useAuth } from '@/features/auth/api'
 import { useFriendRequests } from '../hooks/useFriends'
+import { getConversationPreview } from '../utils/chat.mapper'
 import { storyDisplayName, storyTime } from '../data/storiesData'
 import type { CallEntry, ChatTab, Conversation, StoryEntry } from '../types/chat.types'
 import { CallsHeaderActions } from './CallsHeaderActions'
@@ -44,13 +42,6 @@ interface MiddlePanelProps {
   onCall?: (name: string) => void
   onNewChat?: () => void
   onNewCall?: () => void
-}
-
-function PreviewIcon({ kind }: { kind: Conversation['previewKind'] }) {
-  if (kind === 'photo') return <ImageIcon className="size-3.5 shrink-0" aria-hidden="true" />
-  if (kind === 'gif') return <Film className="size-3.5 shrink-0" aria-hidden="true" />
-  if (kind === 'sticker') return <Sticker className="size-3.5 shrink-0" aria-hidden="true" />
-  return null
 }
 
 function ConversationAvatar({
@@ -110,7 +101,8 @@ export function MiddlePanel({
   onNewChat,
   onNewCall,
 }: MiddlePanelProps) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const { user } = useAuth()
   const navigate = useNavigate()
   const resultCount = tab === 'messages' ? conversations.length : tab === 'calls' ? calls.length : stories.length
   const meta: Record<ChatTab, { title: string; searchHint: string }> = {
@@ -237,6 +229,12 @@ export function MiddlePanel({
                   const isActive = c.id === selectedId
                   // Story còn hiệu lực 24h của contact 1-1 — bấm avatar là xem tin, bấm row là chat
                   const contactStory = !c.isGroup ? storyByName.get(c.name) : undefined
+                  const { text: previewText, isBold, showBlueDot } = getConversationPreview({
+                    conversation: c,
+                    currentUserId: user?.id,
+                    lang: i18n.language,
+                    t,
+                  })
                   return (
                     <li key={c.id} className="relative">
                       <button
@@ -260,30 +258,24 @@ export function MiddlePanel({
                         <span className="min-w-0 flex-1">
                           <span className="flex items-baseline justify-between gap-2">
                             <span className="truncate text-sm font-semibold text-foreground">{c.name}</span>
-                            <span className={cn('shrink-0 text-[11px]', c.unread > 0 ? 'font-bold text-brand-ink' : 'text-muted-foreground')}>
+                            <span className={cn('shrink-0 text-[11px]', isBold ? 'font-semibold text-foreground' : 'text-muted-foreground')}>
                               {c.time}
                             </span>
                           </span>
                           <span className="mt-0.5 flex items-center justify-between gap-2">
                             <span
                               className={cn(
-                                'flex min-w-0 flex-1 items-center gap-1 truncate text-[13px]',
-                                c.unread > 0 ? 'font-semibold text-foreground' : 'text-muted-foreground',
+                                'truncate text-[13px]',
+                                isBold ? 'font-semibold text-foreground' : 'text-muted-foreground',
                               )}
                             >
-                              <PreviewIcon kind={c.previewKind} />
-                              {c.previewKind === 'photo'
-                                ? t('chat.photo')
-                                : c.previewKind === 'gif'
-                                  ? t('chat.gif')
-                                  : c.previewKind === 'sticker'
-                                    ? t('chat.sticker')
-                                    : c.preview || (!c.isGroup ? t('chat.newConnectionPreview') : '')}
+                              {previewText}
                             </span>
-                            {c.unread > 0 && (
-                              <span aria-hidden="true" className="grid min-w-5 shrink-0 place-items-center rounded-full bg-primary px-1.5 text-[11px] leading-5 font-bold text-primary-foreground">
-                                {c.unread}
-                              </span>
+                            {showBlueDot && (
+                              <span
+                                aria-hidden="true"
+                                className="size-2.5 shrink-0 rounded-full bg-blue-500"
+                              />
                             )}
                           </span>
                         </span>

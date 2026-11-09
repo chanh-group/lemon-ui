@@ -16,3 +16,67 @@ export function initials(name?: string | null): string {
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
 }
+
+/**
+ * Chuyển đổi và nén tệp ảnh đại diện thành Data URL tối ưu (JPEG, max 400x400).
+ * Giúp avatar hiển thị ngay lập tức, tương thích 100% không phụ thuộc S3/R2 public URL
+ * và không bị hủy bộ nhớ như blob URL.
+ */
+export async function fileToAvatarDataUrl(file: File | Blob, maxDim = 400, quality = 0.85): Promise<string> {
+  // Nếu ở trình duyệt có canvas và Image, nén ảnh để tiết kiệm dung lượng
+  if (typeof window !== 'undefined' && typeof Image !== 'undefined' && typeof document !== 'undefined') {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => {
+        const rawDataUrl = reader.result as string
+        if (file.type === 'image/svg+xml') {
+          resolve(rawDataUrl)
+          return
+        }
+
+        const img = new Image()
+        img.onload = () => {
+          try {
+            let { width, height } = img
+            if (width > maxDim || height > maxDim) {
+              if (width > height) {
+                height = Math.round((height * maxDim) / width)
+                width = maxDim
+              } else {
+                width = Math.round((width * maxDim) / height)
+                height = maxDim
+              }
+            }
+            const canvas = document.createElement('canvas')
+            canvas.width = width
+            canvas.height = height
+            const ctx = canvas.getContext('2d')
+            if (!ctx) {
+              resolve(rawDataUrl)
+              return
+            }
+            ctx.drawImage(img, 0, 0, width, height)
+            const compressedDataUrl = canvas.toDataURL('image/jpeg', quality)
+            resolve(compressedDataUrl)
+          } catch {
+            resolve(rawDataUrl)
+          }
+        }
+        img.onerror = () => resolve(rawDataUrl)
+        img.src = rawDataUrl
+      }
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    })
+  }
+
+  // Fallback cho môi trường test (Bun / Node) không có DOM canvas
+  const arrayBuffer = await file.arrayBuffer()
+  const bytes = new Uint8Array(arrayBuffer)
+  let binary = ''
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i])
+  }
+  const base64 = btoa(binary)
+  return `data:${file.type || 'image/png'};base64,${base64}`
+}

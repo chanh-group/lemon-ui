@@ -2,6 +2,8 @@ import { useEffect, useRef } from 'react'
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
+import { generateUUID } from '@/lib/utils'
+import { resolveSendMessageKind } from '../utils/messageSend'
 import { queryKeys } from '@/infrastructure/query/keys'
 import {
   getConversationById,
@@ -9,6 +11,7 @@ import {
   getConversationMessages,
   getOrCreateDirectConversation,
   markConversationRead,
+  reactToMessage,
   revokeMessage,
   sendMessage,
 } from '../api/chat.api'
@@ -23,7 +26,7 @@ import type {
 
 export const CHAT_QUERY_KEYS = queryKeys.chat
 const MESSAGE_PAGE_SIZE = 30
-const INITIAL_MESSAGE_BUFFER_PAGES = 3
+const INITIAL_MESSAGE_BUFFER_PAGES = 1
 
 export interface MessagePageParam {
   cursor?: string
@@ -153,6 +156,9 @@ export type SendMessageArg = string | {
   body?: string
   kind?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE' | 'SYSTEM'
   attachments?: import('../types/chat.types').MessageAttachmentInput[]
+  isForwarded?: boolean
+  sourceMessageId?: string
+  targetConversationId?: string
 }
 
 /** Hook gửi tin nhắn mới */
@@ -161,27 +167,35 @@ export function useSendMessageMutation(conversationId: string | null) {
 
   return useMutation({
     mutationFn: async (arg: SendMessageArg) => {
-      if (!conversationId) throw new Error('No conversation selected')
-      const clientMsgId = crypto.randomUUID()
+      const targetConversationId = typeof arg === 'string'
+        ? conversationId
+        : arg.targetConversationId ?? conversationId
+      if (!targetConversationId) throw new Error('No conversation selected')
+      const clientMsgId = generateUUID()
       const payload: SendMessageDto = typeof arg === 'string'
         ? { body: arg, clientMsgId, kind: 'TEXT' }
         : {
             body: arg.body,
             clientMsgId,
-            kind: arg.kind ?? (arg.attachments && arg.attachments.length > 0 ? (arg.attachments[0].kind as any) : 'TEXT'),
+            kind: resolveSendMessageKind(arg.body, arg.kind, arg.attachments),
             attachments: arg.attachments,
+            isForwarded: arg.isForwarded,
+            sourceMessageId: arg.sourceMessageId,
           }
-      return sendMessage(conversationId, payload)
+      return sendMessage(targetConversationId, payload)
     },
-    onSuccess: (newMessage: MessageResponse) => {
-      if (!conversationId) return
+    onSuccess: (newMessage: MessageResponse, arg: SendMessageArg) => {
+      const targetConversationId = typeof arg === 'string'
+        ? conversationId
+        : arg.targetConversationId ?? conversationId
+      if (!targetConversationId) return
 
       // Cập nhật messages cache
       const timeline = queryClient.getQueryData<InfiniteData<MessageTimelineResponse, MessagePageParam>>(
-        CHAT_QUERY_KEYS.messages(conversationId),
+        CHAT_QUERY_KEYS.messages(targetConversationId),
       )
       queryClient.setQueryData<MessageResponse[]>(
-        CHAT_QUERY_KEYS.liveMessages(conversationId),
+        CHAT_QUERY_KEYS.liveMessages(targetConversationId),
         (old) => {
           const alreadyLoaded = timeline?.pages.some((page) => page.items.some((message) =>
             message.id === newMessage.id ||
@@ -201,11 +215,14 @@ export function useSendMessageMutation(conversationId: string | null) {
         (old) => {
           if (!old) return old
           return old.map((conv) => {
-            if (conv.id === conversationId) {
-              const preview = newMessage.body || (newMessage.attachments?.[0]?.fileName ?? 'Đính kèm tệp')
+            if (conv.id === targetConversationId) {
+              const preview = newMessage.body
+                ? newMessage.body
+                : (newMessage.attachments && newMessage.attachments.length > 0 ? '[attachment]' : '')
               return {
                 ...conv,
                 lastMessagePreview: preview,
+                lastMessageSenderId: newMessage.senderId,
                 lastMessageAt: newMessage.createdAt,
               }
             }
@@ -291,6 +308,41 @@ export function useRevokeMessageMutation(conversationId: string | null) {
         (old) => old?.map((message) =>
           message.id === revokedMsg.id ? { ...message, deletedAt: revokedMsg.deletedAt } : message,
         ),
+      )
+    },
+  })
+}
+
+/** Hook thả / toggle cảm xúc tin nhắn */
+export function useReactMessageMutation(conversationId: string | null) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ messageId, emoji }: { messageId: string; emoji: string }) =>
+      reactToMessage(messageId, emoji),
+    onSuccess: (data) => {
+      if (!conversationId) return
+      queryClient.setQueryData<InfiniteData<MessageTimelineResponse, MessagePageParam>>(
+        CHAT_QUERY_KEYS.messages(conversationId),
+        (old) => {
+          if (!old) return old
+          return {
+            ...old,
+            pages: old.pages.map((page) => ({
+              ...page,
+              items: page.items.map((m) =>
+                m.id === data.messageId ? { ...m, reactions: data.reactions } : m,
+              ),
+            })),
+          }
+        },
+      )
+      queryClient.setQueryData<MessageResponse[]>(
+        CHAT_QUERY_KEYS.liveMessages(conversationId),
+        (old) =>
+          old?.map((message) =>
+            message.id === data.messageId ? { ...message, reactions: data.reactions } : message,
+          ),
       )
     },
   })
