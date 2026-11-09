@@ -99,6 +99,12 @@ export interface StoryViewerItem {
   }
 }
 
+export interface MessageReactionItem {
+  emoji: string
+  count: number
+  userIds: string[]
+}
+
 export interface ChatMessage {
   id: string
   fromMe: boolean
@@ -109,7 +115,8 @@ export interface ChatMessage {
   attachments?: MessageAttachmentItem[]
   time: string
   status?: 'sent' | 'read'
-  reactions?: string[]
+  reactions?: MessageReactionItem[]
+  isForwarded?: boolean
   storyId?: string | null
   storyPreview?: StoryPreview | null
   createdAt?: string
@@ -188,6 +195,8 @@ export interface MessageResponse {
   replyToId: string | null
   clientMsgId?: string | null
   attachments?: MessageAttachmentItem[]
+  reactions?: MessageReactionItem[]
+  isForwarded?: boolean
   createdAt: string
   editedAt: string | null
   deletedAt: string | null
@@ -217,6 +226,15 @@ export interface SendMessageDto {
   replyToId?: string | null
   kind?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE' | 'SYSTEM'
   attachments?: MessageAttachmentInput[]
+  isForwarded?: boolean
+}
+
+export interface MessageReactionPayload {
+  messageId: string
+  conversationId: string
+  userId: string
+  emoji: string
+  reactions: MessageReactionItem[]
 }
 
 export interface TypingEventPayload {

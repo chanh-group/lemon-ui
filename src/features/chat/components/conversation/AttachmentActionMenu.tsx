@@ -39,6 +39,8 @@ export interface MessageActionPillProps {
   isMe: boolean
   onPreview?: (attachment: MessageAttachmentItem) => void
   onRevoke?: (messageId: string) => void
+  onReact?: (messageId: string, emoji: string) => void
+  onForward?: (message: ChatMessage) => void
   className?: string
   align?: 'start' | 'end'
   onOpenChange?: (open: boolean) => void
@@ -50,6 +52,8 @@ export function MessageActionPill({
   isMe,
   onPreview,
   onRevoke,
+  onReact,
+  onForward,
   className,
   align = 'end',
   onOpenChange,
@@ -93,7 +97,12 @@ export function MessageActionPill({
 
   const handleForward = (e: React.MouseEvent) => {
     e.stopPropagation()
-    toast.info(t('chat.forwardDeveloping', 'Tính năng chuyển tiếp đang phát triển'))
+    setMenuOpen(false)
+    if (onForward) {
+      onForward(message)
+    } else {
+      toast.info(t('chat.forwardDeveloping', 'Tính năng chuyển tiếp đang phát triển'))
+    }
   }
 
   const handleCopyText = (e: React.MouseEvent) => {
@@ -135,7 +144,7 @@ export function MessageActionPill({
             type="button"
             onClick={(e) => e.stopPropagation()}
             className={cn(
-              'grid size-7 sm:size-8 place-items-center rounded-full bg-card/90 dark:bg-zinc-800/90 border border-border/60 text-muted-foreground shadow-xs transition-all hover:bg-muted hover:text-foreground active:scale-95 focus:outline-none',
+              'grid size-7 sm:size-8 place-items-center rounded-full bg-white dark:bg-zinc-800 border border-border/80 text-foreground/80 shadow-sm transition-all hover:bg-muted hover:text-foreground active:scale-95 focus:outline-none',
               emojiOpen && 'bg-muted text-foreground ring-1 ring-border',
             )}
             title="Thả cảm xúc"
@@ -156,7 +165,11 @@ export function MessageActionPill({
               onClick={(e) => {
                 e.stopPropagation()
                 setEmojiOpen(false)
-                toast.success(`${t('chat.reactStorySuccess', 'Đã thả cảm xúc')} ${emoji}`)
+                if (onReact) {
+                  onReact(message.id, emoji)
+                } else {
+                  toast.success(`${t('chat.reactStorySuccess', 'Đã thả cảm xúc')} ${emoji}`)
+                }
               }}
               className="grid size-7 sm:size-8 place-items-center rounded-full text-base sm:text-lg transition-transform hover:scale-125 hover:bg-muted"
             >
@@ -170,7 +183,7 @@ export function MessageActionPill({
       <button
         type="button"
         onClick={handleForward}
-        className="grid size-7 sm:size-8 place-items-center rounded-full bg-card/90 dark:bg-zinc-800/90 border border-border/60 text-muted-foreground shadow-xs transition-all hover:bg-muted hover:text-foreground active:scale-95 focus:outline-none"
+        className="grid size-7 sm:size-8 place-items-center rounded-full bg-white dark:bg-zinc-800 border border-border/80 text-foreground/80 shadow-sm transition-all hover:bg-muted hover:text-foreground active:scale-95 focus:outline-none"
         title={t('chat.forward', 'Chuyển tiếp')}
         aria-label={t('chat.forward', 'Chuyển tiếp')}
       >
@@ -184,7 +197,7 @@ export function MessageActionPill({
             type="button"
             onClick={(e) => e.stopPropagation()}
             className={cn(
-              'grid size-7 sm:size-8 place-items-center rounded-full bg-card/90 dark:bg-zinc-800/90 border border-border/60 text-muted-foreground shadow-xs transition-all hover:bg-muted hover:text-foreground active:scale-95 focus:outline-none',
+              'grid size-7 sm:size-8 place-items-center rounded-full bg-white dark:bg-zinc-800 border border-border/80 text-foreground/80 shadow-sm transition-all hover:bg-muted hover:text-foreground active:scale-95 focus:outline-none',
               menuOpen && 'bg-muted text-foreground ring-1 ring-border',
             )}
             title="Tùy chọn khác"

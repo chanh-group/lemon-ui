@@ -9,6 +9,7 @@ import {
   getConversationMessages,
   getOrCreateDirectConversation,
   markConversationRead,
+  reactToMessage,
   revokeMessage,
   sendMessage,
 } from '../api/chat.api'
@@ -153,6 +154,7 @@ export type SendMessageArg = string | {
   body?: string
   kind?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE' | 'SYSTEM'
   attachments?: import('../types/chat.types').MessageAttachmentInput[]
+  isForwarded?: boolean
 }
 
 /** Hook gửi tin nhắn mới */
@@ -170,6 +172,7 @@ export function useSendMessageMutation(conversationId: string | null) {
             clientMsgId,
             kind: arg.kind ?? (arg.attachments && arg.attachments.length > 0 ? (arg.attachments[0].kind as any) : 'TEXT'),
             attachments: arg.attachments,
+            isForwarded: arg.isForwarded,
           }
       return sendMessage(conversationId, payload)
     },
@@ -291,6 +294,41 @@ export function useRevokeMessageMutation(conversationId: string | null) {
         (old) => old?.map((message) =>
           message.id === revokedMsg.id ? { ...message, deletedAt: revokedMsg.deletedAt } : message,
         ),
+      )
+    },
+  })
+}
+
+/** Hook thả / toggle cảm xúc tin nhắn */
+export function useReactMessageMutation(conversationId: string | null) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ messageId, emoji }: { messageId: string; emoji: string }) =>
+      reactToMessage(messageId, emoji),
+    onSuccess: (data) => {
+      if (!conversationId) return
+      queryClient.setQueryData<InfiniteData<MessageTimelineResponse, MessagePageParam>>(
+        CHAT_QUERY_KEYS.messages(conversationId),
+        (old) => {
+          if (!old) return old
+          return {
+            ...old,
+            pages: old.pages.map((page) => ({
+              ...page,
+              items: page.items.map((m) =>
+                m.id === data.messageId ? { ...m, reactions: data.reactions } : m,
+              ),
+            })),
+          }
+        },
+      )
+      queryClient.setQueryData<MessageResponse[]>(
+        CHAT_QUERY_KEYS.liveMessages(conversationId),
+        (old) =>
+          old?.map((message) =>
+            message.id === data.messageId ? { ...message, reactions: data.reactions } : message,
+          ),
       )
     },
   })

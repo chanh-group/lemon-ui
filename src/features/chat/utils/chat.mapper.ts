@@ -102,6 +102,8 @@ export function mapMessageResponse(
     photoLabel: raw.attachments?.[0]?.fileName,
     time: formatTimeHHmm(raw.createdAt),
     status: isMe ? 'sent' : undefined,
+    reactions: raw.reactions,
+    isForwarded: raw.isForwarded,
     createdAt: typeof raw.createdAt === 'string' ? raw.createdAt : new Date(raw.createdAt).toISOString(),
     editedAt: raw.editedAt ? (typeof raw.editedAt === 'string' ? raw.editedAt : new Date(raw.editedAt).toISOString()) : null,
     deletedAt: raw.deletedAt ? (typeof raw.deletedAt === 'string' ? raw.deletedAt : new Date(raw.deletedAt).toISOString()) : null,

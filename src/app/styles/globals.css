@@ -1,5 +1,7 @@
 @import 'tailwindcss';
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* ============================================================
    LemonChat — Design tokens
    Brand: lemon green + white (dark mode support)

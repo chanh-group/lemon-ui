@@ -1,6 +1,17 @@
 import { api } from '@/infrastructure/api/client'
 import { isAuthBypass } from '@/config/env'
-import type { ChatUser, CursorPage, ConversationResponse, FriendRequest, FriendRequestsPageResponse, MessageResponse, MessageTimelineResponse, SendMessageDto, UserSearchItem } from '../types/chat.types'
+import type {
+  ChatUser,
+  CursorPage,
+  ConversationResponse,
+  FriendRequest,
+  FriendRequestsPageResponse,
+  MessageReactionItem,
+  MessageResponse,
+  MessageTimelineResponse,
+  SendMessageDto,
+  UserSearchItem,
+} from '../types/chat.types'
 
 /* ------------------------------------------------------------------ */
 /* Chat API — Axios client unwraps the backend response envelope. */
@@ -142,7 +153,7 @@ export async function revokeMessage(messageId: string): Promise<MessageResponse>
 /* ------------------------------------------------------------------ */
 
 export interface PresignFileRequest {
-  kind: 'STORY_IMAGE' | 'STORY_VIDEO' | 'CHAT_IMAGE' | 'CHAT_VIDEO' | 'CHAT_AUDIO' | 'CHAT_FILE'
+  kind: 'STORY_IMAGE' | 'STORY_VIDEO' | 'CHAT_IMAGE' | 'CHAT_VIDEO' | 'CHAT_AUDIO' | 'CHAT_FILE' | 'USER_AVATAR'
   sizeBytes: number
   mimeType: string
   fileName?: string
@@ -193,5 +204,17 @@ export async function uploadFileViaBackend(
   const res = await api.post<{ objectKey: string }>('/files/upload', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   })
+  return res.data
+}
+
+/** Thả / toggle cảm xúc cho tin nhắn */
+export async function reactToMessage(
+  messageId: string,
+  emoji: string,
+): Promise<{ messageId: string; reactions: MessageReactionItem[] }> {
+  const res = await api.post<{ messageId: string; reactions: MessageReactionItem[] }>(
+    `/messages/${messageId}/react`,
+    { emoji },
+  )
   return res.data
 }

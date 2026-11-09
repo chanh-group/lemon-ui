@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
-import { buildDayGroupsFromMessages, mapMessageResponse } from './chat.mapper'
-import type { MessageResponse } from '../types/chat.types'
+import { buildDayGroupsFromMessages, mapConversationResponse, mapMessageResponse } from './chat.mapper'
+import type { ConversationResponse, MessageResponse } from '../types/chat.types'
 
 describe('chat.mapper', () => {
   it('maps an image attachment message correctly', () => {
@@ -109,6 +109,74 @@ describe('chat.mapper', () => {
     const groups = buildDayGroupsFromMessages(messages)
     expect(groups.length).toBe(1)
     expect(groups[0].messages.length).toBe(2)
+  })
+
+  it('maps conversation partner avatar correctly', () => {
+    const raw: ConversationResponse = {
+      id: 'conv-1',
+      kind: 'DIRECT',
+      createdAt: '2026-11-09T10:00:00Z',
+      lastMessageAt: '2026-11-09T10:30:00Z',
+      lastMessagePreview: 'Xin chào',
+      unreadCount: 2,
+      partner: {
+        id: 'user-partner',
+        username: 'lemon_friend',
+        fullName: 'Lemon Friend',
+        avatarUrl: 'https://images.example.com/avatar.jpg',
+        isOnline: true,
+      },
+    }
+
+    const mapped = mapConversationResponse(raw)
+    expect(mapped.id).toBe('conv-1')
+    expect(mapped.name).toBe('Lemon Friend')
+    expect(mapped.partnerAvatar).toBe('https://images.example.com/avatar.jpg')
+    expect(mapped.online).toBe(true)
+    expect(mapped.unread).toBe(2)
+  })
+
+  it('maps conversation when partner has null avatar', () => {
+    const raw: ConversationResponse = {
+      id: 'conv-2',
+      kind: 'DIRECT',
+      createdAt: '2026-11-09T10:00:00Z',
+      partner: {
+        id: 'user-partner-2',
+        username: 'no_avatar_user',
+        fullName: 'No Avatar',
+        avatarUrl: null,
+      },
+    }
+
+    const mapped = mapConversationResponse(raw)
+    expect(mapped.partnerAvatar).toBeNull()
+    expect(mapped.name).toBe('No Avatar')
+  })
+
+  it('maps reactions and isForwarded flag correctly', () => {
+    const raw: MessageResponse = {
+      id: 'msg-fwd',
+      conversationId: 'conv-1',
+      senderId: 'user-me',
+      body: 'Forwarded text',
+      kind: 'TEXT',
+      replyToId: null,
+      editedAt: null,
+      deletedAt: null,
+      isForwarded: true,
+      reactions: [
+        { emoji: '❤️', count: 2, userIds: ['user-me', 'user-other'] },
+        { emoji: '👍', count: 1, userIds: ['user-other'] },
+      ],
+      createdAt: '2026-11-09T10:00:00Z',
+    }
+
+    const mapped = mapMessageResponse(raw, 'user-me')
+    expect(mapped.isForwarded).toBe(true)
+    expect(mapped.reactions).toHaveLength(2)
+    expect(mapped.reactions![0].emoji).toBe('❤️')
+    expect(mapped.reactions![0].count).toBe(2)
   })
 })
 
