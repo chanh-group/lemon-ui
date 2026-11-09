@@ -125,9 +125,13 @@ export function useChatRealtime(activeConversationId: string | null) {
             old?.map((conversation) => {
               if (conversation.id !== convId) return conversation
               const isCurrentActive = convId === activeConversationId
+              const preview = msg.deletedAt
+                ? '[message-revoked]'
+                : (msg.body ?? (msg.attachments && msg.attachments.length > 0 ? '[attachment]' : ''))
               return {
                 ...conversation,
-                lastMessagePreview: msg.deletedAt ? 'Tin nhắn đã bị thu hồi' : (msg.body ?? ''),
+                lastMessagePreview: preview,
+                lastMessageSenderId: msg.senderId,
                 lastMessageAt: msg.createdAt,
                 unreadCount:
                   isCurrentActive || msg.senderId === userId

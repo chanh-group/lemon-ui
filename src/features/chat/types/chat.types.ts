@@ -39,7 +39,7 @@ export interface Conversation {
   id: string
   name: string
   preview: string
-  previewKind: 'text' | 'photo' | 'gif' | 'sticker' | 'call'
+  previewKind: 'text' | 'photo' | 'video' | 'audio' | 'file' | 'gif' | 'sticker' | 'call'
   time: string
   unread: number
   online: boolean
@@ -48,6 +48,7 @@ export interface Conversation {
   lastActive?: string
   partnerId?: string
   partnerAvatar?: string | null
+  lastMessageSenderId?: string | null
 }
 
 export interface MessageAttachmentItem {
@@ -181,6 +182,7 @@ export interface ConversationResponse {
   kind: 'DIRECT' | 'GROUP'
   partner?: ConversationPartnerResponse
   lastMessagePreview: string | null
+  lastMessageSenderId?: string | null
   lastMessageAt: string | null
   unreadCount: number
   createdAt: string

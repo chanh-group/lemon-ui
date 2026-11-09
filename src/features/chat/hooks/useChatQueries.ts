@@ -206,10 +206,13 @@ export function useSendMessageMutation(conversationId: string | null) {
           if (!old) return old
           return old.map((conv) => {
             if (conv.id === conversationId) {
-              const preview = newMessage.body || (newMessage.attachments?.[0]?.fileName ?? 'Đính kèm tệp')
+              const preview = newMessage.body
+                ? newMessage.body
+                : (newMessage.attachments && newMessage.attachments.length > 0 ? '[attachment]' : '')
               return {
                 ...conv,
                 lastMessagePreview: preview,
+                lastMessageSenderId: newMessage.senderId,
                 lastMessageAt: newMessage.createdAt,
               }
             }
