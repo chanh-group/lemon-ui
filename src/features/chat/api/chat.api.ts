@@ -225,7 +225,8 @@ export async function uploadFileViaBackend(
   formData.append('kind', kind)
   if (conversationId) formData.append('conversationId', conversationId)
 
-  const res = await api.post<{ objectKey: string; avatarUrl?: string }>('/files/upload', formData, {
+  const endpoint = kind === 'USER_AVATAR' ? '/files/avatars/upload' : '/files/upload'
+  const res = await api.post<{ objectKey: string; avatarUrl?: string }>(endpoint, formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   })
   return res.data
