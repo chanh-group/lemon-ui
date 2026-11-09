@@ -8,12 +8,7 @@ import {
 } from '@hugeicons/core-free-icons'
 import { createIcon } from '@/components/icons/hugeIcon'
 import { toast } from 'sonner'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { UserAvatar } from '@/components/common/UserAvatar'
 import { useConversationsQuery, useSendMessageMutation } from '../../hooks/useChatQueries'
 import type { ChatMessage, Conversation } from '../../types/chat.types'
@@ -65,7 +60,9 @@ export function ForwardMessageModal({
         sourceMessageId: message.id,
       })
 
-      toast.success(`${t('chat.forwardSuccess', 'Đã chuyển tiếp tin nhắn đến')} ${conversation.name}`)
+      toast.success(
+        `${t('chat.forwardSuccess', 'Đã chuyển tiếp tin nhắn đến')} ${conversation.name}`,
+      )
       onOpenChange(false)
     } catch {
       toast.error(t('chat.forwardFailed', 'Chuyển tiếp tin nhắn thất bại'))
@@ -160,7 +157,9 @@ export function ForwardMessageModal({
                   />
                   <div className="min-w-0">
                     <p className="text-xs font-medium text-foreground truncate">{c.name}</p>
-                    <p className="text-[11px] text-muted-foreground truncate">{c.preview || t('chat.directChat', 'Trò chuyện')}</p>
+                    <p className="text-[11px] text-muted-foreground truncate">
+                      {c.preview || t('chat.directChat', 'Trò chuyện')}
+                    </p>
                   </div>
                 </div>
 

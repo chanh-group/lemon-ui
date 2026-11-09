@@ -22,9 +22,17 @@ export function initials(name?: string | null): string {
  * Giúp avatar hiển thị ngay lập tức, tương thích 100% không phụ thuộc S3/R2 public URL
  * và không bị hủy bộ nhớ như blob URL.
  */
-export async function fileToAvatarDataUrl(file: File | Blob, maxDim = 400, quality = 0.85): Promise<string> {
+export async function fileToAvatarDataUrl(
+  file: File | Blob,
+  maxDim = 400,
+  quality = 0.85,
+): Promise<string> {
   // Nếu ở trình duyệt có canvas và Image, nén ảnh để tiết kiệm dung lượng
-  if (typeof window !== 'undefined' && typeof Image !== 'undefined' && typeof document !== 'undefined') {
+  if (
+    typeof window !== 'undefined' &&
+    typeof Image !== 'undefined' &&
+    typeof document !== 'undefined'
+  ) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader()
       reader.onload = () => {

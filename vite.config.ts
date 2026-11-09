@@ -7,7 +7,7 @@ import { defineConfig } from 'vite'
 export default defineConfig({
   plugins: [react(), babel({ presets: [reactCompilerPreset()] }), tailwindcss()],
   server: {
-    host: "0.0.0.0",
+    host: '0.0.0.0',
     port: 5173,
     proxy: {
       '/api': {
@@ -38,7 +38,10 @@ export default defineConfig({
           if (id.includes('node_modules/@tanstack')) {
             return 'vendor-query'
           }
-          if (id.includes('node_modules/react-hook-form') || id.includes('node_modules/@hookform')) {
+          if (
+            id.includes('node_modules/react-hook-form') ||
+            id.includes('node_modules/@hookform')
+          ) {
             return 'vendor-form'
           }
           if (id.includes('node_modules/radix-ui') || id.includes('node_modules/@radix-ui')) {

@@ -1,7 +1,12 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { EyeIcon as EyeData, EyeOffIcon as EyeOffData, LoaderCircleIcon as LoaderData, LockPasswordIcon as LockData } from '@hugeicons/core-free-icons'
+import {
+  EyeIcon as EyeData,
+  EyeOffIcon as EyeOffData,
+  LoaderCircleIcon as LoaderData,
+  LockPasswordIcon as LockData,
+} from '@hugeicons/core-free-icons'
 import { createIcon } from '@/components/icons/hugeIcon'
 const Eye = createIcon(EyeData)
 const EyeOff = createIcon(EyeOffData)
@@ -21,13 +26,7 @@ import {
 import { changePasswordSchema, type ChangePasswordInput } from '@/domain/auth'
 import { useChangePassword } from '@/features/auth/hooks/useAuth'
 
-function PasswordVisibilityButton({
-  visible,
-  onClick,
-}: {
-  visible: boolean
-  onClick: () => void
-}) {
+function PasswordVisibilityButton({ visible, onClick }: { visible: boolean; onClick: () => void }) {
   const { t } = useTranslation()
   return (
     <button
@@ -37,7 +36,11 @@ function PasswordVisibilityButton({
       aria-pressed={visible}
       className="absolute inset-y-0 right-0 flex w-12 cursor-pointer items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
     >
-      {visible ? <EyeOff className="size-4" aria-hidden="true" /> : <Eye className="size-4" aria-hidden="true" />}
+      {visible ? (
+        <EyeOff className="size-4" aria-hidden="true" />
+      ) : (
+        <Eye className="size-4" aria-hidden="true" />
+      )}
     </button>
   )
 }
@@ -78,7 +81,9 @@ export function ChangePasswordSettings() {
           </span>
           <div>
             <p className="text-sm font-semibold text-foreground">{t('chat.changePasswordTitle')}</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">{t('chat.changePasswordSubtitle')}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {t('chat.changePasswordSubtitle')}
+            </p>
           </div>
         </div>
 
@@ -100,7 +105,10 @@ export function ChangePasswordSettings() {
                         aria-invalid={!!form.formState.errors.oldPassword}
                         {...field}
                       />
-                      <PasswordVisibilityButton visible={showOld} onClick={() => setShowOld((v) => !v)} />
+                      <PasswordVisibilityButton
+                        visible={showOld}
+                        onClick={() => setShowOld((v) => !v)}
+                      />
                     </div>
                   </FormControl>
                   <FormMessage />
@@ -124,7 +132,10 @@ export function ChangePasswordSettings() {
                         aria-invalid={!!form.formState.errors.newPassword}
                         {...field}
                       />
-                      <PasswordVisibilityButton visible={showNew} onClick={() => setShowNew((v) => !v)} />
+                      <PasswordVisibilityButton
+                        visible={showNew}
+                        onClick={() => setShowNew((v) => !v)}
+                      />
                     </div>
                   </FormControl>
                   <FormMessage />
@@ -148,7 +159,10 @@ export function ChangePasswordSettings() {
                         aria-invalid={!!form.formState.errors.confirmPassword}
                         {...field}
                       />
-                      <PasswordVisibilityButton visible={showConfirm} onClick={() => setShowConfirm((v) => !v)} />
+                      <PasswordVisibilityButton
+                        visible={showConfirm}
+                        onClick={() => setShowConfirm((v) => !v)}
+                      />
                     </div>
                   </FormControl>
                   <FormMessage />
@@ -156,7 +170,12 @@ export function ChangePasswordSettings() {
               )}
             />
 
-            <Button type="submit" size="lg" className="mt-1 w-full" disabled={changePassword.isPending}>
+            <Button
+              type="submit"
+              size="lg"
+              className="mt-1 w-full"
+              disabled={changePassword.isPending}
+            >
               {changePassword.isPending ? (
                 <>
                   <Loader className="size-4 animate-spin" aria-hidden="true" />

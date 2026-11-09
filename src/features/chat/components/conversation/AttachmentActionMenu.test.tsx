@@ -16,12 +16,7 @@ describe('AttachmentActionMenu & MessageActionPill Component', () => {
   }
 
   it('renders 3 action buttons for message interaction', () => {
-    const html = renderToString(
-      <MessageActionPill
-        message={dummyMessage}
-        isMe={true}
-      />
-    )
+    const html = renderToString(<MessageActionPill message={dummyMessage} isMe={true} />)
 
     expect(html).toContain('title="Thả cảm xúc"')
     expect(html).toContain('title="Chuyển tiếp"')
@@ -29,12 +24,7 @@ describe('AttachmentActionMenu & MessageActionPill Component', () => {
   })
 
   it('applies crisp light mode background and high contrast text styling', () => {
-    const html = renderToString(
-      <MessageActionPill
-        message={dummyMessage}
-        isMe={true}
-      />
-    )
+    const html = renderToString(<MessageActionPill message={dummyMessage} isMe={true} />)
 
     // Verify the buttons use bg-white and text-foreground/80
     expect(html).toContain('bg-white')

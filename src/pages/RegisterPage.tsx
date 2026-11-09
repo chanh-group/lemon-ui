@@ -7,10 +7,7 @@ import { ROUTES } from '@/config/constants'
 export function RegisterPage() {
   const { t } = useTranslation()
   return (
-    <AuthLayout
-      title={t('pages.registerTitle')}
-      subtitle={t('pages.registerSubtitle')}
-    >
+    <AuthLayout title={t('pages.registerTitle')} subtitle={t('pages.registerSubtitle')}>
       <SignupWizard />
       <p className="mt-4 text-center text-sm text-muted-foreground">
         {t('auth.alreadyHaveAccount')}{' '}

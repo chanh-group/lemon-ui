@@ -24,7 +24,10 @@ export function NewCallView() {
   const [query, setQuery] = useState('')
   const friendsQuery = useFriends()
   const conversationsQuery = useConversationsQuery()
-  const totalUnread = (conversationsQuery.data ?? []).reduce((count, conversation) => count + conversation.unread, 0)
+  const totalUnread = (conversationsQuery.data ?? []).reduce(
+    (count, conversation) => count + conversation.unread,
+    0,
+  )
   const normalizedQuery = query.trim().toLocaleLowerCase()
   const friends = useMemo(
     () =>
@@ -79,7 +82,9 @@ export function NewCallView() {
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
-          <h2 className="px-2 pt-3 pb-2 text-sm font-semibold text-foreground">{t('chat.newChatContacts')}</h2>
+          <h2 className="px-2 pt-3 pb-2 text-sm font-semibold text-foreground">
+            {t('chat.newChatContacts')}
+          </h2>
           {friendsQuery.isPending ? (
             <p className="px-2 py-3 text-sm text-muted-foreground">{t('chat.pending')}</p>
           ) : friendsQuery.isError ? (
@@ -91,7 +96,9 @@ export function NewCallView() {
               {friends.map((friend) => (
                 <li key={friend.id} className="flex min-h-16 items-center gap-3 rounded-xl px-2">
                   <Avatar name={friend.name} />
-                  <span className="min-w-0 flex-1 truncate text-[15px] text-foreground">{friend.name}</span>
+                  <span className="min-w-0 flex-1 truncate text-[15px] text-foreground">
+                    {friend.name}
+                  </span>
                   <button
                     type="button"
                     onClick={callUnavailable}
@@ -115,7 +122,9 @@ export function NewCallView() {
             </ul>
           )}
 
-          <h2 className="px-2 pt-5 pb-2 text-sm font-semibold text-foreground">{t('chat.newChatGroups')}</h2>
+          <h2 className="px-2 pt-5 pb-2 text-sm font-semibold text-foreground">
+            {t('chat.newChatGroups')}
+          </h2>
           {conversationsQuery.isPending ? (
             <p className="px-2 py-3 text-sm text-muted-foreground">{t('chat.pending')}</p>
           ) : conversationsQuery.isError ? (
@@ -127,7 +136,9 @@ export function NewCallView() {
               {groups.map((group) => (
                 <li key={group.id} className="flex min-h-16 items-center gap-3 rounded-xl px-2">
                   <Avatar name={group.name} square />
-                  <span className="min-w-0 flex-1 truncate text-[15px] text-foreground">{group.name}</span>
+                  <span className="min-w-0 flex-1 truncate text-[15px] text-foreground">
+                    {group.name}
+                  </span>
                   <button
                     type="button"
                     onClick={callUnavailable}

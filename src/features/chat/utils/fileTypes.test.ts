@@ -94,7 +94,12 @@ describe('fileTypes utility', () => {
 
     it('returns false for archives, binaries, docx, etc.', () => {
       expect(isPreviewable('application/zip', 'files.zip')).toBe(false)
-      expect(isPreviewable('application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'contract.docx')).toBe(false)
+      expect(
+        isPreviewable(
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          'contract.docx',
+        ),
+      ).toBe(false)
       expect(isPreviewable('application/octet-stream', 'program.exe')).toBe(false)
       expect(isPreviewable('application/x-rar-compressed', 'backup.rar')).toBe(false)
     })
@@ -110,4 +115,3 @@ describe('fileTypes utility', () => {
     })
   })
 })
-

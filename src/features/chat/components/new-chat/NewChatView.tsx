@@ -20,7 +20,11 @@ export function NewChatView() {
 
   return (
     <main className="flex h-dvh w-full overflow-hidden bg-background text-foreground">
-      <SideNav active="messages" onOpenSettings={() => navigate(ROUTES.settings)} mobileBarVisible={false} />
+      <SideNav
+        active="messages"
+        onOpenSettings={() => navigate(ROUTES.settings)}
+        mobileBarVisible={false}
+      />
 
       <aside
         className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col border-r border-border bg-card md:w-88 md:flex-none lg:w-100"
@@ -35,10 +39,18 @@ export function NewChatView() {
         {pane === 'group' && <GroupWizard onBack={() => setPane('main')} onDone={backToMessages} />}
         {pane === 'requests' && <RequestsPane onBack={() => setPane('main')} />}
         {pane === 'username' && (
-          <FindUserPane mode="username" hint={t('chat.searchByUsernameHint')} onBack={() => setPane('main')} />
+          <FindUserPane
+            mode="username"
+            hint={t('chat.searchByUsernameHint')}
+            onBack={() => setPane('main')}
+          />
         )}
         {pane === 'email' && (
-          <FindUserPane mode="email" hint={t('chat.searchByEmailHint')} onBack={() => setPane('main')} />
+          <FindUserPane
+            mode="email"
+            hint={t('chat.searchByEmailHint')}
+            onBack={() => setPane('main')}
+          />
         )}
       </aside>
 

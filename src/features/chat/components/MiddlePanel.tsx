@@ -1,4 +1,15 @@
-import { CallIncoming01Icon as PhoneIncomingData, CallMissed01Icon as PhoneMissedData, CallOutgoing01Icon as PhoneOutgoingData, Search01Icon as SearchData, Search01Icon as SearchXData, Edit02Icon as SquarePenData, Add01Icon as PlusData, ChevronRightIcon as ChevronRightData, CallIcon as PhoneData, MultiplicationSignIcon as XData } from '@hugeicons/core-free-icons'
+import {
+  CallIncoming01Icon as PhoneIncomingData,
+  CallMissed01Icon as PhoneMissedData,
+  CallOutgoing01Icon as PhoneOutgoingData,
+  Search01Icon as SearchData,
+  Search01Icon as SearchXData,
+  Edit02Icon as SquarePenData,
+  Add01Icon as PlusData,
+  ChevronRightIcon as ChevronRightData,
+  CallIcon as PhoneData,
+  MultiplicationSignIcon as XData,
+} from '@hugeicons/core-free-icons'
 import { createIcon } from '@/components/icons/hugeIcon'
 const PhoneIncoming = createIcon(PhoneIncomingData)
 const PhoneMissed = createIcon(PhoneMissedData)
@@ -69,7 +80,11 @@ function ConversationAvatar({
         className={cn(
           'size-11',
           // Có story: bọc vòng kiểu Messenger (xanh chưa xem / xám đã xem)
-          story ? (story.viewed ? 'ring-2 ring-border ring-offset-2 ring-offset-card' : 'chat-story-ring') : 'ring-1 ring-border',
+          story
+            ? story.viewed
+              ? 'ring-2 ring-border ring-offset-2 ring-offset-card'
+              : 'chat-story-ring'
+            : 'ring-1 ring-border',
         )}
       />
       {online && (
@@ -104,7 +119,8 @@ export function MiddlePanel({
   const { t, i18n } = useTranslation()
   const { user } = useAuth()
   const navigate = useNavigate()
-  const resultCount = tab === 'messages' ? conversations.length : tab === 'calls' ? calls.length : stories.length
+  const resultCount =
+    tab === 'messages' ? conversations.length : tab === 'calls' ? calls.length : stories.length
   const meta: Record<ChatTab, { title: string; searchHint: string }> = {
     messages: { title: t('chat.messages'), searchHint: t('chat.searchConversations') },
     calls: { title: t('chat.calls'), searchHint: t('chat.searchCalls') },
@@ -116,7 +132,11 @@ export function MiddlePanel({
   const { data: requests } = requestsQuery
   useEffect(() => {
     if (requestsQuery.isError) {
-      toast.error(requestsQuery.error instanceof Error ? requestsQuery.error.message : t('chat.friendRequestsLoadError'))
+      toast.error(
+        requestsQuery.error instanceof Error
+          ? requestsQuery.error.message
+          : t('chat.friendRequestsLoadError'),
+      )
     }
   }, [requestsQuery.isError, requestsQuery.error, t])
   const incomingRequests = requests?.incoming?.length ?? 0
@@ -172,7 +192,10 @@ export function MiddlePanel({
 
       <div className="px-4 pb-2">
         <label className="chat-search group flex items-center gap-2 rounded-full border border-border bg-muted px-3.5 py-2 transition-all duration-150 focus-within:border-ring focus-within:bg-card">
-          <Search className="size-4.5 shrink-0 text-muted-foreground transition-colors group-focus-within:text-brand-ink" aria-hidden="true" />
+          <Search
+            className="size-4.5 shrink-0 text-muted-foreground transition-colors group-focus-within:text-brand-ink"
+            aria-hidden="true"
+          />
           <input
             value={query}
             onChange={(e) => onQuery(e.target.value)}
@@ -198,7 +221,11 @@ export function MiddlePanel({
         )}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3" role="list" aria-label={activeMeta.title}>
+      <div
+        className="min-h-0 flex-1 overflow-y-auto px-2 pb-3"
+        role="list"
+        aria-label={activeMeta.title}
+      >
         {tab === 'messages' && (
           <>
             {conversationsLoading ? (
@@ -207,7 +234,11 @@ export function MiddlePanel({
               <div className="px-4 py-5 text-sm">
                 <p className="font-semibold text-destructive">{t('chat.conversationsLoadError')}</p>
                 <p className="mt-1 text-muted-foreground">{conversationsError}</p>
-                <button type="button" onClick={onRetryConversations} className="mt-3 font-semibold text-brand-ink hover:underline">
+                <button
+                  type="button"
+                  onClick={onRetryConversations}
+                  className="mt-3 font-semibold text-brand-ink hover:underline"
+                >
                   {t('common.retry')}
                 </button>
               </div>
@@ -215,13 +246,14 @@ export function MiddlePanel({
               <div className="px-2 pt-4">
                 <EmptyState
                   title={query ? t('chat.noResults') : t('chat.noConversations')}
-                  message={
-                    query
-                      ? t('chat.noResultsFor', { query })
-                      : t('chat.startFirst')
-                  }
+                  message={query ? t('chat.noResultsFor', { query }) : t('chat.startFirst')}
                 />
-                {query && <SearchX className="mx-auto mt-2 size-6 text-muted-foreground" aria-hidden="true" />}
+                {query && (
+                  <SearchX
+                    className="mx-auto mt-2 size-6 text-muted-foreground"
+                    aria-hidden="true"
+                  />
+                )}
               </div>
             ) : (
               <ul className="flex flex-col gap-0.5">
@@ -229,7 +261,11 @@ export function MiddlePanel({
                   const isActive = c.id === selectedId
                   // Story còn hiệu lực 24h của contact 1-1 — bấm avatar là xem tin, bấm row là chat
                   const contactStory = !c.isGroup ? storyByName.get(c.name) : undefined
-                  const { text: previewText, isBold, showBlueDot } = getConversationPreview({
+                  const {
+                    text: previewText,
+                    isBold,
+                    showBlueDot,
+                  } = getConversationPreview({
                     conversation: c,
                     currentUserId: user?.id,
                     lang: i18n.language,
@@ -257,8 +293,15 @@ export function MiddlePanel({
                         />
                         <span className="min-w-0 flex-1">
                           <span className="flex items-baseline justify-between gap-2">
-                            <span className="truncate text-sm font-semibold text-foreground">{c.name}</span>
-                            <span className={cn('shrink-0 text-[11px]', isBold ? 'font-semibold text-foreground' : 'text-muted-foreground')}>
+                            <span className="truncate text-sm font-semibold text-foreground">
+                              {c.name}
+                            </span>
+                            <span
+                              className={cn(
+                                'shrink-0 text-[11px]',
+                                isBold ? 'font-semibold text-foreground' : 'text-muted-foreground',
+                              )}
+                            >
                               {c.time}
                             </span>
                           </span>
@@ -311,11 +354,15 @@ export function MiddlePanel({
                     <div className="chat-item flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 transition-colors duration-150 hover:bg-muted">
                       <UserAvatar name={call.name} className="size-11" />
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold text-foreground">{call.name}</p>
+                        <p className="truncate text-sm font-semibold text-foreground">
+                          {call.name}
+                        </p>
                         <p
                           className={cn(
                             'mt-0.5 flex items-center gap-1.5 text-xs',
-                            call.direction === 'missed' ? 'font-medium text-destructive' : 'text-muted-foreground',
+                            call.direction === 'missed'
+                              ? 'font-medium text-destructive'
+                              : 'text-muted-foreground',
                           )}
                         >
                           {call.direction === 'missed' ? (
@@ -325,7 +372,11 @@ export function MiddlePanel({
                           ) : (
                             <PhoneOutgoing className="size-3.5" aria-hidden="true" />
                           )}
-                          {call.direction === 'missed' ? t('chat.missedCall') : call.direction === 'incoming' ? t('chat.incomingCall') : t('chat.outgoingCall')}
+                          {call.direction === 'missed'
+                            ? t('chat.missedCall')
+                            : call.direction === 'incoming'
+                              ? t('chat.incomingCall')
+                              : t('chat.outgoingCall')}
                           <span aria-hidden="true">·</span> {call.time}
                         </p>
                       </div>
@@ -346,7 +397,14 @@ export function MiddlePanel({
           </>
         )}
 
-        {tab === 'stories' && <StoriesTab stories={stories} activeStoryId={activeStoryId} onOpenStory={onOpenStory} onOpenCreate={() => navigate(ROUTES.storiesCreate)} />}
+        {tab === 'stories' && (
+          <StoriesTab
+            stories={stories}
+            activeStoryId={activeStoryId}
+            onOpenStory={onOpenStory}
+            onOpenCreate={() => navigate(ROUTES.storiesCreate)}
+          />
+        )}
       </div>
     </section>
   )
@@ -395,7 +453,10 @@ function StoriesTab({ stories, activeStoryId, onOpenStory, onOpenCreate }: Stori
           </span>
           {/* Chưa có tin: ô + nét đứt như Messenger — chỉ nút tạo, không phải chủ đề */}
           {!myStory && (
-            <span aria-hidden="true" className="grid size-14 shrink-0 place-items-center rounded-2xl border-2 border-dashed border-border bg-muted/40 text-muted-foreground">
+            <span
+              aria-hidden="true"
+              className="grid size-14 shrink-0 place-items-center rounded-2xl border-2 border-dashed border-border bg-muted/40 text-muted-foreground"
+            >
               <Plus className="size-5" />
             </span>
           )}
@@ -433,20 +494,26 @@ function StoriesTab({ stories, activeStoryId, onOpenStory, onOpenCreate }: Stori
                     : 'hover:translate-x-0.5 hover:bg-muted',
                 )}
               >
-              <UserAvatar
-                name={s.name}
-                src={s.authorAvatar}
-                className={cn(
-                  'size-11',
-                  s.viewed ? 'ring-2 ring-border ring-offset-2 ring-offset-card' : 'chat-story-ring',
-                )}
-              />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-semibold text-foreground">{storyDisplayName(s, t)}</span>
-                <span className="mt-0.5 block truncate text-xs text-muted-foreground">{storyTime(s, t('chat.now'))}</span>
-              </span>
-            </button>
-          </li>
+                <UserAvatar
+                  name={s.name}
+                  src={s.authorAvatar}
+                  className={cn(
+                    'size-11',
+                    s.viewed
+                      ? 'ring-2 ring-border ring-offset-2 ring-offset-card'
+                      : 'chat-story-ring',
+                  )}
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold text-foreground">
+                    {storyDisplayName(s, t)}
+                  </span>
+                  <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                    {storyTime(s, t('chat.now'))}
+                  </span>
+                </span>
+              </button>
+            </li>
           )
         })
       )}

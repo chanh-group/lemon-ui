@@ -77,7 +77,13 @@ let storyStore: StoryEntry[] = MOCK_STORIES.map((s, index) => ({
   reactionsCount: index === 0 ? 3 : 0,
   viewsCount: index === 0 ? 12 : 5,
   viewerReaction: null,
-  reactionsSummary: index === 0 ? [{ reaction: '❤️', count: 2 }, { reaction: '🔥', count: 1 }] : [],
+  reactionsSummary:
+    index === 0
+      ? [
+          { reaction: '❤️', count: 2 },
+          { reaction: '🔥', count: 1 },
+        ]
+      : [],
 }))
 
 const delay = (ms = 300) => new Promise<void>((r) => setTimeout(r, ms))
@@ -96,7 +102,10 @@ function formatRelativeTime(isoString: string): string {
   }
 }
 
-export function mapBackendStoryToEntry(item: BackendStoryResponse, currentUserId?: string): StoryEntry {
+export function mapBackendStoryToEntry(
+  item: BackendStoryResponse,
+  currentUserId?: string,
+): StoryEntry {
   const isMine = currentUserId ? item.userId === currentUserId : false
   return {
     id: item.id,
@@ -177,7 +186,12 @@ export async function listStories(currentUserId?: string): Promise<StoryEntry[]>
     const flattened: StoryEntry[] = []
 
     for (const group of raw) {
-      if (group && typeof group === 'object' && 'stories' in group && Array.isArray(group.stories)) {
+      if (
+        group &&
+        typeof group === 'object' &&
+        'stories' in group &&
+        Array.isArray(group.stories)
+      ) {
         for (const item of group.stories) {
           flattened.push({
             id: item.id,
@@ -210,7 +224,6 @@ export async function listStories(currentUserId?: string): Promise<StoryEntry[]>
     const res = await api.get<BackendStoryResponse[]>('/stories')
     return (res.data ?? []).map((item) => mapBackendStoryToEntry(item, currentUserId))
   }
-
 }
 
 /** Đăng tin dạng văn bản — nền cố định, không chủ đề/không tùy chọn kiểu chữ. */
@@ -284,7 +297,10 @@ export async function createMediaStory(payload: CreateMediaStoryPayload): Promis
 }
 
 /** Thả cảm xúc vào Story (❤️, 🔥, 😂, 😮, 😢, 👏, 👍). */
-export async function reactStory(storyId: string, reaction: StoryReactionType | string): Promise<{ success: boolean; reaction: string }> {
+export async function reactStory(
+  storyId: string,
+  reaction: StoryReactionType | string,
+): Promise<{ success: boolean; reaction: string }> {
   if (isAuthBypass()) {
     await delay(100)
     storyStore = storyStore.map((s) => {
@@ -299,10 +315,13 @@ export async function reactStory(storyId: string, reaction: StoryReactionType | 
     })
     return { success: true, reaction }
   }
-  const res = await api.post<{ id: string; emoji?: string; reaction?: string }>(`/stories/${storyId}/react`, {
-    emoji: reaction,
-    reaction,
-  })
+  const res = await api.post<{ id: string; emoji?: string; reaction?: string }>(
+    `/stories/${storyId}/react`,
+    {
+      emoji: reaction,
+      reaction,
+    },
+  )
   return { success: true, reaction: res.data?.emoji ?? res.data?.reaction ?? reaction }
 }
 
@@ -351,7 +370,10 @@ export async function getStoryReactions(storyId: string): Promise<StoryReactionI
 }
 
 /** Phản hồi (reply) story bằng tin nhắn, tự động gửi vào hội thoại 1:1 với tác giả. */
-export async function replyStory(storyId: string, payload: ReplyStoryPayload): Promise<StoryReplyResponse> {
+export async function replyStory(
+  storyId: string,
+  payload: ReplyStoryPayload,
+): Promise<StoryReplyResponse> {
   if (isAuthBypass()) {
     await delay(200)
     const story = storyStore.find((s) => s.id === storyId)
@@ -386,7 +408,9 @@ export async function replyStory(storyId: string, payload: ReplyStoryPayload): P
 /** Đánh dấu người dùng hiện tại đã xem Story. */
 export async function viewStory(storyId: string): Promise<{ success: boolean }> {
   if (isAuthBypass()) {
-    storyStore = storyStore.map((s) => (s.id === storyId ? { ...s, viewed: true, viewerHasViewed: true } : s))
+    storyStore = storyStore.map((s) =>
+      s.id === storyId ? { ...s, viewed: true, viewerHasViewed: true } : s,
+    )
     return { success: true }
   }
   await api.post(`/stories/${storyId}/view`)
@@ -408,9 +432,10 @@ export async function getStoryViews(storyId: string): Promise<StoryViewerItem[]>
   }
 }
 
-
 /** Thích story im lặng (silent like - chỉ hiện ở viewer list, không gửi tin nhắn DM). */
-export async function likeStory(storyId: string): Promise<{ success: boolean; reaction: string; kind: 'LIKE' }> {
+export async function likeStory(
+  storyId: string,
+): Promise<{ success: boolean; reaction: string; kind: 'LIKE' }> {
   if (isAuthBypass()) {
     await delay(100)
     storyStore = storyStore.map((s) => {
@@ -424,7 +449,9 @@ export async function likeStory(storyId: string): Promise<{ success: boolean; re
     })
     return { success: true, reaction: '❤️', kind: 'LIKE' }
   }
-  const res = await api.post<{ storyId: string; emoji: string; kind: 'LIKE' }>(`/stories/${storyId}/like`)
+  const res = await api.post<{ storyId: string; emoji: string; kind: 'LIKE' }>(
+    `/stories/${storyId}/like`,
+  )
   return { success: true, reaction: res.data?.emoji ?? '❤️', kind: 'LIKE' }
 }
 
@@ -500,7 +527,9 @@ export async function getMutedAuthors(): Promise<string[]> {
 }
 
 /** Lấy kho lưu trữ tin (archive) của người dùng hiện tại. */
-export async function getArchivedStories(cursor?: string): Promise<{ items: StoryEntry[]; nextCursor: string | null }> {
+export async function getArchivedStories(
+  cursor?: string,
+): Promise<{ items: StoryEntry[]; nextCursor: string | null }> {
   if (isAuthBypass()) {
     return { items: [], nextCursor: null }
   }

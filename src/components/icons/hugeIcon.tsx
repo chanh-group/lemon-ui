@@ -15,7 +15,14 @@ export type IconProps = ComponentProps<'svg'> & {
 
 export function createIcon(data: IconSvgElement) {
   function HugeIcon({ className, strokeWidth = 1.5, ...rest }: IconProps) {
-    return <HugeiconsIcon icon={data} strokeWidth={strokeWidth} className={cn('block', className)} {...rest} />
+    return (
+      <HugeiconsIcon
+        icon={data}
+        strokeWidth={strokeWidth}
+        className={cn('block', className)}
+        {...rest}
+      />
+    )
   }
   return HugeIcon
 }

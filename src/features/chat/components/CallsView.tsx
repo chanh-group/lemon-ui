@@ -1,4 +1,11 @@
-import { ArrowLeft01Icon as ArrowLeftData, CallIcon as PhoneData, Search01Icon as SearchData, CallIncoming01Icon as PhoneIncomingData, CallOutgoing01Icon as PhoneOutgoingData, CallMissed01Icon as PhoneXData } from '@hugeicons/core-free-icons'
+import {
+  ArrowLeft01Icon as ArrowLeftData,
+  CallIcon as PhoneData,
+  Search01Icon as SearchData,
+  CallIncoming01Icon as PhoneIncomingData,
+  CallOutgoing01Icon as PhoneOutgoingData,
+  CallMissed01Icon as PhoneXData,
+} from '@hugeicons/core-free-icons'
 import { createIcon } from '@/components/icons/hugeIcon'
 const ArrowLeft = createIcon(ArrowLeftData)
 const Phone = createIcon(PhoneData)
@@ -18,7 +25,11 @@ import type { CallEntry } from '../types/chat.types'
 import { SideNav } from './SideNav'
 import { CallsHeaderActions } from './CallsHeaderActions'
 
-const DIRECTION_KEYS = { incoming: 'chat.incomingCall', outgoing: 'chat.outgoingCall', missed: 'chat.missedCall' } as const
+const DIRECTION_KEYS = {
+  incoming: 'chat.incomingCall',
+  outgoing: 'chat.outgoingCall',
+  missed: 'chat.missedCall',
+} as const
 
 const DIRECTION_ICON = { incoming: PhoneIncoming, outgoing: PhoneOutgoing, missed: PhoneX } as const
 
@@ -35,7 +46,12 @@ function CallRow({ call }: { call: CallEntry }) {
       <UserAvatar name={call.name} className="size-11" />
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-semibold text-foreground">{call.name}</span>
-        <span className={cn('flex items-center gap-1 truncate text-[13px]', isMissed ? 'font-semibold text-destructive' : 'text-muted-foreground')}>
+        <span
+          className={cn(
+            'flex items-center gap-1 truncate text-[13px]',
+            isMissed ? 'font-semibold text-destructive' : 'text-muted-foreground',
+          )}
+        >
           <DirectionIcon className="size-3.5 shrink-0" aria-hidden="true" />
           {t(DIRECTION_KEYS[call.direction])} · {call.time}
         </span>
@@ -57,11 +73,16 @@ export function CallsView() {
   const [query, setQuery] = useState('')
 
   const conversationsQuery = useConversationsQuery()
-  const totalUnread = (conversationsQuery.data ?? []).reduce((n, conversation) => n + conversation.unread, 0)
+  const totalUnread = (conversationsQuery.data ?? []).reduce(
+    (n, conversation) => n + conversation.unread,
+    0,
+  )
 
   const calls = useMemo(() => {
     const q = query.trim().toLowerCase()
-    return MOCK_CALLS.filter((c) => !q || c.name.toLowerCase().includes(q) || c.time.toLowerCase().includes(q))
+    return MOCK_CALLS.filter(
+      (c) => !q || c.name.toLowerCase().includes(q) || c.time.toLowerCase().includes(q),
+    )
   }, [query])
 
   return (
@@ -74,7 +95,10 @@ export function CallsView() {
       />
 
       {/* Cột 2: Danh sách cuộc gọi */}
-      <aside className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col border-r border-border bg-card md:w-88 md:flex-none lg:w-100" aria-label={t('chat.calls')}>
+      <aside
+        className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col border-r border-border bg-card md:w-88 md:flex-none lg:w-100"
+        aria-label={t('chat.calls')}
+      >
         <header className="flex h-14 shrink-0 items-center justify-between gap-2 px-4 pt-3 pb-1 sm:px-5">
           <div className="flex items-center gap-2">
             <button
@@ -92,7 +116,10 @@ export function CallsView() {
 
         <div className="px-4 pb-2 sm:px-5">
           <label className="chat-search group flex items-center gap-2 rounded-full border border-border bg-muted px-3.5 py-2 transition-all duration-150 focus-within:border-ring focus-within:bg-card">
-            <Search className="size-4.5 shrink-0 text-muted-foreground transition-colors group-focus-within:text-brand-ink" aria-hidden="true" />
+            <Search
+              className="size-4.5 shrink-0 text-muted-foreground transition-colors group-focus-within:text-brand-ink"
+              aria-hidden="true"
+            />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -103,9 +130,15 @@ export function CallsView() {
           </label>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3" role="list" aria-label={t('chat.calls')}>
+        <div
+          className="min-h-0 flex-1 overflow-y-auto px-2 pb-3"
+          role="list"
+          aria-label={t('chat.calls')}
+        >
           {calls.length === 0 ? (
-            <p className="px-4 pt-6 text-center text-sm text-muted-foreground">{t('chat.noCalls')}</p>
+            <p className="px-4 pt-6 text-center text-sm text-muted-foreground">
+              {t('chat.noCalls')}
+            </p>
           ) : (
             <ul className="flex flex-col gap-0.5">
               {calls.map((call) => (
@@ -119,7 +152,10 @@ export function CallsView() {
       </aside>
 
       {/* Cột 3: Pane trống — Signal style */}
-      <section className="hidden h-full min-h-0 min-w-0 flex-1 flex-col items-center justify-center gap-3 p-8 text-center md:flex" aria-label={t('chat.calls')}>
+      <section
+        className="hidden h-full min-h-0 min-w-0 flex-1 flex-col items-center justify-center gap-3 p-8 text-center md:flex"
+        aria-label={t('chat.calls')}
+      >
         <span className="grid size-16 place-items-center rounded-3xl text-brand-ink">
           <Phone className="size-14" strokeWidth={1.25} aria-hidden="true" />
         </span>

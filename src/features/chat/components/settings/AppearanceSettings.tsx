@@ -1,5 +1,9 @@
 import { useTranslation } from 'react-i18next'
-import { GlobeIcon as GlobeData, Moon02Icon as MoonData, Sun02Icon as SunData } from '@hugeicons/core-free-icons'
+import {
+  GlobeIcon as GlobeData,
+  Moon02Icon as MoonData,
+  Sun02Icon as SunData,
+} from '@hugeicons/core-free-icons'
 import { createIcon } from '@/components/icons/hugeIcon'
 const Globe = createIcon(GlobeData)
 const Moon = createIcon(MoonData)

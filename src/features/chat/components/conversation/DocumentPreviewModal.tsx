@@ -35,7 +35,7 @@ export function DocumentPreviewModal({ attachment, onClose }: DocumentPreviewMod
     if (isTextDoc) {
       let isMounted = true
       const url = attachment.previewUrl || attachment.downloadUrl
-      
+
       fetch(url)
         .then(async (res) => {
           if (!res.ok) throw new Error(`HTTP ${res.status}`)

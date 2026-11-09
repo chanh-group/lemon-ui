@@ -36,7 +36,10 @@ interface PendingFile {
 interface MessageComposerProps {
   draft: string
   onDraftChange: (v: string) => void
-  onSubmit: (text: string, attachments?: MessageAttachmentInput[]) => boolean | void | Promise<boolean | void>
+  onSubmit: (
+    text: string,
+    attachments?: MessageAttachmentInput[],
+  ) => boolean | void | Promise<boolean | void>
   disabled?: boolean
   conversationId?: string
   onTypingStart?: () => void
@@ -185,11 +188,14 @@ export function MessageComposer({
 
         const sent = await onSubmit('', [attachmentInput])
         if (sent === false) {
-          setPendingFiles((prev) => [...prev, {
-            id: generateUUID(),
-            file,
-            uploadedAttachment: attachmentInput,
-          }])
+          setPendingFiles((prev) => [
+            ...prev,
+            {
+              id: generateUUID(),
+              file,
+              uploadedAttachment: attachmentInput,
+            },
+          ])
           toast.error(t('chat.voiceNoteFailed', 'Gửi tin nhắn thoại thất bại'))
           return
         }
@@ -245,7 +251,12 @@ export function MessageComposer({
       if (rawFile.type.startsWith('video/')) {
         try {
           if (rawFile.size > 15 * 1024 * 1024) {
-            toast.info(t('chat.optimizingVideo', { name: rawFile.name, defaultValue: `Đang tối ưu dung lượng video "${rawFile.name}"...` }))
+            toast.info(
+              t('chat.optimizingVideo', {
+                name: rawFile.name,
+                defaultValue: `Đang tối ưu dung lượng video "${rawFile.name}"...`,
+              }),
+            )
           }
           const compressed = await compressVideoIfNeeded(rawFile, { maxSizeBytes: MAX_FILE_SIZE })
           if (compressed instanceof File) {
@@ -258,7 +269,13 @@ export function MessageComposer({
       }
 
       if (fileToUse.size > MAX_FILE_SIZE) {
-        toast.error(t('chat.fileTooLarge', { fileName: fileToUse.name, fileSize: formatBytes(fileToUse.size), defaultValue: `Tệp "${fileToUse.name}" vượt quá giới hạn 25MB (${formatBytes(fileToUse.size)}).` }))
+        toast.error(
+          t('chat.fileTooLarge', {
+            fileName: fileToUse.name,
+            fileSize: formatBytes(fileToUse.size),
+            defaultValue: `Tệp "${fileToUse.name}" vượt quá giới hạn 25MB (${formatBytes(fileToUse.size)}).`,
+          }),
+        )
         continue
       }
 
@@ -353,7 +370,10 @@ export function MessageComposer({
           objectKey = presignRes.objectKey
         } catch (r2Err) {
           // 2. Nếu R2 trực tiếp lỗi CORS hoặc mạng (Failed to fetch), tự động fallback qua backend
-          console.warn('R2 direct upload encountered an error, falling back to backend upload proxy:', r2Err)
+          console.warn(
+            'R2 direct upload encountered an error, falling back to backend upload proxy:',
+            r2Err,
+          )
           const fallbackRes = await uploadFileViaBackend(file, kind, conversationId, file.name)
           objectKey = fallbackRes.objectKey
         }
@@ -367,9 +387,11 @@ export function MessageComposer({
           kind: kind.replace('CHAT_', '') as 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE',
         }
         attachments.push(attachment)
-        setPendingFiles((prev) => prev.map((pending) =>
-          pending.id === item.id ? { ...pending, uploadedAttachment: attachment } : pending,
-        ))
+        setPendingFiles((prev) =>
+          prev.map((pending) =>
+            pending.id === item.id ? { ...pending, uploadedAttachment: attachment } : pending,
+          ),
+        )
       }
 
       // 4. Gửi tin nhắn kèm danh sách attachments
@@ -383,13 +405,18 @@ export function MessageComposer({
       })
       setPendingFiles([])
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t('chat.uploadFailed', 'Tải tệp lên thất bại. Vui lòng thử lại.'))
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : t('chat.uploadFailed', 'Tải tệp lên thất bại. Vui lòng thử lại.'),
+      )
     } finally {
       setIsUploading(false)
     }
   }
 
-  const canSubmit = (draft.trim().length > 0 || pendingFiles.length > 0) && !disabled && !isUploading
+  const canSubmit =
+    (draft.trim().length > 0 || pendingFiles.length > 0) && !disabled && !isUploading
 
   return (
     <footer

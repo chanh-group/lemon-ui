@@ -1,11 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import {
-  ArchiveIcon,
-  ArrowLeft01Icon,
-  EyeIcon,
-  HeartIcon,
-} from '@hugeicons/core-free-icons'
+import { ArchiveIcon, ArrowLeft01Icon, EyeIcon, HeartIcon } from '@hugeicons/core-free-icons'
 import { createIcon } from '@/components/icons/hugeIcon'
 import { ROUTES } from '@/config/constants'
 import { StoryViewer } from '@/features/chat/components/StoryViewer'
@@ -71,10 +66,7 @@ export function StoriesArchivePage() {
             {isLoading ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                 {Array.from({ length: 6 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="aspect-[9/16] rounded-xl bg-[#252728] animate-pulse"
-                  />
+                  <div key={i} className="aspect-[9/16] rounded-xl bg-[#252728] animate-pulse" />
                 ))}
               </div>
             ) : items.length === 0 ? (
@@ -82,9 +74,12 @@ export function StoriesArchivePage() {
                 <div className="grid size-16 place-items-center rounded-full bg-[#252728] text-[#8a8d91] mb-3">
                   <Archive className="size-8" />
                 </div>
-                <p className="text-base font-semibold text-white">Chưa có tin nào trong kho lưu trữ</p>
+                <p className="text-base font-semibold text-white">
+                  Chưa có tin nào trong kho lưu trữ
+                </p>
                 <p className="text-xs text-[#b0b3b8] mt-1 max-w-sm">
-                  Khi bạn chia sẻ tin và bật tính năng tự động lưu trữ, các tin đã hết hạn sẽ xuất hiện ở đây.
+                  Khi bạn chia sẻ tin và bật tính năng tự động lưu trữ, các tin đã hết hạn sẽ xuất
+                  hiện ở đây.
                 </p>
               </div>
             ) : (

@@ -7,7 +7,11 @@ const Media = createIcon(MediaData)
 interface MediaStoryActorProps {
   onDiscard: () => void
   /** Nhận kèm captionText để gửi API. */
-  onShare: (mediaKind: 'photo' | 'gif' | 'sticker' | 'video', label: string, captionText: string) => void
+  onShare: (
+    mediaKind: 'photo' | 'gif' | 'sticker' | 'video',
+    label: string,
+    captionText: string,
+  ) => void
   isSharing: boolean
 }
 
@@ -50,7 +54,9 @@ export function MediaStoryEditor({ onDiscard, onShare, isSharing }: MediaStoryAc
             <span className="block truncate text-sm font-semibold text-foreground">
               {file ? file.name : t('chat.chooseMedia')}
             </span>
-            <span className="block truncate text-xs text-muted-foreground">{t('chat.chooseMediaHint')}</span>
+            <span className="block truncate text-xs text-muted-foreground">
+              {t('chat.chooseMediaHint')}
+            </span>
           </span>
           <input
             ref={fileInputRef}
@@ -74,10 +80,19 @@ export function MediaStoryEditor({ onDiscard, onShare, isSharing }: MediaStoryAc
       {/* Xem trước */}
       <div className="flex min-h-0 flex-col items-center justify-center gap-3 bg-background p-4">
         {objectUrl && !isVideo && (
-          <img src={objectUrl} alt={caption || t('chat.storyPreview')} className="aspect-[9/16] w-full max-w-60 rounded-2xl object-cover shadow-xl" />
+          <img
+            src={objectUrl}
+            alt={caption || t('chat.storyPreview')}
+            className="aspect-[9/16] w-full max-w-60 rounded-2xl object-cover shadow-xl"
+          />
         )}
         {objectUrl && isVideo && (
-          <video src={objectUrl} className="aspect-[9/16] w-full max-w-60 rounded-2xl object-cover shadow-xl" playsInline controls />
+          <video
+            src={objectUrl}
+            className="aspect-[9/16] w-full max-w-60 rounded-2xl object-cover shadow-xl"
+            playsInline
+            controls
+          />
         )}
         {!objectUrl ? (
           <button

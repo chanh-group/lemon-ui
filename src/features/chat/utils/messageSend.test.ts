@@ -16,10 +16,18 @@ describe('resolveSendMessageKind', () => {
   })
 
   it('uses TEXT for mixed attachment kinds', () => {
-    expect(resolveSendMessageKind(undefined, undefined, [
-      image,
-      { ...image, objectKey: 'video', fileName: 'video.mp4', mimeType: 'video/mp4', kind: 'VIDEO' },
-    ])).toBe('TEXT')
+    expect(
+      resolveSendMessageKind(undefined, undefined, [
+        image,
+        {
+          ...image,
+          objectKey: 'video',
+          fileName: 'video.mp4',
+          mimeType: 'video/mp4',
+          kind: 'VIDEO',
+        },
+      ]),
+    ).toBe('TEXT')
   })
 
   it('uses the attachment kind for a single uncaptained attachment', () => {

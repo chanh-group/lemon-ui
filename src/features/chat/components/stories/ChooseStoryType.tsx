@@ -1,5 +1,8 @@
 import { useTranslation } from 'react-i18next'
-import { ImagePlusIcon as MediaGlyphData, TextCreationIcon as TextGlyphData } from '@hugeicons/core-free-icons'
+import {
+  ImagePlusIcon as MediaGlyphData,
+  TextCreationIcon as TextGlyphData,
+} from '@hugeicons/core-free-icons'
 import { createIcon } from '@/components/icons/hugeIcon'
 const MediaGlyph = createIcon(MediaGlyphData)
 const TextGlyph = createIcon(TextGlyphData)
@@ -42,7 +45,9 @@ export function ChooseStoryType({ onPickMedia, onPickText }: ChooseStoryTypeProp
             <span className="grid size-20 place-items-center rounded-full bg-white/90 text-foreground shadow-md lg:size-24">
               <Icon className="size-8 lg:size-9" aria-hidden="true" />
             </span>
-            <span className="text-[13px] font-bold text-white drop-shadow-sm lg:text-base">{label}</span>
+            <span className="text-[13px] font-bold text-white drop-shadow-sm lg:text-base">
+              {label}
+            </span>
           </button>
         ))}
       </div>

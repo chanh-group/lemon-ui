@@ -17,7 +17,10 @@ export function formatTimeHHmm(dateStrOrObj?: string | Date | null): string {
 }
 
 /** Định dạng ngày hiển thị (Hôm nay, Hôm qua, hoặc DD/MM/YYYY) */
-export function formatDateLabel(dateStrOrObj?: string | Date | null, todayLabel = 'Hôm nay'): string {
+export function formatDateLabel(
+  dateStrOrObj?: string | Date | null,
+  todayLabel = 'Hôm nay',
+): string {
   if (!dateStrOrObj) return todayLabel
   const d = typeof dateStrOrObj === 'string' ? new Date(dateStrOrObj) : dateStrOrObj
   if (isNaN(d.getTime())) return todayLabel
@@ -46,9 +49,7 @@ export function formatDateLabel(dateStrOrObj?: string | Date | null, todayLabel 
 }
 
 /** Chuyển đổi từ ConversationResponse của Backend sang Conversation của UI */
-export function mapConversationResponse(
-  raw: ConversationResponse,
-): Conversation {
+export function mapConversationResponse(raw: ConversationResponse): Conversation {
   const isGroup = raw.kind === 'GROUP'
   const partner = raw.partner
   const name = isGroup
@@ -159,7 +160,7 @@ export function getConversationPreview({
   const isMe = Boolean(
     (currentUserId && lastMessageSenderId && lastMessageSenderId === currentUserId) ||
     preview.startsWith('Bạn: ') ||
-    preview.startsWith('You: ')
+    preview.startsWith('You: '),
   )
 
   const shortName = getShortName(name, lang)
@@ -219,10 +220,7 @@ export function getConversationPreview({
 }
 
 /** Chuyển đổi từ MessageResponse của Backend sang ChatMessage của UI */
-export function mapMessageResponse(
-  raw: MessageResponse,
-  currentUserId?: string,
-): ChatMessage {
+export function mapMessageResponse(raw: MessageResponse, currentUserId?: string): ChatMessage {
   const isRevoked = Boolean(raw.deletedAt)
   const isMe = currentUserId ? raw.senderId === currentUserId : false
 
@@ -251,9 +249,18 @@ export function mapMessageResponse(
     status: isMe ? 'sent' : undefined,
     reactions: raw.reactions,
     isForwarded: raw.isForwarded,
-    createdAt: typeof raw.createdAt === 'string' ? raw.createdAt : new Date(raw.createdAt).toISOString(),
-    editedAt: raw.editedAt ? (typeof raw.editedAt === 'string' ? raw.editedAt : new Date(raw.editedAt).toISOString()) : null,
-    deletedAt: raw.deletedAt ? (typeof raw.deletedAt === 'string' ? raw.deletedAt : new Date(raw.deletedAt).toISOString()) : null,
+    createdAt:
+      typeof raw.createdAt === 'string' ? raw.createdAt : new Date(raw.createdAt).toISOString(),
+    editedAt: raw.editedAt
+      ? typeof raw.editedAt === 'string'
+        ? raw.editedAt
+        : new Date(raw.editedAt).toISOString()
+      : null,
+    deletedAt: raw.deletedAt
+      ? typeof raw.deletedAt === 'string'
+        ? raw.deletedAt
+        : new Date(raw.deletedAt).toISOString()
+      : null,
   }
 }
 

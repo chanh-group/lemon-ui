@@ -1,4 +1,12 @@
-import { forwardRef, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import {
+  forwardRef,
+  useImperativeHandle,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+} from 'react'
 import { useTranslation } from 'react-i18next'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import {
@@ -69,7 +77,9 @@ function bubbleRadius(pos: number, total: number, isMe: boolean, hasMedia: boole
   if (total === 1) return isMe ? 'rounded-2xl rounded-br-md' : 'rounded-2xl rounded-bl-md'
   if (pos === 0) return isMe ? 'rounded-t-2xl rounded-b-md' : 'rounded-t-2xl rounded-b-md'
   if (pos === total - 1) {
-    return isMe ? `rounded-t-md rounded-b-2xl rounded-br-md${hasMedia ? '' : ' rounded-br-sm'}` : 'rounded-t-md rounded-b-2xl rounded-bl-sm'
+    return isMe
+      ? `rounded-t-md rounded-b-2xl rounded-br-md${hasMedia ? '' : ' rounded-br-sm'}`
+      : 'rounded-t-md rounded-b-2xl rounded-bl-sm'
   }
   return 'rounded-md'
 }
@@ -89,7 +99,9 @@ function MediaBubble({ label, kind }: { label: string; kind: ChatMessage['kind']
     <span
       className={cn(
         'flex aspect-video w-60 max-w-full flex-col items-center justify-center gap-1.5 rounded-xl text-xs font-medium',
-        isGif ? 'bg-foreground text-primary' : 'bg-linear-to-br from-primary via-secondary to-ring text-foreground',
+        isGif
+          ? 'bg-foreground text-primary'
+          : 'bg-linear-to-br from-primary via-secondary to-ring text-foreground',
       )}
     >
       <MediaIcon kind={kind} />
@@ -98,7 +110,13 @@ function MediaBubble({ label, kind }: { label: string; kind: ChatMessage['kind']
   )
 }
 
-function StoryReplyQuote({ preview, defaultAuthor }: { preview: NonNullable<ChatMessage['storyPreview']>; defaultAuthor: string }) {
+function StoryReplyQuote({
+  preview,
+  defaultAuthor,
+}: {
+  preview: NonNullable<ChatMessage['storyPreview']>
+  defaultAuthor: string
+}) {
   const { t } = useTranslation()
   const author = preview.authorName || defaultAuthor
   return (
@@ -241,7 +259,12 @@ function MessageRowView({
       {isMe && actionBar}
 
       {/* Single Message Box */}
-      <div className={cn('flex max-w-[78%] flex-col sm:max-w-[65%]', isMe ? 'items-end' : 'items-start')}>
+      <div
+        className={cn(
+          'flex max-w-[78%] flex-col sm:max-w-[65%]',
+          isMe ? 'items-end' : 'items-start',
+        )}
+      >
         <div
           className={cn(
             'w-fit max-w-full text-sm leading-relaxed wrap-break-word whitespace-pre-wrap',
@@ -250,12 +273,16 @@ function MessageRowView({
               : isMediaWithCaption
                 ? cn(
                     'p-0 overflow-hidden shadow-sm',
-                    isMe ? 'bg-secondary text-foreground' : 'border border-border bg-card text-foreground',
+                    isMe
+                      ? 'bg-secondary text-foreground'
+                      : 'border border-border bg-card text-foreground',
                     bubbleRadius(messageIndex, total, isMe, true),
                   )
                 : cn(
                     'px-3.5 py-2.5 shadow-sm',
-                    isMe ? 'bg-secondary text-foreground' : 'border border-border bg-card text-foreground',
+                    isMe
+                      ? 'bg-secondary text-foreground'
+                      : 'border border-border bg-card text-foreground',
                     bubbleRadius(messageIndex, total, isMe, msg.kind !== 'text'),
                   ),
           )}
@@ -298,9 +325,7 @@ function MessageRowView({
 
               {/* Render Text / Caption if present */}
               {msg.text && (
-                <div className={cn(isMediaWithCaption && 'px-3.5 py-2 text-sm')}>
-                  {msg.text}
-                </div>
+                <div className={cn(isMediaWithCaption && 'px-3.5 py-2 text-sm')}>{msg.text}</div>
               )}
 
               {/* Legacy fallback for media without attachments */}
@@ -355,7 +380,12 @@ function MessageRowView({
         )}
 
         {isLast && (
-          <span className={cn('mt-1 flex items-center gap-1 px-1 text-[11px] text-muted-foreground', isMe ? 'justify-end' : 'justify-start')}>
+          <span
+            className={cn(
+              'mt-1 flex items-center gap-1 px-1 text-[11px] text-muted-foreground',
+              isMe ? 'justify-end' : 'justify-start',
+            )}
+          >
             {msg.time}
             {isMe &&
               (msg.status === 'read' ? (
@@ -453,16 +483,20 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
     count: rows.length,
     getScrollElement: () => scrollRef.current,
     getItemKey: (index) => rows[index]?.key ?? index,
-    estimateSize: (index) => rows[index]?.kind === 'date' ? 48 : 80,
+    estimateSize: (index) => (rows[index]?.kind === 'date' ? 48 : 80),
     overscan: 10,
     anchorTo: 'end',
     followOnAppend: true,
     scrollEndThreshold: 120,
   })
 
-  useImperativeHandle(ref, () => ({
-    scrollToEnd: (behavior = 'auto') => virtualizer.scrollToEnd({ behavior }),
-  }), [virtualizer])
+  useImperativeHandle(
+    ref,
+    () => ({
+      scrollToEnd: (behavior = 'auto') => virtualizer.scrollToEnd({ behavior }),
+    }),
+    [virtualizer],
+  )
 
   useLayoutEffect(() => {
     if (rows.length === 0 || didInitialScroll.current) return
@@ -510,10 +544,20 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
 
   return (
     <>
-      <div className="relative w-full" style={virtualRows.length ? { height: virtualizer.getTotalSize() } : undefined}>
+      <div
+        className="relative w-full"
+        style={virtualRows.length ? { height: virtualizer.getTotalSize() } : undefined}
+      >
         {virtualRows.length === 0 && rows.length > 0
           ? rows.map((row) => (
-              <div key={row.key} className={row.kind === 'message' && row.messageIndex === row.group.messages.length - 1 ? 'pb-2' : 'pb-0'}>
+              <div
+                key={row.key}
+                className={
+                  row.kind === 'message' && row.messageIndex === row.group.messages.length - 1
+                    ? 'pb-2'
+                    : 'pb-0'
+                }
+              >
                 {renderRow(row)}
               </div>
             ))
@@ -527,7 +571,13 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
                   className="absolute top-0 left-0 w-full"
                   style={{ transform: `translateY(${virtualRow.start}px)` }}
                 >
-                  <div className={row.kind === 'message' && row.messageIndex === row.group.messages.length - 1 ? 'pb-2' : 'pb-0'}>
+                  <div
+                    className={
+                      row.kind === 'message' && row.messageIndex === row.group.messages.length - 1
+                        ? 'pb-2'
+                        : 'pb-0'
+                    }
+                  >
                     {renderRow(row)}
                   </div>
                 </div>

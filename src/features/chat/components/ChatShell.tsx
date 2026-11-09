@@ -63,10 +63,7 @@ export function ChatShell() {
   const lastTypingSentAt = useRef(0)
   const lastReadAttempt = useRef<string | null>(null)
 
-  const rawConversations = useMemo(
-    () => conversationsQuery.data ?? [],
-    [conversationsQuery.data],
-  )
+  const rawConversations = useMemo(() => conversationsQuery.data ?? [], [conversationsQuery.data])
 
   const q = query.trim().toLowerCase()
   const conversations = useMemo(
@@ -77,15 +74,16 @@ export function ChatShell() {
     [rawConversations, q],
   )
 
-  const calls = useMemo(
-    () => MOCK_CALLS.filter((c) => !q || c.name.toLowerCase().includes(q)),
-    [q],
-  )
+  const calls = useMemo(() => MOCK_CALLS.filter((c) => !q || c.name.toLowerCase().includes(q)), [q])
 
   const storiesQuery = useStoriesList(user?.id)
   useEffect(() => {
     if (storiesQuery.isError) {
-      toast.error(storiesQuery.error instanceof Error ? storiesQuery.error.message : t('chat.storiesLoadError'))
+      toast.error(
+        storiesQuery.error instanceof Error
+          ? storiesQuery.error.message
+          : t('chat.storiesLoadError'),
+      )
     }
   }, [storiesQuery.isError, storiesQuery.error, t])
   const stories = useMemo(
@@ -102,7 +100,8 @@ export function ChatShell() {
 
   // Fallback khi URL trỏ tới hội thoại không có trong trang inbox đầu tiên.
   const selectedFromList = rawConversations.find((c) => c.id === selectedId) ?? null
-  const needsConversationDetail = Boolean(selectedId) && !selectedFromList && !conversationsQuery.isPending
+  const needsConversationDetail =
+    Boolean(selectedId) && !selectedFromList && !conversationsQuery.isPending
   const conversationDetailQuery = useConversationQuery(selectedId, needsConversationDetail)
   const selected = selectedFromList ?? conversationDetailQuery.data ?? null
 
@@ -157,7 +156,10 @@ export function ChatShell() {
     markReadMutate({ conversationId: selectedId, lastReadMessageId: lastMessageId })
   }, [selectedId, lastMessageId, lastMessageConversationId, selectedUnread, markReadMutate])
 
-  const handleSend = async (text: string, attachments?: MessageAttachmentInput[]): Promise<boolean> => {
+  const handleSend = async (
+    text: string,
+    attachments?: MessageAttachmentInput[],
+  ): Promise<boolean> => {
     if (!selectedId) return false
     try {
       handleTypingStop()
@@ -201,7 +203,9 @@ export function ChatShell() {
           role="status"
           aria-live="polite"
         >
-          {connectionStatus === 'connecting' ? t('chat.realtimeConnecting') : t('chat.realtimeOffline')}
+          {connectionStatus === 'connecting'
+            ? t('chat.realtimeConnecting')
+            : t('chat.realtimeOffline')}
         </div>
       )}
       <SideNav
@@ -213,7 +217,8 @@ export function ChatShell() {
             setViewingStory(stories[0])
           }
           // Desktop giữ hội thoại đang mở trên URL; mobile quay về danh sách.
-          const targetPath = !isMdDown && selectedId ? conversationPath(selectedId) : ROUTES.messages
+          const targetPath =
+            !isMdDown && selectedId ? conversationPath(selectedId) : ROUTES.messages
           navigate(targetPath, { replace: true, state: { tab: nextTab } })
         }}
         totalUnread={totalUnread}
@@ -227,7 +232,7 @@ export function ChatShell() {
       {/* Panel B — danh sách (tin nhắn / cuộc gọi / story) */}
       <div
         className={cn(
-          (selectedId || (tab === 'stories' && viewingStory))
+          selectedId || (tab === 'stories' && viewingStory)
             ? 'hidden h-full min-h-0 md:flex md:h-full md:min-w-0'
             : 'flex h-full min-h-0 min-w-0 flex-1 md:flex-none',
           !sidebarOpen && 'hidden md:hidden',
@@ -258,7 +263,7 @@ export function ChatShell() {
       {/* Panel C — Hội thoại hoặc Story Viewer trực tiếp trên màn hình chính */}
       <div
         className={
-          (selectedId || (tab === 'stories' && viewingStory))
+          selectedId || (tab === 'stories' && viewingStory)
             ? 'flex h-full min-h-0 w-full min-w-0 flex-1'
             : 'hidden h-full min-h-0 w-full min-w-0 flex-1 md:flex'
         }
@@ -294,7 +299,9 @@ export function ChatShell() {
             conversation={selected}
             groups={groups}
             messagesLoading={messagesQuery.isPending}
-            messagesError={messagesQuery.isError && !messagesQuery.data ? messagesQuery.error.message : undefined}
+            messagesError={
+              messagesQuery.isError && !messagesQuery.data ? messagesQuery.error.message : undefined
+            }
             onRetryMessages={() => {
               void messagesQuery.refetch()
             }}
@@ -326,13 +333,18 @@ export function ChatShell() {
           >
             {restoringConversation ? (
               <>
-                <span className="size-8 animate-spin rounded-full border-2 border-border border-t-brand-ink" aria-hidden="true" />
+                <span
+                  className="size-8 animate-spin rounded-full border-2 border-border border-t-brand-ink"
+                  aria-hidden="true"
+                />
                 <p className="text-sm text-muted-foreground">{t('chat.loadingConversation')}</p>
               </>
             ) : (
               <>
                 <p className="text-sm font-semibold text-foreground">
-                  {restoreListError ? t('chat.conversationsLoadError') : t('chat.conversationNotFound')}
+                  {restoreListError
+                    ? t('chat.conversationsLoadError')
+                    : t('chat.conversationNotFound')}
                 </p>
                 <div className="flex items-center gap-2">
                   {restoreFailed && (

@@ -33,9 +33,7 @@ export function StorySettingsModal({ open, onOpenChange }: StorySettingsModalPro
     try {
       await updateSettings.mutateAsync({ viewedReceiptsEnabled: checked })
       toast.success(
-        checked
-          ? 'Đã bật biên nhận đã xem tin'
-          : 'Đã tắt biên nhận đã xem tin (chế độ ẩn danh)',
+        checked ? 'Đã bật biên nhận đã xem tin' : 'Đã tắt biên nhận đã xem tin (chế độ ẩn danh)',
       )
     } catch {
       toast.error('Không thể cập nhật cài đặt')
@@ -45,9 +43,7 @@ export function StorySettingsModal({ open, onOpenChange }: StorySettingsModalPro
   const handleToggleArchive = async (checked: boolean) => {
     try {
       await updateSettings.mutateAsync({ archiveEnabled: checked })
-      toast.success(
-        checked ? 'Đã bật tự động lưu trữ tin' : 'Đã tắt tự động lưu trữ tin',
-      )
+      toast.success(checked ? 'Đã bật tự động lưu trữ tin' : 'Đã tắt tự động lưu trữ tin')
     } catch {
       toast.error('Không thể cập nhật cài đặt')
     }
@@ -66,9 +62,7 @@ export function StorySettingsModal({ open, onOpenChange }: StorySettingsModalPro
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[480px] bg-[#1c1e21] text-white border-[#3a3b3c]">
         <DialogHeader>
-          <DialogTitle className="text-lg font-bold text-white">
-            Cài đặt tin (Stories)
-          </DialogTitle>
+          <DialogTitle className="text-lg font-bold text-white">Cài đặt tin (Stories)</DialogTitle>
           <DialogDescription className="text-xs text-[#b0b3b8]">
             Tuỳ chỉnh quyền riêng tư, biên nhận đã xem và lưu trữ tin
           </DialogDescription>
@@ -84,13 +78,11 @@ export function StorySettingsModal({ open, onOpenChange }: StorySettingsModalPro
             {/* Toggle 1: View receipts */}
             <div className="flex items-start justify-between gap-3 p-3 rounded-xl bg-[#252728]">
               <div className="space-y-1">
-                <p className="text-sm font-semibold text-white">
-                  Biên nhận đã xem (View Receipts)
-                </p>
+                <p className="text-sm font-semibold text-white">Biên nhận đã xem (View Receipts)</p>
                 <p className="text-xs text-[#b0b3b8] leading-relaxed">
-                  Khi bật, tác giả sẽ thấy bạn trong danh sách người đã xem. Khi tắt,
-                  bạn xem tin ẩn danh (không hiện tên trong danh sách của họ), đồng thời
-                  bạn cũng sẽ không thấy ai đã xem tin của mình.
+                  Khi bật, tác giả sẽ thấy bạn trong danh sách người đã xem. Khi tắt, bạn xem tin ẩn
+                  danh (không hiện tên trong danh sách của họ), đồng thời bạn cũng sẽ không thấy ai
+                  đã xem tin của mình.
                 </p>
               </div>
               <Switch
@@ -103,12 +95,10 @@ export function StorySettingsModal({ open, onOpenChange }: StorySettingsModalPro
             {/* Toggle 2: Archiving */}
             <div className="flex items-start justify-between gap-3 p-3 rounded-xl bg-[#252728]">
               <div className="space-y-1">
-                <p className="text-sm font-semibold text-white">
-                  Kho lưu trữ tin (Story Archive)
-                </p>
+                <p className="text-sm font-semibold text-white">Kho lưu trữ tin (Story Archive)</p>
                 <p className="text-xs text-[#b0b3b8] leading-relaxed">
-                  Tự động lưu tin vào kho lưu trữ sau khi hết hạn 24 giờ. Cảm xúc và tổng số
-                  lượt xem của tin sẽ được giữ lại vĩnh viễn.
+                  Tự động lưu tin vào kho lưu trữ sau khi hết hạn 24 giờ. Cảm xúc và tổng số lượt
+                  xem của tin sẽ được giữ lại vĩnh viễn.
                 </p>
               </div>
               <Switch
@@ -125,9 +115,7 @@ export function StorySettingsModal({ open, onOpenChange }: StorySettingsModalPro
               Tin đã ẩn ({mutedAuthors.length})
             </h3>
             {mutedAuthors.length === 0 ? (
-              <p className="text-xs text-[#8a8d91] italic px-1">
-                Bạn chưa ẩn tin của ai.
-              </p>
+              <p className="text-xs text-[#8a8d91] italic px-1">Bạn chưa ẩn tin của ai.</p>
             ) : (
               <div className="max-h-40 overflow-y-auto space-y-2 pr-1">
                 {mutedAuthors.map((authorId) => (

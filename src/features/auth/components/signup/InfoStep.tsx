@@ -1,7 +1,11 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { EyeIcon as EyeIconData, EyeOffIcon as EyeOffIconData, LoaderCircleIcon as Loader2IconData } from '@hugeicons/core-free-icons'
+import {
+  EyeIcon as EyeIconData,
+  EyeOffIcon as EyeOffIconData,
+  LoaderCircleIcon as Loader2IconData,
+} from '@hugeicons/core-free-icons'
 import { createIcon } from '@/components/icons/hugeIcon'
 const EyeIcon = createIcon(EyeIconData)
 const EyeOffIcon = createIcon(EyeOffIconData)
@@ -34,7 +38,12 @@ export function InfoStep({ email, isPending, attemptsLeft, onSubmit }: InfoStepP
 
   const form = useForm<SignupInfoInput>({
     resolver: zodResolver(signupInfoSchema),
-    defaultValues: { fullName: '', username: usernameFromEmail(email), password: '', confirmPassword: '' },
+    defaultValues: {
+      fullName: '',
+      username: usernameFromEmail(email),
+      password: '',
+      confirmPassword: '',
+    },
     mode: 'onBlur',
     reValidateMode: 'onChange',
   })

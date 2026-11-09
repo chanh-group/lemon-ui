@@ -1,4 +1,7 @@
-import { CircleCheckIcon as CheckCircleIconData, LockIcon as LockIconData } from '@hugeicons/core-free-icons'
+import {
+  CircleCheckIcon as CheckCircleIconData,
+  LockIcon as LockIconData,
+} from '@hugeicons/core-free-icons'
 import { createIcon } from '@/components/icons/hugeIcon'
 const CheckCircleIcon = createIcon(CheckCircleIconData)
 const LockIcon = createIcon(LockIconData)

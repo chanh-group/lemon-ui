@@ -2,7 +2,11 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import { ArrowLeft01Icon as BackData, ChevronRightIcon as ChevronRightData, Settings01Icon as GearData } from '@hugeicons/core-free-icons'
+import {
+  ArrowLeft01Icon as BackData,
+  ChevronRightIcon as ChevronRightData,
+  Settings01Icon as GearData,
+} from '@hugeicons/core-free-icons'
 import { createIcon } from '@/components/icons/hugeIcon'
 const Back = createIcon(BackData)
 const Gear = createIcon(GearData)
@@ -58,11 +62,18 @@ export function StoriesCreateView() {
     })
   }
 
-  const shareMediaPayload = (mediaKind: 'photo' | 'gif' | 'sticker' | 'video', label: string, captionText: string) =>
-    shareMedia({ mediaKind, label, captionText })
+  const shareMediaPayload = (
+    mediaKind: 'photo' | 'gif' | 'sticker' | 'video',
+    label: string,
+    captionText: string,
+  ) => shareMedia({ mediaKind, label, captionText })
   return (
     <main className="flex h-dvh w-full overflow-hidden bg-background pb-16 text-foreground md:pb-0">
-      <SideNav active="stories" onOpenSettings={() => navigate(ROUTES.settings)} mobileBarVisible={true} />
+      <SideNav
+        active="stories"
+        onOpenSettings={() => navigate(ROUTES.settings)}
+        mobileBarVisible={true}
+      />
 
       {/* Panel trái — "Tin của bạn" (kiểu Facebook) */}
       <div className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col border-r border-border bg-card md:w-88 md:flex-none">
@@ -75,7 +86,9 @@ export function StoriesCreateView() {
           >
             <Back className="size-5" aria-hidden="true" />
           </button>
-          <h1 className="text-lg font-bold tracking-tight text-foreground">{t('chat.yourStory')}</h1>
+          <h1 className="text-lg font-bold tracking-tight text-foreground">
+            {t('chat.yourStory')}
+          </h1>
           <button
             type="button"
             aria-label={t('chat.settingsTitle')}
@@ -103,7 +116,10 @@ export function StoriesCreateView() {
         {/* Trên mobile, panel lựa chọn nằm dưới thông tin tài khoản; panel desktop bị ẩn ở breakpoint md. */}
         {step === 'choose' && (
           <div className="min-h-0 flex-1 overflow-y-auto md:hidden">
-            <ChooseStoryType onPickMedia={() => setStep('media')} onPickText={() => setStep('text')} />
+            <ChooseStoryType
+              onPickMedia={() => setStep('media')}
+              onPickText={() => setStep('text')}
+            />
           </div>
         )}
 
@@ -128,10 +144,17 @@ export function StoriesCreateView() {
                       className="size-11"
                     />
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-semibold text-foreground">{storyDisplayName(s, t)}</span>
-                      <span className="mt-0.5 block truncate text-xs text-muted-foreground">{storyTime(s, t('chat.now'))}</span>
+                      <span className="block truncate text-sm font-semibold text-foreground">
+                        {storyDisplayName(s, t)}
+                      </span>
+                      <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                        {storyTime(s, t('chat.now'))}
+                      </span>
                     </span>
-                    <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                    <ChevronRight
+                      className="size-4 shrink-0 text-muted-foreground"
+                      aria-hidden="true"
+                    />
                   </button>
                 </li>
               ))}
@@ -146,11 +169,26 @@ export function StoriesCreateView() {
         className="hidden h-full min-h-0 min-w-0 flex-1 overflow-y-auto md:block"
       >
         <div className="mx-auto h-full w-full max-w-2xl">
-          {step === 'choose' && <ChooseStoryType onPickMedia={() => setStep('media')} onPickText={() => setStep('text')} />}
-          {step === 'text' && (
-            <TextStoryEditor onDiscard={() => setStep('choose')} onShare={shareText} isSharing={createText.isPending} />
+          {step === 'choose' && (
+            <ChooseStoryType
+              onPickMedia={() => setStep('media')}
+              onPickText={() => setStep('text')}
+            />
           )}
-          {step === 'media' && <MediaStoryEditor onDiscard={() => setStep('choose')} onShare={shareMediaPayload} isSharing={createMedia.isPending} />}
+          {step === 'text' && (
+            <TextStoryEditor
+              onDiscard={() => setStep('choose')}
+              onShare={shareText}
+              isSharing={createText.isPending}
+            />
+          )}
+          {step === 'media' && (
+            <MediaStoryEditor
+              onDiscard={() => setStep('choose')}
+              onShare={shareMediaPayload}
+              isSharing={createMedia.isPending}
+            />
+          )}
         </div>
       </section>
 
@@ -158,9 +196,17 @@ export function StoriesCreateView() {
       {showingEditor && (
         <div className="fixed inset-x-0 bottom-16 top-0 z-40 overflow-y-auto bg-background md:hidden">
           {step === 'text' ? (
-            <TextStoryEditor onDiscard={() => setStep('choose')} onShare={shareText} isSharing={createText.isPending} />
+            <TextStoryEditor
+              onDiscard={() => setStep('choose')}
+              onShare={shareText}
+              isSharing={createText.isPending}
+            />
           ) : (
-            <MediaStoryEditor onDiscard={() => setStep('choose')} onShare={shareMediaPayload} isSharing={createMedia.isPending} />
+            <MediaStoryEditor
+              onDiscard={() => setStep('choose')}
+              onShare={shareMediaPayload}
+              isSharing={createMedia.isPending}
+            />
           )}
         </div>
       )}

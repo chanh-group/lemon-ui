@@ -79,7 +79,10 @@ export function ProfileSettings() {
     try {
       await navigator.clipboard.writeText(value)
       setCopiedField(field)
-      window.setTimeout(() => setCopiedField((current) => (current === field ? null : current)), 1500)
+      window.setTimeout(
+        () => setCopiedField((current) => (current === field ? null : current)),
+        1500,
+      )
     } catch {
       setCopiedField(null)
     }
@@ -219,11 +222,21 @@ export function ProfileSettings() {
               await uploadBinaryToUrl(presignRes.uploadUrl, selectedFile, mimeType)
               avatarUrl = presignRes.avatarUrl
             } catch {
-              const fallback = await uploadFileViaBackend(selectedFile, 'USER_AVATAR', undefined, selectedFile.name)
+              const fallback = await uploadFileViaBackend(
+                selectedFile,
+                'USER_AVATAR',
+                undefined,
+                selectedFile.name,
+              )
               avatarUrl = fallback.avatarUrl
             }
           } else {
-            const fallback = await uploadFileViaBackend(selectedFile, 'USER_AVATAR', undefined, selectedFile.name)
+            const fallback = await uploadFileViaBackend(
+              selectedFile,
+              'USER_AVATAR',
+              undefined,
+              selectedFile.name,
+            )
             avatarUrl = fallback.avatarUrl
           }
           if (!avatarUrl) throw new Error(t('chat.profileUpdateFailed'))
@@ -281,9 +294,7 @@ export function ProfileSettings() {
 
   return (
     <div className="space-y-6 sm:space-y-8 animate-in fade-in duration-200">
-      <h2 className="text-center text-base font-bold text-foreground">
-        {t('chat.profile')}
-      </h2>
+      <h2 className="text-center text-base font-bold text-foreground">{t('chat.profile')}</h2>
 
       {/* Avatar Section */}
       <div className="flex flex-col items-center">
@@ -310,7 +321,9 @@ export function ProfileSettings() {
           {/* Full Name Row */}
           {isEditingName ? (
             <div className="flex flex-col gap-2 p-3.5">
-              <label className="text-xs font-medium text-muted-foreground">{t('chat.nameLabel')}</label>
+              <label className="text-xs font-medium text-muted-foreground">
+                {t('chat.nameLabel')}
+              </label>
               <div className="flex items-center gap-2">
                 <input
                   type="text"
@@ -355,8 +368,12 @@ export function ProfileSettings() {
               <div className="flex min-w-0 items-center gap-3.5">
                 <UserIcon className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
                 <div className="min-w-0">
-                  <span className="block text-xs font-medium text-muted-foreground">{t('chat.nameLabel')}</span>
-                  <span className="block truncate text-sm font-semibold text-foreground">{userName}</span>
+                  <span className="block text-xs font-medium text-muted-foreground">
+                    {t('chat.nameLabel')}
+                  </span>
+                  <span className="block truncate text-sm font-semibold text-foreground">
+                    {userName}
+                  </span>
                 </div>
               </div>
               <button
@@ -376,7 +393,9 @@ export function ProfileSettings() {
           {/* Bio Row */}
           {isEditingBio ? (
             <div className="flex flex-col gap-2 p-3.5">
-              <label className="text-xs font-medium text-muted-foreground">{t('chat.aboutLabel')}</label>
+              <label className="text-xs font-medium text-muted-foreground">
+                {t('chat.aboutLabel')}
+              </label>
               <textarea
                 value={bioDraft}
                 onChange={(e) => setBioDraft(e.target.value)}
@@ -395,7 +414,9 @@ export function ProfileSettings() {
                 <span
                   className={cn(
                     'text-[11px]',
-                    bioDraft.length > 500 ? 'text-destructive font-semibold' : 'text-muted-foreground',
+                    bioDraft.length > 500
+                      ? 'text-destructive font-semibold'
+                      : 'text-muted-foreground',
                   )}
                 >
                   {bioDraft.length}/500
@@ -430,7 +451,9 @@ export function ProfileSettings() {
               <div className="flex min-w-0 items-center gap-3.5">
                 <Pencil className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
                 <div className="min-w-0 flex-1">
-                  <span className="block text-xs font-medium text-muted-foreground">{t('chat.aboutLabel')}</span>
+                  <span className="block text-xs font-medium text-muted-foreground">
+                    {t('chat.aboutLabel')}
+                  </span>
                   <span
                     className={
                       user.bio
@@ -463,8 +486,12 @@ export function ProfileSettings() {
             <div className="flex min-w-0 items-center gap-3.5">
               <AtSign className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
               <div className="min-w-0">
-                <span className="block text-xs font-medium text-muted-foreground">{t('chat.usernameLabel')}</span>
-                <span className="block truncate text-sm font-semibold text-foreground">@{user.username}</span>
+                <span className="block text-xs font-medium text-muted-foreground">
+                  {t('chat.usernameLabel')}
+                </span>
+                <span className="block truncate text-sm font-semibold text-foreground">
+                  @{user.username}
+                </span>
               </div>
             </div>
             <button
@@ -487,8 +514,12 @@ export function ProfileSettings() {
             <div className="flex min-w-0 items-center gap-3.5">
               <Mail className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
               <div className="min-w-0">
-                <span className="block text-xs font-medium text-muted-foreground">{t('chat.emailLabel')}</span>
-                <span className="block truncate text-sm font-semibold text-foreground">{user.email}</span>
+                <span className="block text-xs font-medium text-muted-foreground">
+                  {t('chat.emailLabel')}
+                </span>
+                <span className="block truncate text-sm font-semibold text-foreground">
+                  {user.email}
+                </span>
               </div>
             </div>
             <button
@@ -506,12 +537,8 @@ export function ProfileSettings() {
           </div>
         </div>
 
-        <p className="mt-2 px-3 text-xs text-muted-foreground">
-          {t('chat.usernameSubtitle')}
-        </p>
-        <p className="mt-1 px-3 text-xs text-muted-foreground">
-          {t('chat.emailSubtitle')}
-        </p>
+        <p className="mt-2 px-3 text-xs text-muted-foreground">{t('chat.usernameSubtitle')}</p>
+        <p className="mt-1 px-3 text-xs text-muted-foreground">{t('chat.emailSubtitle')}</p>
       </div>
 
       {/* Đăng xuất — nút logout chính của mobile */}
@@ -529,7 +556,9 @@ export function ProfileSettings() {
       <Dialog open={isAvatarDialogOpen} onOpenChange={setIsAvatarDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-base font-bold">{t('chat.editPhotoDialogTitle')}</DialogTitle>
+            <DialogTitle className="text-base font-bold">
+              {t('chat.editPhotoDialogTitle')}
+            </DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground">
               {t('chat.editPhotoDialogDesc')}
             </DialogDescription>
@@ -590,7 +619,9 @@ export function ProfileSettings() {
                 <p className="text-xs font-semibold text-foreground">
                   {selectedFile ? selectedFile.name : t('chat.uploadFromDevice')}
                 </p>
-                <p className="mt-0.5 text-[11px] text-muted-foreground">{t('chat.dragOrClickPhoto')}</p>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
+                  {t('chat.dragOrClickPhoto')}
+                </p>
               </div>
             </div>
 

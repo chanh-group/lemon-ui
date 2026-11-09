@@ -373,7 +373,10 @@ export function StoryViewer({
                     story.background || TEXT_STORY_BG,
                   )}
                 >
-                  <BrandMark animated={false} className="size-16 sm:size-20 mb-6 drop-shadow-2xl opacity-95 transition-transform hover:scale-105" />
+                  <BrandMark
+                    animated={false}
+                    className="size-16 sm:size-20 mb-6 drop-shadow-2xl opacity-95 transition-transform hover:scale-105"
+                  />
                   <p className="text-xl sm:text-2xl md:text-3xl font-extrabold text-white leading-snug drop-shadow-xl max-w-xs px-2 wrap-break-word text-center">
                     {story.caption || t('chat.storyGreeting', { name: story.name })}
                   </p>
@@ -453,7 +456,9 @@ export function StoryViewer({
                         {authorTitle}
                       </p>
                       <span className="text-white/70 text-xs shrink-0">·</span>
-                      <span className="text-white/80 text-xs shrink-0">{story.time || t('chat.now')}</span>
+                      <span className="text-white/80 text-xs shrink-0">
+                        {story.time || t('chat.now')}
+                      </span>
                       <span title="Bạn bè" className="flex items-center">
                         <UserGroup className="size-3.5 text-white/75 shrink-0" />
                       </span>
@@ -475,7 +480,11 @@ export function StoryViewer({
                     aria-label={isMuted ? 'Bật âm thanh' : 'Tắt âm thanh'}
                     className="grid size-8 place-items-center rounded-full bg-black/40 hover:bg-black/60 text-white backdrop-blur-xs transition-colors cursor-pointer"
                   >
-                    {isMuted ? <VolumeMute className="size-4" /> : <VolumeHigh className="size-4" />}
+                    {isMuted ? (
+                      <VolumeMute className="size-4" />
+                    ) : (
+                      <VolumeHigh className="size-4" />
+                    )}
                   </button>
 
                   <button
@@ -498,7 +507,10 @@ export function StoryViewer({
                         <MoreHorizontal className="size-4" />
                       </button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-52 bg-[#242526] text-white border-[#3e4042]">
+                    <DropdownMenuContent
+                      align="end"
+                      className="w-52 bg-[#242526] text-white border-[#3e4042]"
+                    >
                       {!story.mine ? (
                         <>
                           <DropdownMenuItem
@@ -567,7 +579,10 @@ export function StoryViewer({
                   Tác giả đã tắt tính năng phản hồi
                 </div>
               ) : (
-                <form onSubmit={handleSendReply} className="w-[240px] sm:w-[280px] md:w-[300px] shrink-0">
+                <form
+                  onSubmit={handleSendReply}
+                  className="w-[240px] sm:w-[280px] md:w-[300px] shrink-0"
+                >
                   <label className="flex h-11 items-center rounded-full border border-white/35 bg-transparent hover:border-white/55 focus-within:border-white px-4 text-white text-sm transition-all shadow-md cursor-text">
                     <input
                       ref={replyInputRef}
@@ -622,18 +637,26 @@ export function StoryViewer({
                     >
                       {emoji === '👍' ? (
                         <span className="grid size-8 sm:size-9 place-items-center rounded-full bg-[#1877F2] text-white shadow-md">
-                          <svg className="size-4.5 sm:size-5 fill-white text-white" viewBox="0 0 24 24">
+                          <svg
+                            className="size-4.5 sm:size-5 fill-white text-white"
+                            viewBox="0 0 24 24"
+                          >
                             <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" />
                           </svg>
                         </span>
                       ) : emoji === '❤️' ? (
                         <span className="grid size-8 sm:size-9 place-items-center rounded-full bg-gradient-to-tr from-[#E41E3F] to-[#FA383E] text-white shadow-md">
-                          <svg className="size-4.5 sm:size-5 fill-white text-white" viewBox="0 0 24 24">
+                          <svg
+                            className="size-4.5 sm:size-5 fill-white text-white"
+                            viewBox="0 0 24 24"
+                          >
                             <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
                           </svg>
                         </span>
                       ) : (
-                        <span className="text-[26px] sm:text-[30px] leading-none select-none drop-shadow-sm">{emoji}</span>
+                        <span className="text-[26px] sm:text-[30px] leading-none select-none drop-shadow-sm">
+                          {emoji}
+                        </span>
                       )}
                     </button>
                   )
@@ -922,7 +945,10 @@ export function StoryViewer({
                     story.background || TEXT_STORY_BG,
                   )}
                 >
-                  <BrandMark animated={false} className="size-16 sm:size-20 mb-6 drop-shadow-2xl opacity-95 transition-transform hover:scale-105" />
+                  <BrandMark
+                    animated={false}
+                    className="size-16 sm:size-20 mb-6 drop-shadow-2xl opacity-95 transition-transform hover:scale-105"
+                  />
                   <p className="text-xl sm:text-2xl md:text-3xl font-extrabold text-white leading-snug drop-shadow-xl max-w-xs px-2 wrap-break-word text-center">
                     {story.caption || t('chat.storyGreeting', { name: story.name })}
                   </p>
@@ -1002,7 +1028,9 @@ export function StoryViewer({
                         {authorTitle}
                       </p>
                       <span className="text-white/70 text-xs shrink-0">·</span>
-                      <span className="text-white/80 text-xs shrink-0">{story.time || t('chat.now')}</span>
+                      <span className="text-white/80 text-xs shrink-0">
+                        {story.time || t('chat.now')}
+                      </span>
                       <span title="Bạn bè" className="flex items-center">
                         <UserGroup className="size-3.5 text-white/75 shrink-0" />
                       </span>
@@ -1024,7 +1052,11 @@ export function StoryViewer({
                     aria-label={isMuted ? 'Bật âm thanh' : 'Tắt âm thanh'}
                     className="grid size-8 place-items-center rounded-full bg-black/40 hover:bg-black/60 text-white backdrop-blur-xs transition-colors"
                   >
-                    {isMuted ? <VolumeMute className="size-4" /> : <VolumeHigh className="size-4" />}
+                    {isMuted ? (
+                      <VolumeMute className="size-4" />
+                    ) : (
+                      <VolumeHigh className="size-4" />
+                    )}
                   </button>
 
                   <button
@@ -1047,7 +1079,10 @@ export function StoryViewer({
                         <MoreHorizontal className="size-4" />
                       </button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-52 bg-[#242526] text-white border-[#3e4042]">
+                    <DropdownMenuContent
+                      align="end"
+                      className="w-52 bg-[#242526] text-white border-[#3e4042]"
+                    >
                       {!story.mine ? (
                         <>
                           <DropdownMenuItem
@@ -1118,7 +1153,10 @@ export function StoryViewer({
                   Tác giả đã tắt tính năng phản hồi
                 </div>
               ) : (
-                <form onSubmit={handleSendReply} className="w-[240px] sm:w-[280px] md:w-[300px] shrink-0">
+                <form
+                  onSubmit={handleSendReply}
+                  className="w-[240px] sm:w-[280px] md:w-[300px] shrink-0"
+                >
                   <label className="flex h-11 items-center rounded-full border border-white/35 bg-transparent hover:border-white/55 focus-within:border-white px-4 text-white text-sm transition-all shadow-md cursor-text">
                     <input
                       ref={replyInputRef}
@@ -1173,18 +1211,26 @@ export function StoryViewer({
                     >
                       {emoji === '👍' ? (
                         <span className="grid size-8 sm:size-9 place-items-center rounded-full bg-[#1877F2] text-white shadow-md">
-                          <svg className="size-4.5 sm:size-5 fill-white text-white" viewBox="0 0 24 24">
+                          <svg
+                            className="size-4.5 sm:size-5 fill-white text-white"
+                            viewBox="0 0 24 24"
+                          >
                             <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" />
                           </svg>
                         </span>
                       ) : emoji === '❤️' ? (
                         <span className="grid size-8 sm:size-9 place-items-center rounded-full bg-gradient-to-tr from-[#E41E3F] to-[#FA383E] text-white shadow-md">
-                          <svg className="size-4.5 sm:size-5 fill-white text-white" viewBox="0 0 24 24">
+                          <svg
+                            className="size-4.5 sm:size-5 fill-white text-white"
+                            viewBox="0 0 24 24"
+                          >
                             <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
                           </svg>
                         </span>
                       ) : (
-                        <span className="text-[26px] sm:text-[30px] leading-none select-none drop-shadow-sm">{emoji}</span>
+                        <span className="text-[26px] sm:text-[30px] leading-none select-none drop-shadow-sm">
+                          {emoji}
+                        </span>
                       )}
                     </button>
                   )

@@ -1,5 +1,10 @@
 import { useTranslation } from 'react-i18next'
-import { ChevronLeftIcon as ChevronLeftData, MoreVerticalIcon as MoreVerticalData, CallIcon as PhoneData, Video01Icon as VideoData } from '@hugeicons/core-free-icons'
+import {
+  ChevronLeftIcon as ChevronLeftData,
+  MoreVerticalIcon as MoreVerticalData,
+  CallIcon as PhoneData,
+  Video01Icon as VideoData,
+} from '@hugeicons/core-free-icons'
 import { createIcon } from '@/components/icons/hugeIcon'
 const ChevronLeft = createIcon(ChevronLeftData)
 const MoreVertical = createIcon(MoreVerticalData)
@@ -39,7 +44,12 @@ function TypingIndicator() {
   )
 }
 
-export function ConversationHeader({ conversation, showBack, onBack, isTyping }: ConversationHeaderProps) {
+export function ConversationHeader({
+  conversation,
+  showBack,
+  onBack,
+  isTyping,
+}: ConversationHeaderProps) {
   const { t } = useTranslation()
   const headerActions = [
     { label: t('chat.voiceCall'), icon: Phone },
@@ -48,7 +58,11 @@ export function ConversationHeader({ conversation, showBack, onBack, isTyping }:
   ]
 
   return (
-    <header className={cn('flex shrink-0 items-center gap-3 border-b border-border bg-card/95 px-3 py-2.5 backdrop-blur sm:px-5')}>
+    <header
+      className={cn(
+        'flex shrink-0 items-center gap-3 border-b border-border bg-card/95 px-3 py-2.5 backdrop-blur sm:px-5',
+      )}
+    >
       {showBack && (
         <button
           type="button"
@@ -67,7 +81,11 @@ export function ConversationHeader({ conversation, showBack, onBack, isTyping }:
           className="size-10"
         />
         {conversation.online && (
-          <span className="absolute right-0 bottom-0 size-2.5 rounded-full bg-success ring-2 ring-card" title={t('chat.online')} aria-hidden="true" />
+          <span
+            className="absolute right-0 bottom-0 size-2.5 rounded-full bg-success ring-2 ring-card"
+            title={t('chat.online')}
+            aria-hidden="true"
+          />
         )}
       </span>
       <div className="min-w-0 flex-1">

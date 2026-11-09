@@ -11,7 +11,8 @@ import vi from '@/locales/vi.json'
 import en from '@/locales/en.json'
 
 function makeMockT(lang: 'vi' | 'en') {
-  const dict = lang === 'vi' ? (vi.chat as Record<string, string>) : (en.chat as Record<string, string>)
+  const dict =
+    lang === 'vi' ? (vi.chat as Record<string, string>) : (en.chat as Record<string, string>)
   return (key: string, options?: Record<string, unknown>) => {
     const k = key.replace(/^chat\./, '')
     let val = dict[k] || key

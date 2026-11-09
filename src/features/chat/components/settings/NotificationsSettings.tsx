@@ -1,6 +1,9 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { BellIcon as BellData, Message02Icon as MessageCircleData } from '@hugeicons/core-free-icons'
+import {
+  BellIcon as BellData,
+  Message02Icon as MessageCircleData,
+} from '@hugeicons/core-free-icons'
 import { createIcon } from '@/components/icons/hugeIcon'
 const Bell = createIcon(BellData)
 const MessageCircle = createIcon(MessageCircleData)

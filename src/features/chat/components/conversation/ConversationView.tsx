@@ -61,7 +61,12 @@ export function ConversationView({
   const previousLatestMessageId = useRef<string | undefined>(undefined)
 
   useEffect(() => {
-    if (latestMessage?.id && previousLatestMessageId.current && latestMessage.id !== previousLatestMessageId.current && !latestMessage.fromMe) {
+    if (
+      latestMessage?.id &&
+      previousLatestMessageId.current &&
+      latestMessage.id !== previousLatestMessageId.current &&
+      !latestMessage.fromMe
+    ) {
       const el = scrollRef.current
       if (el && el.scrollHeight - el.scrollTop - el.clientHeight >= 120) setShowJump(true)
     }
@@ -97,7 +102,8 @@ export function ConversationView({
       isLoadingNewerMessages ||
       newerRequestPending.current ||
       olderRequestPending.current
-    ) return
+    )
+      return
     newerRequestPending.current = true
     void onLoadNewerMessages()
       .catch(() => toast.error(t('chat.messagesLoadError')))
@@ -118,7 +124,8 @@ export function ConversationView({
       el.scrollHeight - el.scrollTop - el.clientHeight < 250 &&
       hasNewerMessages &&
       !isLoadingNewerMessages
-    ) loadNewerMessages()
+    )
+      loadNewerMessages()
   }
 
   const submit = async (text: string, attachments?: MessageAttachmentInput[]) => {
@@ -132,7 +139,10 @@ export function ConversationView({
   }
 
   return (
-    <section aria-label={t('chat.conversationWith', { name: conversation.name })} className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col bg-background">
+    <section
+      aria-label={t('chat.conversationWith', { name: conversation.name })}
+      className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col bg-background"
+    >
       <ConversationHeader
         conversation={conversation}
         showBack={showBack}
@@ -141,26 +151,39 @@ export function ConversationView({
       />
 
       {/* Nội dung hội thoại */}
-      <div ref={scrollRef} onScroll={handleScroll} className="relative min-h-0 flex-1 overflow-y-auto px-3 py-4 sm:px-6">
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="relative min-h-0 flex-1 overflow-y-auto px-3 py-4 sm:px-6"
+      >
         {messagesLoading ? (
           <p className="py-6 text-center text-sm text-muted-foreground">{t('chat.pending')}</p>
         ) : messagesError ? (
           <div className="py-6 text-center text-sm">
             <p className="font-semibold text-destructive">{t('chat.messagesLoadError')}</p>
             <p className="mt-1 text-muted-foreground">{messagesError}</p>
-            <button type="button" onClick={onRetryMessages} className="mt-3 font-semibold text-brand-ink hover:underline">
+            <button
+              type="button"
+              onClick={onRetryMessages}
+              className="mt-3 font-semibold text-brand-ink hover:underline"
+            >
               {t('common.retry')}
             </button>
           </div>
         ) : groups.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center px-6 text-center">
-            <span className="mb-4 grid size-14 place-items-center rounded-full bg-primary/10 text-brand-ink" aria-hidden="true">
+            <span
+              className="mb-4 grid size-14 place-items-center rounded-full bg-primary/10 text-brand-ink"
+              aria-hidden="true"
+            >
               ✓
             </span>
             <h2 className="text-base font-semibold text-foreground">
               {t('chat.newConnectionTitle', { name: conversation.name })}
             </h2>
-            <p className="mt-1 max-w-sm text-sm text-muted-foreground">{t('chat.newConnectionPrompt')}</p>
+            <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+              {t('chat.newConnectionPrompt')}
+            </p>
           </div>
         ) : (
           <MessageList

@@ -14,7 +14,10 @@ export function SearchResultCard({ user, onMessage }: { user: ChatUser; onMessag
   const relationLoading = friends.isPending || requests.isPending
   const data = requests.data
   const isFriend = friends.data?.some((friend) => friend.id === user.id) ?? false
-  const isPending = data?.outgoing.some((r) => r.user.id === user.id) || data?.incoming.some((r) => r.user.id === user.id) || false
+  const isPending =
+    data?.outgoing.some((r) => r.user.id === user.id) ||
+    data?.incoming.some((r) => r.user.id === user.id) ||
+    false
 
   const displayName = user.name || user.username
 
@@ -47,7 +50,8 @@ export function SearchResultCard({ user, onMessage }: { user: ChatUser; onMessag
           onClick={() =>
             sendRequest.mutate(user.id, {
               onSuccess: () => toast.success(t('chat.friendRequestSent')),
-              onError: (error) => toast.error(error instanceof Error ? error.message : t('common.error')),
+              onError: (error) =>
+                toast.error(error instanceof Error ? error.message : t('common.error')),
             })
           }
           disabled={sendRequest.isPending}

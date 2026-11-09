@@ -26,7 +26,8 @@ import {
 import type { StoryReactionType } from '../types/chat.types'
 
 export const STORIES_KEY = queryKeys.chat.stories
-export const STORY_REACTIONS_KEY = (storyId: string) => [...STORIES_KEY, storyId, 'reactions'] as const
+export const STORY_REACTIONS_KEY = (storyId: string) =>
+  [...STORIES_KEY, storyId, 'reactions'] as const
 export const STORY_VIEWS_KEY = (storyId: string) => [...STORIES_KEY, storyId, 'views'] as const
 
 export function useStoriesList(currentUserId?: string) {
@@ -59,8 +60,13 @@ export function useCreateMediaStory() {
 export function useReactStory() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ storyId, reaction }: { storyId: string; reaction: StoryReactionType | string }) =>
-      reactStory(storyId, reaction),
+    mutationFn: ({
+      storyId,
+      reaction,
+    }: {
+      storyId: string
+      reaction: StoryReactionType | string
+    }) => reactStory(storyId, reaction),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: STORIES_KEY })
       queryClient.invalidateQueries({ queryKey: STORY_REACTIONS_KEY(variables.storyId) })

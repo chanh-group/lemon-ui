@@ -1,4 +1,11 @@
-import { ApertureIcon as ApertureData, Menu02Icon as ListData, Logout02Icon as LogOutData, Message02Icon as MessageCircleData, CallIcon as PhoneData, Settings04Icon as SettingsData } from '@hugeicons/core-free-icons'
+import {
+  ApertureIcon as ApertureData,
+  Menu02Icon as ListData,
+  Logout02Icon as LogOutData,
+  Message02Icon as MessageCircleData,
+  CallIcon as PhoneData,
+  Settings04Icon as SettingsData,
+} from '@hugeicons/core-free-icons'
 import { createIcon } from '@/components/icons/hugeIcon'
 const Aperture = createIcon(ApertureData)
 const List = createIcon(ListData)
@@ -26,13 +33,23 @@ interface SideNavProps {
   mobileBarVisible?: boolean
 }
 
-const TABS: Array<{ id: ChatTab; labelKey: string; icon: typeof MessageCircle; badge?: boolean }> = [
-  { id: 'messages', labelKey: 'chat.messages', icon: MessageCircle, badge: true },
-  { id: 'calls', labelKey: 'chat.calls', icon: Phone },
-  { id: 'stories', labelKey: 'chat.stories', icon: Aperture },
-]
+const TABS: Array<{ id: ChatTab; labelKey: string; icon: typeof MessageCircle; badge?: boolean }> =
+  [
+    { id: 'messages', labelKey: 'chat.messages', icon: MessageCircle, badge: true },
+    { id: 'calls', labelKey: 'chat.calls', icon: Phone },
+    { id: 'stories', labelKey: 'chat.stories', icon: Aperture },
+  ]
 
-export function SideNav({ active, onChange, totalUnread = 0, onOpenSettings, settingsActive, sidebarOpen = true, onToggleSidebar, mobileBarVisible = true }: SideNavProps) {
+export function SideNav({
+  active,
+  onChange,
+  totalUnread = 0,
+  onOpenSettings,
+  settingsActive,
+  sidebarOpen = true,
+  onToggleSidebar,
+  mobileBarVisible = true,
+}: SideNavProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const logout = useLogout()
@@ -73,7 +90,11 @@ export function SideNav({ active, onChange, totalUnread = 0, onOpenSettings, set
         <button
           type="button"
           aria-current={isActive ? 'page' : undefined}
-          aria-label={tab.badge && totalUnread > 0 ? `${label}, ${t('chat.unreadCount', { count: totalUnread })}` : label}
+          aria-label={
+            tab.badge && totalUnread > 0
+              ? `${label}, ${t('chat.unreadCount', { count: totalUnread })}`
+              : label
+          }
           onClick={() => handleTabClick(tab.id)}
           className={cn(
             'chat-nav-btn relative grid size-11 min-h-11 min-w-11 place-items-center rounded-2xl transition-all duration-150',
@@ -85,9 +106,7 @@ export function SideNav({ active, onChange, totalUnread = 0, onOpenSettings, set
         </button>
       )
       if (!options.withTooltip) {
-        return (
-          <span key={tab.id}>{button}</span>
-        )
+        return <span key={tab.id}>{button}</span>
       }
       return (
         <Tooltip key={tab.id}>
@@ -109,7 +128,9 @@ export function SideNav({ active, onChange, totalUnread = 0, onOpenSettings, set
         aria-current={settingsActive ? 'page' : undefined}
         className={cn(
           'grid size-11 min-h-11 min-w-11 place-items-center rounded-2xl transition-all duration-150',
-          settingsActive ? 'bg-secondary text-secondary-foreground ring-1.5 ring-ring' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+          settingsActive
+            ? 'bg-secondary text-secondary-foreground ring-1.5 ring-ring'
+            : 'text-muted-foreground hover:bg-muted hover:text-foreground',
         )}
       >
         <Settings className="size-6" aria-hidden="true" />

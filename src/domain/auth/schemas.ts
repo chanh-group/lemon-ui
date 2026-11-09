@@ -1,11 +1,7 @@
 import { z } from 'zod'
 import { PASSWORD_MIN_LENGTH } from '@/config/constants'
 
-const emailSchema = z
-  .string()
-  .trim()
-  .min(1, 'errors.required')
-  .email('errors.emailInvalid')
+const emailSchema = z.string().trim().min(1, 'errors.required').email('errors.emailInvalid')
 
 const passwordSchema = z
   .string()

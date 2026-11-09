@@ -19,7 +19,12 @@ export function TextStoryEditor({ onDiscard, onShare, isSharing }: TextStoryEdit
   return (
     <div className="flex h-full min-h-0 flex-col items-center justify-center gap-4 p-4">
       {/* Canvas tin — gõ thẳng lên như Facebook */}
-      <div className={cn('flex aspect-[9/16] w-full max-w-60 flex-col rounded-2xl bg-linear-to-br p-4 shadow-xl', TEXT_STORY_BG)}>
+      <div
+        className={cn(
+          'flex aspect-[9/16] w-full max-w-60 flex-col rounded-2xl bg-linear-to-br p-4 shadow-xl',
+          TEXT_STORY_BG,
+        )}
+      >
         <p className="text-[11px] font-medium text-white/80">{t('chat.storyPreview')}</p>
         <textarea
           value={text}

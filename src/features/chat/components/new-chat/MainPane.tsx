@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
-import { AtIcon as AtData, Mail01Icon as MailData, UserAdd01Icon as UserPlusData, UsersIcon as UsersGroupData } from '@hugeicons/core-free-icons'
+import {
+  AtIcon as AtData,
+  Mail01Icon as MailData,
+  UserAdd01Icon as UserPlusData,
+  UsersIcon as UsersGroupData,
+} from '@hugeicons/core-free-icons'
 import { createIcon } from '@/components/icons/hugeIcon'
 const At = createIcon(AtData)
 const Mail = createIcon(MailData)
@@ -16,7 +21,11 @@ import { Avatar, SectionLabel, SearchBox } from './kit'
 import { FriendRowMenu } from './FriendRowMenu'
 
 /** Màn chính: hành động nhanh + bạn bè + nhóm. */
-export function MainPane({ onOpenPane }: { onOpenPane: (pane: Exclude<NewChatPane, 'main'>) => void }) {
+export function MainPane({
+  onOpenPane,
+}: {
+  onOpenPane: (pane: Exclude<NewChatPane, 'main'>) => void
+}) {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const [query, setQuery] = useState('')
@@ -39,7 +48,11 @@ export function MainPane({ onOpenPane }: { onOpenPane: (pane: Exclude<NewChatPan
     [friendsQuery.data, q],
   )
   const groups = useMemo(
-    () => (conversationsQuery.data ?? []).filter((conversation) => conversation.isGroup && (!q || conversation.name.toLowerCase().includes(q))),
+    () =>
+      (conversationsQuery.data ?? []).filter(
+        (conversation) =>
+          conversation.isGroup && (!q || conversation.name.toLowerCase().includes(q)),
+      ),
     [conversationsQuery.data, q],
   )
 
@@ -76,10 +89,31 @@ export function MainPane({ onOpenPane }: { onOpenPane: (pane: Exclude<NewChatPan
         {/* Hành động nhanh */}
         <ul className="flex flex-col gap-0.5">
           {[
-            { key: 'group', icon: UsersGroup, label: t('chat.newChatActionGroup'), onClick: () => onOpenPane('group') },
-            { key: 'username', icon: At, label: t('chat.newChatByUsername'), onClick: () => onOpenPane('username') },
-            { key: 'email', icon: Mail, label: t('chat.newChatByEmail'), onClick: () => onOpenPane('email') },
-            { key: 'requests', icon: UserPlus, label: t('chat.friendRequests'), onClick: () => onOpenPane('requests'), badge: incoming.length },
+            {
+              key: 'group',
+              icon: UsersGroup,
+              label: t('chat.newChatActionGroup'),
+              onClick: () => onOpenPane('group'),
+            },
+            {
+              key: 'username',
+              icon: At,
+              label: t('chat.newChatByUsername'),
+              onClick: () => onOpenPane('username'),
+            },
+            {
+              key: 'email',
+              icon: Mail,
+              label: t('chat.newChatByEmail'),
+              onClick: () => onOpenPane('email'),
+            },
+            {
+              key: 'requests',
+              icon: UserPlus,
+              label: t('chat.friendRequests'),
+              onClick: () => onOpenPane('requests'),
+              badge: incoming.length,
+            },
           ].map(({ key, icon: Icon, label, onClick, badge }) => (
             <li key={key}>
               <button
@@ -87,7 +121,10 @@ export function MainPane({ onOpenPane }: { onOpenPane: (pane: Exclude<NewChatPan
                 onClick={onClick}
                 className="chat-item flex w-full items-center gap-3.5 rounded-2xl px-3 py-2.5 text-left transition-all duration-150 hover:translate-x-0.5 hover:bg-muted"
               >
-                <span className="grid size-11 shrink-0 place-items-center rounded-full bg-accent text-brand-ink" aria-hidden="true">
+                <span
+                  className="grid size-11 shrink-0 place-items-center rounded-full bg-accent text-brand-ink"
+                  aria-hidden="true"
+                >
                   <Icon className="size-5.5" aria-hidden="true" />
                 </span>
                 <span className="text-sm font-semibold text-foreground">{label}</span>
@@ -128,10 +165,18 @@ export function MainPane({ onOpenPane }: { onOpenPane: (pane: Exclude<NewChatPan
                 >
                   <Avatar name={friend.name} src={friend.avatarUrl} />
                   <span className="flex min-w-0 flex-1 items-center gap-1.5">
-                    <span className="truncate text-sm font-semibold text-foreground">{friend.name}</span>
-                    <span className="truncate text-xs text-muted-foreground">@{friend.username}</span>
+                    <span className="truncate text-sm font-semibold text-foreground">
+                      {friend.name}
+                    </span>
+                    <span className="truncate text-xs text-muted-foreground">
+                      @{friend.username}
+                    </span>
                   </span>
-                  <FriendRowMenu id={friend.id} name={friend.name} onMessage={() => openConversationWith(friend.id)} />
+                  <FriendRowMenu
+                    id={friend.id}
+                    name={friend.name}
+                    onMessage={() => openConversationWith(friend.id)}
+                  />
                 </div>
               </li>
             ))}
@@ -156,7 +201,9 @@ export function MainPane({ onOpenPane }: { onOpenPane: (pane: Exclude<NewChatPan
                   className="chat-item flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-all duration-150 hover:bg-muted"
                 >
                   <Avatar name={group.name} square />
-                  <span className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">{group.name}</span>
+                  <span className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">
+                    {group.name}
+                  </span>
                 </button>
               </li>
             ))}

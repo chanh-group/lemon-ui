@@ -1,5 +1,11 @@
 import { useEffect, useRef } from 'react'
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query'
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type InfiniteData,
+} from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { generateUUID } from '@/lib/utils'
@@ -72,7 +78,12 @@ export function useConversationMessagesQuery(conversationId: string | null) {
       if (!conversationId) {
         return Promise.resolve({ items: [], hasMore: false })
       }
-      return getConversationMessages(conversationId, pageParam.cursor, MESSAGE_PAGE_SIZE, pageParam.after)
+      return getConversationMessages(
+        conversationId,
+        pageParam.cursor,
+        MESSAGE_PAGE_SIZE,
+        pageParam.after,
+      )
     },
     initialPageParam: {} as MessagePageParam,
     getNextPageParam: (lastPage) =>
@@ -118,11 +129,15 @@ export function useConversationMessagesQuery(conversationId: string | null) {
     }
     initialPrefetches.current.add(conversationId)
     const prefetchOlderPages = async () => {
-      for (let pagesLoaded = pageCount; pagesLoaded < INITIAL_MESSAGE_BUFFER_PAGES; pagesLoaded += 1) {
+      for (
+        let pagesLoaded = pageCount;
+        pagesLoaded < INITIAL_MESSAGE_BUFFER_PAGES;
+        pagesLoaded += 1
+      ) {
         if (activeConversationId.current !== conversationId) return
-        const current = queryClient.getQueryData<InfiniteData<MessageTimelineResponse, MessagePageParam>>(
-          CHAT_QUERY_KEYS.messages(conversationId),
-        )
+        const current = queryClient.getQueryData<
+          InfiniteData<MessageTimelineResponse, MessagePageParam>
+        >(CHAT_QUERY_KEYS.messages(conversationId))
         if (!current?.pages.at(-1)?.hasMore) return
         const result = await fetchNextPage({ cancelRefetch: false })
         if (result.isError) {
@@ -134,32 +149,47 @@ export function useConversationMessagesQuery(conversationId: string | null) {
     void prefetchOlderPages().catch((error: unknown) => {
       toast.error(error instanceof Error ? error.message : t('chat.messagesLoadError'))
     })
-  }, [conversationId, fetchNextPage, isFetchingNextPage, latestPage?.hasMore, pageCount, queryClient, t])
+  }, [
+    conversationId,
+    fetchNextPage,
+    isFetchingNextPage,
+    latestPage?.hasMore,
+    pageCount,
+    queryClient,
+    t,
+  ])
 
   useEffect(() => {
     const loadedMessages = data?.pages.flatMap((page) => page.items)
     if (!loadedMessages?.length) return
     const loadedIds = new Set(loadedMessages.map((message) => message.id))
-    const loadedClientIds = new Set(loadedMessages.flatMap((message) => message.clientMsgId ? [message.clientMsgId] : []))
+    const loadedClientIds = new Set(
+      loadedMessages.flatMap((message) => (message.clientMsgId ? [message.clientMsgId] : [])),
+    )
     queryClient.setQueryData<MessageResponse[]>(
       CHAT_QUERY_KEYS.liveMessages(conversationId ?? 'none'),
-      (liveMessages) => liveMessages?.filter(
-        (message) => !loadedIds.has(message.id) && (!message.clientMsgId || !loadedClientIds.has(message.clientMsgId)),
-      ),
+      (liveMessages) =>
+        liveMessages?.filter(
+          (message) =>
+            !loadedIds.has(message.id) &&
+            (!message.clientMsgId || !loadedClientIds.has(message.clientMsgId)),
+        ),
     )
   }, [conversationId, data, queryClient])
 
   return { ...query, liveMessages: liveMessagesQuery.data }
 }
 
-export type SendMessageArg = string | {
-  body?: string
-  kind?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE' | 'SYSTEM'
-  attachments?: import('../types/chat.types').MessageAttachmentInput[]
-  isForwarded?: boolean
-  sourceMessageId?: string
-  targetConversationId?: string
-}
+export type SendMessageArg =
+  | string
+  | {
+      body?: string
+      kind?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE' | 'SYSTEM'
+      attachments?: import('../types/chat.types').MessageAttachmentInput[]
+      isForwarded?: boolean
+      sourceMessageId?: string
+      targetConversationId?: string
+    }
 
 /** Hook gửi tin nhắn mới */
 export function useSendMessageMutation(conversationId: string | null) {
@@ -167,69 +197,71 @@ export function useSendMessageMutation(conversationId: string | null) {
 
   return useMutation({
     mutationFn: async (arg: SendMessageArg) => {
-      const targetConversationId = typeof arg === 'string'
-        ? conversationId
-        : arg.targetConversationId ?? conversationId
+      const targetConversationId =
+        typeof arg === 'string' ? conversationId : (arg.targetConversationId ?? conversationId)
       if (!targetConversationId) throw new Error('No conversation selected')
       const clientMsgId = generateUUID()
-      const payload: SendMessageDto = typeof arg === 'string'
-        ? { body: arg, clientMsgId, kind: 'TEXT' }
-        : {
-            body: arg.body,
-            clientMsgId,
-            kind: resolveSendMessageKind(arg.body, arg.kind, arg.attachments),
-            attachments: arg.attachments,
-            isForwarded: arg.isForwarded,
-            sourceMessageId: arg.sourceMessageId,
-          }
+      const payload: SendMessageDto =
+        typeof arg === 'string'
+          ? { body: arg, clientMsgId, kind: 'TEXT' }
+          : {
+              body: arg.body,
+              clientMsgId,
+              kind: resolveSendMessageKind(arg.body, arg.kind, arg.attachments),
+              attachments: arg.attachments,
+              isForwarded: arg.isForwarded,
+              sourceMessageId: arg.sourceMessageId,
+            }
       return sendMessage(targetConversationId, payload)
     },
     onSuccess: (newMessage: MessageResponse, arg: SendMessageArg) => {
-      const targetConversationId = typeof arg === 'string'
-        ? conversationId
-        : arg.targetConversationId ?? conversationId
+      const targetConversationId =
+        typeof arg === 'string' ? conversationId : (arg.targetConversationId ?? conversationId)
       if (!targetConversationId) return
 
       // Cập nhật messages cache
-      const timeline = queryClient.getQueryData<InfiniteData<MessageTimelineResponse, MessagePageParam>>(
-        CHAT_QUERY_KEYS.messages(targetConversationId),
-      )
+      const timeline = queryClient.getQueryData<
+        InfiniteData<MessageTimelineResponse, MessagePageParam>
+      >(CHAT_QUERY_KEYS.messages(targetConversationId))
       queryClient.setQueryData<MessageResponse[]>(
         CHAT_QUERY_KEYS.liveMessages(targetConversationId),
         (old) => {
-          const alreadyLoaded = timeline?.pages.some((page) => page.items.some((message) =>
-            message.id === newMessage.id ||
-            (message.clientMsgId && message.clientMsgId === newMessage.clientMsgId),
-          ))
-          const alreadyLive = old?.some((message) =>
-            message.id === newMessage.id ||
-            (message.clientMsgId && message.clientMsgId === newMessage.clientMsgId),
+          const alreadyLoaded = timeline?.pages.some((page) =>
+            page.items.some(
+              (message) =>
+                message.id === newMessage.id ||
+                (message.clientMsgId && message.clientMsgId === newMessage.clientMsgId),
+            ),
+          )
+          const alreadyLive = old?.some(
+            (message) =>
+              message.id === newMessage.id ||
+              (message.clientMsgId && message.clientMsgId === newMessage.clientMsgId),
           )
           return alreadyLoaded || alreadyLive ? old : [...(old ?? []), newMessage]
         },
       )
 
       // Cập nhật preview trong conversations cache
-      queryClient.setQueryData<ConversationResponse[]>(
-        CHAT_QUERY_KEYS.conversations,
-        (old) => {
-          if (!old) return old
-          return old.map((conv) => {
-            if (conv.id === targetConversationId) {
-              const preview = newMessage.body
-                ? newMessage.body
-                : (newMessage.attachments && newMessage.attachments.length > 0 ? '[attachment]' : '')
-              return {
-                ...conv,
-                lastMessagePreview: preview,
-                lastMessageSenderId: newMessage.senderId,
-                lastMessageAt: newMessage.createdAt,
-              }
+      queryClient.setQueryData<ConversationResponse[]>(CHAT_QUERY_KEYS.conversations, (old) => {
+        if (!old) return old
+        return old.map((conv) => {
+          if (conv.id === targetConversationId) {
+            const preview = newMessage.body
+              ? newMessage.body
+              : newMessage.attachments && newMessage.attachments.length > 0
+                ? '[attachment]'
+                : ''
+            return {
+              ...conv,
+              lastMessagePreview: preview,
+              lastMessageSenderId: newMessage.senderId,
+              lastMessageAt: newMessage.createdAt,
             }
-            return conv
-          })
-        },
-      )
+          }
+          return conv
+        })
+      })
     },
   })
 }
@@ -242,16 +274,13 @@ export function useCreateDirectChatMutation() {
     mutationFn: (targetUserId: string) => getOrCreateDirectConversation(targetUserId),
     onSuccess: (newConv: ConversationResponse) => {
       // Invalidate hoặc thêm vào danh sách conversations
-      queryClient.setQueryData<ConversationResponse[]>(
-        CHAT_QUERY_KEYS.conversations,
-        (old) => {
-          if (!old) return [newConv]
-          if (old.some((c) => c.id === newConv.id)) {
-            return old.map((c) => (c.id === newConv.id ? newConv : c))
-          }
-          return [newConv, ...old]
-        },
-      )
+      queryClient.setQueryData<ConversationResponse[]>(CHAT_QUERY_KEYS.conversations, (old) => {
+        if (!old) return [newConv]
+        if (old.some((c) => c.id === newConv.id)) {
+          return old.map((c) => (c.id === newConv.id ? newConv : c))
+        }
+        return [newConv, ...old]
+      })
     },
   })
 }
@@ -262,17 +291,19 @@ export function useMarkReadMutation() {
   const { t } = useTranslation()
 
   return useMutation({
-    mutationFn: ({ conversationId, lastReadMessageId }: { conversationId: string; lastReadMessageId: string }) =>
-      markConversationRead(conversationId, lastReadMessageId),
+    mutationFn: ({
+      conversationId,
+      lastReadMessageId,
+    }: {
+      conversationId: string
+      lastReadMessageId: string
+    }) => markConversationRead(conversationId, lastReadMessageId),
     onSuccess: (_, { conversationId }) => {
       // Reset unreadCount trong conversations cache
-      queryClient.setQueryData<ConversationResponse[]>(
-        CHAT_QUERY_KEYS.conversations,
-        (old) => {
-          if (!old) return old
-          return old.map((conv) => (conv.id === conversationId ? { ...conv, unreadCount: 0 } : conv))
-        },
-      )
+      queryClient.setQueryData<ConversationResponse[]>(CHAT_QUERY_KEYS.conversations, (old) => {
+        if (!old) return old
+        return old.map((conv) => (conv.id === conversationId ? { ...conv, unreadCount: 0 } : conv))
+      })
     },
     onError: (error) => {
       toast.error(error instanceof Error ? error.message : t('chat.markReadError'))
@@ -305,9 +336,12 @@ export function useRevokeMessageMutation(conversationId: string | null) {
       )
       queryClient.setQueryData<MessageResponse[]>(
         CHAT_QUERY_KEYS.liveMessages(conversationId),
-        (old) => old?.map((message) =>
-          message.id === revokedMsg.id ? { ...message, deletedAt: revokedMsg.deletedAt } : message,
-        ),
+        (old) =>
+          old?.map((message) =>
+            message.id === revokedMsg.id
+              ? { ...message, deletedAt: revokedMsg.deletedAt }
+              : message,
+          ),
       )
     },
   })

@@ -7,7 +7,7 @@ export function resolveSendMessageKind(
   requestedKind?: MessageKind,
   attachments?: MessageAttachmentInput[],
 ): MessageKind {
-  const attachmentKinds = new Set(attachments?.flatMap(({ kind }) => kind ? [kind] : []))
+  const attachmentKinds = new Set(attachments?.flatMap(({ kind }) => (kind ? [kind] : [])))
   if (body?.trim() || attachmentKinds.size > 1) return 'TEXT'
   return requestedKind ?? attachmentKinds.values().next().value ?? 'TEXT'
 }

@@ -63,4 +63,3 @@ export function getKindFromMime(
   if (isAudio(mimeType, fileName)) return 'CHAT_AUDIO'
   return 'CHAT_FILE'
 }
-

@@ -1,7 +1,11 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { EyeIcon as EyeIconData, EyeOffIcon as EyeOffIconData, LoaderCircleIcon as Loader2IconData } from '@hugeicons/core-free-icons'
+import {
+  EyeIcon as EyeIconData,
+  EyeOffIcon as EyeOffIconData,
+  LoaderCircleIcon as Loader2IconData,
+} from '@hugeicons/core-free-icons'
 import { createIcon } from '@/components/icons/hugeIcon'
 const EyeIcon = createIcon(EyeIconData)
 const EyeOffIcon = createIcon(EyeOffIconData)
@@ -71,7 +75,14 @@ export function LoginForm() {
               <FormLabel className="sr-only">{t('auth.password')}</FormLabel>
               <FormControl>
                 <div className="relative">
-                  <Input type={showPassword ? 'text' : 'password'} autoComplete="current-password" placeholder={t('auth.password')} className="pr-12" aria-invalid={!!form.formState.errors.password} {...field} />
+                  <Input
+                    type={showPassword ? 'text' : 'password'}
+                    autoComplete="current-password"
+                    placeholder={t('auth.password')}
+                    className="pr-12"
+                    aria-invalid={!!form.formState.errors.password}
+                    {...field}
+                  />
                   <button
                     type="button"
                     onClick={() => setShowPassword((p) => !p)}
@@ -79,7 +90,11 @@ export function LoginForm() {
                     aria-pressed={showPassword}
                     className="absolute inset-y-0 right-0 flex w-12 cursor-pointer items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
                   >
-                    {showPassword ? <EyeOffIcon className="size-4" /> : <EyeIcon className="size-4" />}
+                    {showPassword ? (
+                      <EyeOffIcon className="size-4" />
+                    ) : (
+                      <EyeIcon className="size-4" />
+                    )}
                   </button>
                 </div>
               </FormControl>
@@ -88,7 +103,12 @@ export function LoginForm() {
           )}
         />
 
-        <Button type="submit" size="lg" className="w-full cursor-pointer" disabled={login.isPending}>
+        <Button
+          type="submit"
+          size="lg"
+          className="w-full cursor-pointer"
+          disabled={login.isPending}
+        >
           {login.isPending ? (
             <>
               <Loader2Icon className="size-4 animate-spin" aria-hidden="true" />
@@ -111,7 +131,10 @@ export function LoginForm() {
           </button>
           <p className="text-muted-foreground">
             {t('auth.noAccount')}{' '}
-            <Link to={ROUTES.register} className="font-semibold text-brand-ink underline-offset-4 hover:underline">
+            <Link
+              to={ROUTES.register}
+              className="font-semibold text-brand-ink underline-offset-4 hover:underline"
+            >
               {t('auth.register')}
             </Link>
           </p>

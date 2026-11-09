@@ -5,10 +5,7 @@ import { LoginForm } from '@/features/auth/components/LoginForm'
 export function LoginPage() {
   const { t } = useTranslation()
   return (
-    <AuthLayout
-      title={t('pages.loginTitle')}
-      subtitle={t('pages.loginSubtitle')}
-    >
+    <AuthLayout title={t('pages.loginTitle')} subtitle={t('pages.loginSubtitle')}>
       <LoginForm />
     </AuthLayout>
   )

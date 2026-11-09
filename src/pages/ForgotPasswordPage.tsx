@@ -5,10 +5,7 @@ import { ForgotPasswordWizard } from '@/features/auth/components/forgot'
 export function ForgotPasswordPage() {
   const { t } = useTranslation()
   return (
-    <AuthLayout
-      title={t('pages.forgotTitle')}
-      subtitle={t('pages.forgotSubtitle')}
-    >
+    <AuthLayout title={t('pages.forgotTitle')} subtitle={t('pages.forgotSubtitle')}>
       <ForgotPasswordWizard />
     </AuthLayout>
   )

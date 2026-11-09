@@ -1,4 +1,10 @@
-import { CircleCheckIcon as CircleCheckIconData, InformationCircleIcon as InfoIconData, LoaderCircleIcon as Loader2IconData, CancelCircleIcon as OctagonXIconData, TriangleAlertIcon as TriangleAlertIconData } from '@hugeicons/core-free-icons'
+import {
+  CircleCheckIcon as CircleCheckIconData,
+  InformationCircleIcon as InfoIconData,
+  LoaderCircleIcon as Loader2IconData,
+  CancelCircleIcon as OctagonXIconData,
+  TriangleAlertIcon as TriangleAlertIconData,
+} from '@hugeicons/core-free-icons'
 import { createIcon } from '@/components/icons/hugeIcon'
 const CircleCheckIcon = createIcon(CircleCheckIconData)
 const InfoIcon = createIcon(InfoIconData)

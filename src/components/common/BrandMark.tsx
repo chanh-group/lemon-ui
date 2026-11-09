@@ -42,7 +42,14 @@ export function BrandMark({ className, animated = true }: BrandMarkProps) {
         <path d="M34 68 Q32 82 22 86 Q36 84 42 72 Z" fill="#00c853" />
 
         {/* Bóng sáng trên vỏ chanh */}
-        <ellipse cx="36" cy="33" rx="14" ry="8" fill="url(#lemonShine)" transform="rotate(-18 36 33)" />
+        <ellipse
+          cx="36"
+          cy="33"
+          rx="14"
+          ry="8"
+          fill="url(#lemonShine)"
+          transform="rotate(-18 36 33)"
+        />
 
         {/* 3 chấm "đang gõ" trong lòng bong bóng */}
         <circle

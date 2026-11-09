@@ -45,13 +45,18 @@ export function FindUserPane({
 
   return (
     <>
-      <PaneHeader title={mode === 'username' ? t('chat.newChatByUsername') : t('chat.newChatByEmail')} onBack={onBack} />
+      <PaneHeader
+        title={mode === 'username' ? t('chat.newChatByUsername') : t('chat.newChatByEmail')}
+        onBack={onBack}
+      />
       <div className="px-4 pb-2 sm:px-5">
         <label className="chat-search group flex items-center gap-2 rounded-lg border border-border bg-muted px-3.5 py-2.5 transition-all duration-150 focus-within:border-ring focus-within:bg-card">
           <input
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            placeholder={mode === 'username' ? t('chat.searchPeopleHint') : t('chat.searchByEmailHint')}
+            placeholder={
+              mode === 'username' ? t('chat.searchPeopleHint') : t('chat.searchByEmailHint')
+            }
             aria-label={hint}
             type={mode === 'email' ? 'email' : 'text'}
             inputMode="email"
@@ -66,7 +71,11 @@ export function FindUserPane({
         {users.length > 0 ? (
           <div className="space-y-2 px-2">
             {users.map((user) => (
-              <SearchResultCard key={user.id} user={user} onMessage={() => handleStartChat(user.id)} />
+              <SearchResultCard
+                key={user.id}
+                user={user}
+                onMessage={() => handleStartChat(user.id)}
+              />
             ))}
           </div>
         ) : finder.isError ? (
@@ -76,7 +85,9 @@ export function FindUserPane({
         ) : null}
       </div>
 
-      {finder.isPending && <p className="px-5 pb-4 text-xs text-muted-foreground">{t('chat.pending')}</p>}
+      {finder.isPending && (
+        <p className="px-5 pb-4 text-xs text-muted-foreground">{t('chat.pending')}</p>
+      )}
     </>
   )
 }

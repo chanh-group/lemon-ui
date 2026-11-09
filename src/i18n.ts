@@ -3,7 +3,8 @@ import { initReactI18next } from 'react-i18next'
 import vi from './locales/vi.json'
 import en from './locales/en.json'
 
-const savedLang = (typeof localStorage !== 'undefined' ? localStorage.getItem('lang') : null) || 'vi'
+const savedLang =
+  (typeof localStorage !== 'undefined' ? localStorage.getItem('lang') : null) || 'vi'
 
 i18n.use(initReactI18next).init({
   resources: { vi: { translation: vi }, en: { translation: en } },

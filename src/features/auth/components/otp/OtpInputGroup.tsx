@@ -62,12 +62,7 @@ export function OtpInputGroup({
   }
 
   return (
-    <div
-      className="flex gap-3"
-      onPaste={handlePaste}
-      role="group"
-      aria-label={t('auth.otpA11y')}
-    >
+    <div className="flex gap-3" onPaste={handlePaste} role="group" aria-label={t('auth.otpA11y')}>
       {Array.from({ length: OTP_LENGTH }, (_, index) => {
         const digit = value[index] ?? ''
         return (

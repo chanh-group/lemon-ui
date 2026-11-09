@@ -1,7 +1,13 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft01Icon as ArrowLeftData, BellIcon as BellData, LockPasswordIcon as LockData, PaletteIcon as PaletteData, User02Icon as UserIconData } from '@hugeicons/core-free-icons'
+import {
+  ArrowLeft01Icon as ArrowLeftData,
+  BellIcon as BellData,
+  LockPasswordIcon as LockData,
+  PaletteIcon as PaletteData,
+  User02Icon as UserIconData,
+} from '@hugeicons/core-free-icons'
 import { createIcon } from '@/components/icons/hugeIcon'
 const ArrowLeft = createIcon(ArrowLeftData)
 const Bell = createIcon(BellData)
@@ -38,7 +44,10 @@ export function SettingsView() {
   const userEmail = user?.email ?? ''
 
   const conversationsQuery = useConversationsQuery()
-  const totalUnread = (conversationsQuery.data ?? []).reduce((n, conversation) => n + conversation.unread, 0)
+  const totalUnread = (conversationsQuery.data ?? []).reduce(
+    (n, conversation) => n + conversation.unread,
+    0,
+  )
 
   const handleSelectSection = (section: SettingsSection) => {
     setActiveSection(section)
@@ -103,18 +112,26 @@ export function SettingsView() {
                 fallbackClassName="text-base font-bold text-foreground"
               />
             ) : (
-              <span className="size-12 shrink-0 animate-pulse rounded-full bg-muted" aria-hidden="true" />
+              <span
+                className="size-12 shrink-0 animate-pulse rounded-full bg-muted"
+                aria-hidden="true"
+              />
             )}
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-bold text-foreground">{userName}</p>
-              <p className="truncate text-xs text-muted-foreground">{userEmail || t('common.loading')}</p>
+              <p className="truncate text-xs text-muted-foreground">
+                {userEmail || t('common.loading')}
+              </p>
             </div>
           </button>
         </div>
 
         <div className="mx-3 border-t border-border" aria-hidden="true" />
 
-        <nav className="flex-1 space-y-1 overflow-y-auto p-3" aria-label={t('chat.settingsCategories')}>
+        <nav
+          className="flex-1 space-y-1 overflow-y-auto p-3"
+          aria-label={t('chat.settingsCategories')}
+        >
           {SECTIONS.map(({ id, labelKey, icon: Icon }) => (
             <button
               key={id}

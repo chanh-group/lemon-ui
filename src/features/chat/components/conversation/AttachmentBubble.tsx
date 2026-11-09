@@ -5,7 +5,15 @@ import { PauseIcon, PlayIcon } from '@hugeicons/core-free-icons'
 import { createIcon } from '@/components/icons/hugeIcon'
 import { cn } from '@/lib/utils'
 import type { MessageAttachmentItem } from '../../types/chat.types'
-import { formatBytes, isAudio, isImage, isPdf, isPreviewable, isText, isVideo } from '../../utils/fileTypes'
+import {
+  formatBytes,
+  isAudio,
+  isImage,
+  isPdf,
+  isPreviewable,
+  isText,
+  isVideo,
+} from '../../utils/fileTypes'
 
 const Play = createIcon(PlayIcon)
 const Pause = createIcon(PauseIcon)
@@ -96,17 +104,21 @@ export function AudioPlayerBubble({
         className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xs transition-transform active:scale-90 hover:opacity-95 cursor-pointer"
         aria-label={isPlaying ? 'Tạm dừng' : 'Phát âm thanh'}
       >
-        {isPlaying ? <Pause className="size-4 fill-current" /> : <Play className="size-4 ml-0.5 fill-current" />}
+        {isPlaying ? (
+          <Pause className="size-4 fill-current" />
+        ) : (
+          <Play className="size-4 ml-0.5 fill-current" />
+        )}
       </button>
 
       {/* Track & Time */}
       <div className="flex-1 min-w-0 flex flex-col justify-center">
         {!isVoiceNote && fileName && (
           <div className="flex items-center justify-between text-xs leading-none mb-1">
-            <span className="truncate font-medium text-foreground/90">
-              {fileName}
-            </span>
-            {sizeBytes ? <span className="ml-1 text-[10px] opacity-70">({formatBytes(sizeBytes)})</span> : null}
+            <span className="truncate font-medium text-foreground/90">{fileName}</span>
+            {sizeBytes ? (
+              <span className="ml-1 text-[10px] opacity-70">({formatBytes(sizeBytes)})</span>
+            ) : null}
           </div>
         )}
 
@@ -122,7 +134,7 @@ export function AudioPlayerBubble({
             className="w-full h-1.5 bg-foreground/15 rounded-full appearance-none cursor-pointer accent-primary"
           />
           <span className="tabular-nums font-mono text-[11px] text-foreground/80 shrink-0 min-w-[28px] text-right">
-            {formatSec(isPlaying ? currentTime : (duration || currentTime))}
+            {formatSec(isPlaying ? currentTime : duration || currentTime)}
           </span>
         </div>
       </div>
@@ -138,7 +150,9 @@ export function DocumentBadge({ ext }: { ext: string }) {
       <div className="absolute top-0 right-0 w-3 h-3 overflow-hidden">
         <div className="absolute -top-3 -right-3 w-6 h-6 bg-zinc-200 dark:bg-zinc-600 rotate-45 transform origin-bottom-left shadow-xs" />
       </div>
-      <span className="text-[10px] font-bold uppercase tracking-tight leading-none mb-0.5">{label}</span>
+      <span className="text-[10px] font-bold uppercase tracking-tight leading-none mb-0.5">
+        {label}
+      </span>
     </div>
   )
 }
@@ -166,7 +180,10 @@ export function AttachmentBubble({
     e.stopPropagation()
     if (isImg) {
       onOpenLightbox?.(attachment)
-    } else if (isPdf(attachment.mimeType, attachment.fileName) || isText(attachment.mimeType, attachment.fileName)) {
+    } else if (
+      isPdf(attachment.mimeType, attachment.fileName) ||
+      isText(attachment.mimeType, attachment.fileName)
+    ) {
       onOpenDocument?.(attachment)
     } else {
       // Non-previewable file -> Automatically trigger download as requested
@@ -190,10 +207,12 @@ export function AttachmentBubble({
 
   if (isImg) {
     return (
-      <div className={cn(
-        'group relative max-w-xs sm:max-w-sm overflow-hidden bg-muted/40 cursor-pointer',
-        hasCaption ? 'rounded-t-2xl' : 'rounded-2xl'
-      )}>
+      <div
+        className={cn(
+          'group relative max-w-xs sm:max-w-sm overflow-hidden bg-muted/40 cursor-pointer',
+          hasCaption ? 'rounded-t-2xl' : 'rounded-2xl',
+        )}
+      >
         <img
           src={attachment.previewUrl || attachment.downloadUrl}
           alt={attachment.fileName}
@@ -208,10 +227,12 @@ export function AttachmentBubble({
   if (isAud) {
     const src = attachment.previewUrl || attachment.downloadUrl
     return (
-      <div className={cn(
-        'w-full max-w-xs sm:max-w-sm',
-        hasCaption && 'pb-2 border-b border-foreground/15 mb-1.5'
-      )}>
+      <div
+        className={cn(
+          'w-full max-w-xs sm:max-w-sm',
+          hasCaption && 'pb-2 border-b border-foreground/15 mb-1.5',
+        )}
+      >
         <AudioPlayerBubble
           src={src}
           fileName={attachment.fileName}
@@ -223,10 +244,12 @@ export function AttachmentBubble({
 
   if (isVid) {
     return (
-      <div className={cn(
-        'group relative max-w-xs sm:max-w-sm overflow-hidden bg-black',
-        hasCaption ? 'rounded-t-2xl' : 'rounded-2xl'
-      )}>
+      <div
+        className={cn(
+          'group relative max-w-xs sm:max-w-sm overflow-hidden bg-black',
+          hasCaption ? 'rounded-t-2xl' : 'rounded-2xl',
+        )}
+      >
         <video
           src={attachment.previewUrl || attachment.downloadUrl}
           controls
@@ -249,7 +272,7 @@ export function AttachmentBubble({
       title={canPreview ? t('chat.preview', 'Xem trước') : t('chat.download', 'Tải xuống')}
       className={cn(
         'flex items-center gap-3 py-1 px-0.5 transition-opacity cursor-pointer hover:opacity-90 select-none min-w-[200px] max-w-xs sm:max-w-sm',
-        hasCaption && 'pb-2 border-b border-foreground/15 mb-1.5'
+        hasCaption && 'pb-2 border-b border-foreground/15 mb-1.5',
       )}
     >
       <DocumentBadge ext={ext} />
@@ -257,9 +280,7 @@ export function AttachmentBubble({
         <p className="truncate text-xs sm:text-sm font-semibold leading-tight hover:underline">
           {attachment.fileName}
         </p>
-        <p className="mt-0.5 text-[11px] opacity-75">
-          {formatBytes(attachment.sizeBytes)}
-        </p>
+        <p className="mt-0.5 text-[11px] opacity-75">{formatBytes(attachment.sizeBytes)}</p>
       </div>
     </div>
   )

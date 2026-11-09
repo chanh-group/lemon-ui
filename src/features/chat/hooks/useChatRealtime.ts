@@ -3,7 +3,12 @@ import { useQueryClient, type InfiniteData } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { useAuth } from '@/features/auth/api'
-import { connectChatSocket, disconnectChatSocket, getChatSocket, type SocketConnectionStatus } from '@/lib/socket'
+import {
+  connectChatSocket,
+  disconnectChatSocket,
+  getChatSocket,
+  type SocketConnectionStatus,
+} from '@/lib/socket'
 import { CHAT_QUERY_KEYS, type MessagePageParam } from './useChatQueries'
 import { getConversationMessages, markConversationRead } from '../api/chat.api'
 import { fetchMissedMessages } from '../utils/messageSync'
@@ -23,8 +28,9 @@ export function mergeMessagesByTime(
 ): MessageResponse[] {
   const messages = new Map(existing.map((message) => [message.id, message]))
   incoming.forEach((message) => messages.set(message.id, message))
-  return [...messages.values()].sort((left, right) =>
-    Date.parse(left.createdAt) - Date.parse(right.createdAt) || left.id.localeCompare(right.id),
+  return [...messages.values()].sort(
+    (left, right) =>
+      Date.parse(left.createdAt) - Date.parse(right.createdAt) || left.id.localeCompare(right.id),
   )
 }
 
@@ -62,16 +68,20 @@ export function useChatRealtime(activeConversationId: string | null) {
       void queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.conversations })
     }
     const syncMissedMessages = async (conversationId: string) => {
-      const live = queryClient.getQueryData<MessageResponse[]>(
-        CHAT_QUERY_KEYS.liveMessages(conversationId),
-      ) ?? []
-      const timeline = queryClient.getQueryData<InfiniteData<MessageTimelineResponse, MessagePageParam>>(
-        CHAT_QUERY_KEYS.messages(conversationId),
-      )
+      const live =
+        queryClient.getQueryData<MessageResponse[]>(CHAT_QUERY_KEYS.liveMessages(conversationId)) ??
+        []
+      const timeline = queryClient.getQueryData<
+        InfiniteData<MessageTimelineResponse, MessagePageParam>
+      >(CHAT_QUERY_KEYS.messages(conversationId))
       const cached = [...(timeline?.pages.flatMap((page) => page.items) ?? []), ...live]
-      const lastMessage = cached.sort((left, right) =>
-        Date.parse(left.createdAt) - Date.parse(right.createdAt) || left.id.localeCompare(right.id),
-      ).at(-1)
+      const lastMessage = cached
+        .sort(
+          (left, right) =>
+            Date.parse(left.createdAt) - Date.parse(right.createdAt) ||
+            left.id.localeCompare(right.id),
+        )
+        .at(-1)
       if (!lastMessage) {
         void queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.messages(conversationId) })
         return
@@ -93,7 +103,9 @@ export function useChatRealtime(activeConversationId: string | null) {
       setConnectionStatus('connected')
       refreshInbox()
       if (activeConversationId) {
-        void syncMissedMessages(activeConversationId).catch(() => toast.error(t('chat.messagesLoadError')))
+        void syncMissedMessages(activeConversationId).catch(() =>
+          toast.error(t('chat.messagesLoadError')),
+        )
       }
     }
     const handleDisconnect = () => {
@@ -109,7 +121,9 @@ export function useChatRealtime(activeConversationId: string | null) {
     socket.io.on('reconnect_attempt', handleReconnectAttempt)
     if (socket.connected && activeConversationId) {
       refreshInbox()
-      void syncMissedMessages(activeConversationId).catch(() => toast.error(t('chat.messagesLoadError')))
+      void syncMissedMessages(activeConversationId).catch(() =>
+        toast.error(t('chat.messagesLoadError')),
+      )
     } else if (socket.connected) {
       refreshInbox()
     }
@@ -123,48 +137,53 @@ export function useChatRealtime(activeConversationId: string | null) {
         convId === activeConversationId ||
         queryClient.getQueryData(CHAT_QUERY_KEYS.messages(convId))
       ) {
-        const timeline = queryClient.getQueryData<InfiniteData<MessageTimelineResponse, MessagePageParam>>(
-          CHAT_QUERY_KEYS.messages(convId),
-        )
-        queryClient.setQueryData<MessageResponse[]>(
-          CHAT_QUERY_KEYS.liveMessages(convId),
-          (old) => {
-            const alreadyLoaded = timeline?.pages.some((page) => page.items.some((message) =>
-              message.id === msg.id ||
-              (message.clientMsgId && message.clientMsgId === msg.clientMsgId),
-            ))
-            if (old?.some((message) =>
-              message.id === msg.id ||
-              (message.clientMsgId && message.clientMsgId === msg.clientMsgId),
-            ) || alreadyLoaded) return old
-            return [...(old ?? []), msg]
-          },
-        )
+        const timeline = queryClient.getQueryData<
+          InfiniteData<MessageTimelineResponse, MessagePageParam>
+        >(CHAT_QUERY_KEYS.messages(convId))
+        queryClient.setQueryData<MessageResponse[]>(CHAT_QUERY_KEYS.liveMessages(convId), (old) => {
+          const alreadyLoaded = timeline?.pages.some((page) =>
+            page.items.some(
+              (message) =>
+                message.id === msg.id ||
+                (message.clientMsgId && message.clientMsgId === msg.clientMsgId),
+            ),
+          )
+          if (
+            old?.some(
+              (message) =>
+                message.id === msg.id ||
+                (message.clientMsgId && message.clientMsgId === msg.clientMsgId),
+            ) ||
+            alreadyLoaded
+          )
+            return old
+          return [...(old ?? []), msg]
+        })
       }
 
       // Cập nhật conversations list
-      const conversations = queryClient.getQueryData<ConversationResponse[]>(CHAT_QUERY_KEYS.conversations)
+      const conversations = queryClient.getQueryData<ConversationResponse[]>(
+        CHAT_QUERY_KEYS.conversations,
+      )
       if (conversations?.some((conversation) => conversation.id === convId)) {
-        queryClient.setQueryData<ConversationResponse[]>(
-          CHAT_QUERY_KEYS.conversations,
-          (old) =>
-            old?.map((conversation) => {
-              if (conversation.id !== convId) return conversation
-              const isCurrentActive = convId === activeConversationId
-              const preview = msg.deletedAt
-                ? '[message-revoked]'
-                : (msg.body ?? (msg.attachments && msg.attachments.length > 0 ? '[attachment]' : ''))
-              return {
-                ...conversation,
-                lastMessagePreview: preview,
-                lastMessageSenderId: msg.senderId,
-                lastMessageAt: msg.createdAt,
-                unreadCount:
-                  isCurrentActive || msg.senderId === userId
-                    ? conversation.unreadCount
-                    : (conversation.unreadCount || 0) + 1,
-              }
-            }),
+        queryClient.setQueryData<ConversationResponse[]>(CHAT_QUERY_KEYS.conversations, (old) =>
+          old?.map((conversation) => {
+            if (conversation.id !== convId) return conversation
+            const isCurrentActive = convId === activeConversationId
+            const preview = msg.deletedAt
+              ? '[message-revoked]'
+              : (msg.body ?? (msg.attachments && msg.attachments.length > 0 ? '[attachment]' : ''))
+            return {
+              ...conversation,
+              lastMessagePreview: preview,
+              lastMessageSenderId: msg.senderId,
+              lastMessageAt: msg.createdAt,
+              unreadCount:
+                isCurrentActive || msg.senderId === userId
+                  ? conversation.unreadCount
+                  : (conversation.unreadCount || 0) + 1,
+            }
+          }),
         )
       } else {
         void queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.conversations })
@@ -187,7 +206,12 @@ export function useChatRealtime(activeConversationId: string | null) {
     }
 
     // B. Tin nhắn được chỉnh sửa
-    const handleMessageUpdated = (updated: { id: string; conversationId: string; body: string; editedAt: string }) => {
+    const handleMessageUpdated = (updated: {
+      id: string
+      conversationId: string
+      body: string
+      editedAt: string
+    }) => {
       queryClient.setQueryData<InfiniteData<MessageTimelineResponse, MessagePageParam>>(
         CHAT_QUERY_KEYS.messages(updated.conversationId),
         (old) => {
@@ -205,11 +229,12 @@ export function useChatRealtime(activeConversationId: string | null) {
       )
       queryClient.setQueryData<MessageResponse[]>(
         CHAT_QUERY_KEYS.liveMessages(updated.conversationId),
-        (old) => old?.map((message) =>
-          message.id === updated.id
-            ? { ...message, body: updated.body, editedAt: updated.editedAt }
-            : message,
-        ),
+        (old) =>
+          old?.map((message) =>
+            message.id === updated.id
+              ? { ...message, body: updated.body, editedAt: updated.editedAt }
+              : message,
+          ),
       )
 
       void queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.conversations })
@@ -234,9 +259,10 @@ export function useChatRealtime(activeConversationId: string | null) {
       )
       queryClient.setQueryData<MessageResponse[]>(
         CHAT_QUERY_KEYS.liveMessages(revoked.conversationId),
-        (old) => old?.map((message) =>
-          message.id === revoked.id ? { ...message, deletedAt: revoked.deletedAt } : message,
-        ),
+        (old) =>
+          old?.map((message) =>
+            message.id === revoked.id ? { ...message, deletedAt: revoked.deletedAt } : message,
+          ),
       )
 
       void queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.conversations })
@@ -275,12 +301,8 @@ export function useChatRealtime(activeConversationId: string | null) {
           }
         },
       )
-      queryClient.setQueryData<MessageResponse[]>(
-        CHAT_QUERY_KEYS.liveMessages(convId),
-        (old) =>
-          old?.map((m) =>
-            m.id === payload.messageId ? { ...m, reactions: payload.reactions } : m,
-          ),
+      queryClient.setQueryData<MessageResponse[]>(CHAT_QUERY_KEYS.liveMessages(convId), (old) =>
+        old?.map((m) => (m.id === payload.messageId ? { ...m, reactions: payload.reactions } : m)),
       )
     }
 

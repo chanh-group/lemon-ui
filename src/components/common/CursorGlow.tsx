@@ -82,15 +82,15 @@ export function CursorGlow({ className = 'size-56' }: CursorGlowProps) {
         currentX = targetX
         currentY = targetY
         render(0, 0)
-        root.dataset.state = "on"
-        root.style.opacity = "0.5"
+        root.dataset.state = 'on'
+        root.style.opacity = '0.5'
       }
       if (!rafId) rafId = requestAnimationFrame(tick)
     }
 
     const onLeave = () => {
-      root.dataset.state = "off"
-      root.style.opacity = "0"
+      root.dataset.state = 'off'
+      root.style.opacity = '0'
       started = false
     }
 
@@ -112,9 +112,21 @@ export function CursorGlow({ className = 'size-56' }: CursorGlowProps) {
       className="pointer-events-none fixed top-0 left-0 z-40 opacity-0 transition-opacity duration-300 will-change-transform"
       style={{ opacity: 0 }}
     >
-      <div ref={barRef} className={`absolute top-0 left-0 ${className}`} style={{ backgroundColor: GREEN }} />
-      <div ref={capStartRef} className={`absolute top-0 left-0 rounded-full ${className}`} style={{ backgroundColor: GREEN }} />
-      <div ref={capEndRef} className={`absolute top-0 left-0 rounded-full ${className}`} style={{ backgroundColor: GREEN }} />
+      <div
+        ref={barRef}
+        className={`absolute top-0 left-0 ${className}`}
+        style={{ backgroundColor: GREEN }}
+      />
+      <div
+        ref={capStartRef}
+        className={`absolute top-0 left-0 rounded-full ${className}`}
+        style={{ backgroundColor: GREEN }}
+      />
+      <div
+        ref={capEndRef}
+        className={`absolute top-0 left-0 rounded-full ${className}`}
+        style={{ backgroundColor: GREEN }}
+      />
     </div>
   )
 }

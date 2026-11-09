@@ -1,8 +1,17 @@
-import { CallAddIcon as PhoneCallData, Delete02Icon as DeleteData, MoreHorizontalIcon as DotsThreeData } from '@hugeicons/core-free-icons'
+import {
+  CallAddIcon as PhoneCallData,
+  Delete02Icon as DeleteData,
+  MoreHorizontalIcon as DotsThreeData,
+} from '@hugeicons/core-free-icons'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { createIcon } from '@/components/icons/hugeIcon'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 
 const PhoneCall = createIcon(PhoneCallData)
 const Delete = createIcon(DeleteData)
@@ -34,7 +43,10 @@ export function CallsHeaderActions({ onNewCall }: { onNewCall: () => void }) {
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="min-w-52">
-          <DropdownMenuItem variant="destructive" onClick={() => toast.info(t('chat.clearCallHistoryUnavailable'))}>
+          <DropdownMenuItem
+            variant="destructive"
+            onClick={() => toast.info(t('chat.clearCallHistoryUnavailable'))}
+          >
             <Delete />
             {t('chat.clearCallHistory')}
           </DropdownMenuItem>

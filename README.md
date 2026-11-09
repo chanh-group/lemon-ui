@@ -11,12 +11,15 @@ bun run dev
 
 ## Scripts
 
-| Lệnh | Mô tả |
-|-------|--------|
-| `bun run dev` | Chạy dev server |
-| `bun run build` | Build production |
-| `bun run lint` | Chạy oxlint |
-| `bun run preview` | Xem trước bản build |
+| Lệnh                | Mô tả               |
+| ------------------- | ------------------- |
+| `bun run dev`       | Chạy dev server     |
+| `bun run test`      | Chạy unit tests     |
+| `bun run build`     | Build production    |
+| `bun run lint`      | Chạy oxlint         |
+| `bun run fmt`       | Format code         |
+| `bun run fmt:check` | Kiểm tra format     |
+| `bun run preview`   | Xem trước bản build |
 
 ## Cấu trúc thư mục
 

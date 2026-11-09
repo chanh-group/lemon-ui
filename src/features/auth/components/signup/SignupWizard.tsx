@@ -1,10 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import {
-  MAX_OTP_ATTEMPTS,
-  OTP_TTL_MS,
-} from '@/config/constants'
+import { MAX_OTP_ATTEMPTS, OTP_TTL_MS } from '@/config/constants'
 import type { SignupStep, SignupInput, SignupInfoInput } from '@/domain/auth'
 import {
   useAutoSignin,
@@ -163,11 +160,7 @@ export function SignupWizard() {
 
       {step === 'email' && (
         <>
-          <EmailStep
-            defaultEmail={email}
-            isPending={requestOtp.isPending}
-            onSubmit={sendOtp}
-          />
+          <EmailStep defaultEmail={email} isPending={requestOtp.isPending} onSubmit={sendOtp} />
           <GoogleButton />
         </>
       )}

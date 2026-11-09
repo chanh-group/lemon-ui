@@ -164,7 +164,6 @@ export interface StoryEntry {
   myReactionKind?: 'REACTION' | 'LIKE' | null
 }
 
-
 /* ------------------------------------------------------------------ */
 /* Backend DTOs & Realtime Payloads (API_CHAT_1_1.md)                */
 /* ------------------------------------------------------------------ */

@@ -1,7 +1,11 @@
 import { useState } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { EyeIcon as EyeIconData, EyeOffIcon as EyeOffIconData, LoaderCircleIcon as Loader2IconData } from '@hugeicons/core-free-icons'
+import {
+  EyeIcon as EyeIconData,
+  EyeOffIcon as EyeOffIconData,
+  LoaderCircleIcon as Loader2IconData,
+} from '@hugeicons/core-free-icons'
 import { createIcon } from '@/components/icons/hugeIcon'
 const EyeIcon = createIcon(EyeIconData)
 const EyeOffIcon = createIcon(EyeOffIconData)
@@ -117,7 +121,11 @@ export function ResetPasswordStep({ email, isPending, onSubmit, onBack }: ResetP
                     aria-pressed={showPassword}
                     className="absolute inset-y-0 right-0 flex w-12 cursor-pointer items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
                   >
-                    {showPassword ? <EyeOffIcon className="size-4" /> : <EyeIcon className="size-4" />}
+                    {showPassword ? (
+                      <EyeOffIcon className="size-4" />
+                    ) : (
+                      <EyeIcon className="size-4" />
+                    )}
                   </button>
                 </div>
               </FormControl>
@@ -149,7 +157,11 @@ export function ResetPasswordStep({ email, isPending, onSubmit, onBack }: ResetP
                     aria-pressed={showConfirm}
                     className="absolute inset-y-0 right-0 flex w-12 cursor-pointer items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
                   >
-                    {showConfirm ? <EyeOffIcon className="size-4" /> : <EyeIcon className="size-4" />}
+                    {showConfirm ? (
+                      <EyeOffIcon className="size-4" />
+                    ) : (
+                      <EyeIcon className="size-4" />
+                    )}
                   </button>
                 </div>
               </FormControl>

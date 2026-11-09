@@ -74,7 +74,14 @@ export function OtpStep({
 
   return (
     <Form {...form}>
-      <form noValidate onSubmit={(e) => { e.preventDefault(); handleSubmit() }} className="flex w-full flex-col gap-3">
+      <form
+        noValidate
+        onSubmit={(e) => {
+          e.preventDefault()
+          handleSubmit()
+        }}
+        className="flex w-full flex-col gap-3"
+      >
         <p className="text-sm text-muted-foreground">
           {t('auth.otpSentTo', { email })}{' '}
           <button
@@ -144,7 +151,9 @@ export function OtpStep({
           disabled={!canResend || isResending}
           onClick={onResend}
         >
-          {canResend ? t('auth.resendOtp') : t('auth.resendIn', { time: formatCountdown(resendSecondsLeft) })}
+          {canResend
+            ? t('auth.resendOtp')
+            : t('auth.resendIn', { time: formatCountdown(resendSecondsLeft) })}
         </Button>
       </form>
     </Form>

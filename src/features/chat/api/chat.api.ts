@@ -87,7 +87,10 @@ export async function blockUser(userId: string): Promise<void> {
 }
 
 /** Tạo nhóm từ danh sách bạn bè đã chọn. */
-export async function createGroup(payload: { name: string; memberIds: string[] }): Promise<{ id: string; name: string }> {
+export async function createGroup(payload: {
+  name: string
+  memberIds: string[]
+}): Promise<{ id: string; name: string }> {
   const res = await api.post<{ id: string; name: string }>('/groups', payload)
   return res.data
 }
@@ -112,13 +115,20 @@ export async function getConversationById(id: string): Promise<ConversationRespo
 }
 
 /** Tạo hoặc lấy cuộc hội thoại 1-1 với một user. */
-export async function getOrCreateDirectConversation(targetUserId: string): Promise<ConversationResponse> {
+export async function getOrCreateDirectConversation(
+  targetUserId: string,
+): Promise<ConversationResponse> {
   const res = await api.post<ConversationResponse>('/conversations/direct', { targetUserId })
   return res.data
 }
 
 /** Lấy lịch sử tin nhắn trong cuộc hội thoại (phân trang con trỏ). */
-export async function getConversationMessages(conversationId: string, cursor?: string, limit = 30, after?: string): Promise<MessageTimelineResponse> {
+export async function getConversationMessages(
+  conversationId: string,
+  cursor?: string,
+  limit = 30,
+  after?: string,
+): Promise<MessageTimelineResponse> {
   const res = await api.get<MessageTimelineResponse>(`/conversations/${conversationId}/messages`, {
     params: { cursor, limit, after },
   })
@@ -126,13 +136,19 @@ export async function getConversationMessages(conversationId: string, cursor?: s
 }
 
 /** Gửi tin nhắn mới vào cuộc hội thoại. */
-export async function sendMessage(conversationId: string, payload: SendMessageDto): Promise<MessageResponse> {
+export async function sendMessage(
+  conversationId: string,
+  payload: SendMessageDto,
+): Promise<MessageResponse> {
   const res = await api.post<MessageResponse>(`/conversations/${conversationId}/messages`, payload)
   return res.data
 }
 
 /** Đánh dấu cuộc hội thoại đã đọc đến tin nhắn cụ thể. */
-export async function markConversationRead(conversationId: string, lastReadMessageId: string): Promise<void> {
+export async function markConversationRead(
+  conversationId: string,
+  lastReadMessageId: string,
+): Promise<void> {
   await api.post(`/conversations/${conversationId}/read`, { lastReadMessageId })
 }
 
@@ -153,7 +169,14 @@ export async function revokeMessage(messageId: string): Promise<MessageResponse>
 /* ------------------------------------------------------------------ */
 
 export interface PresignFileRequest {
-  kind: 'STORY_IMAGE' | 'STORY_VIDEO' | 'CHAT_IMAGE' | 'CHAT_VIDEO' | 'CHAT_AUDIO' | 'CHAT_FILE' | 'USER_AVATAR'
+  kind:
+    | 'STORY_IMAGE'
+    | 'STORY_VIDEO'
+    | 'CHAT_IMAGE'
+    | 'CHAT_VIDEO'
+    | 'CHAT_AUDIO'
+    | 'CHAT_FILE'
+    | 'USER_AVATAR'
   sizeBytes: number
   mimeType: string
   fileName?: string

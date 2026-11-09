@@ -6,7 +6,12 @@ const Check = createIcon(CheckData)
 const X = createIcon(XData)
 import { toast } from 'sonner'
 import { conversationPath } from '@/config/constants'
-import { useAcceptFriendRequest, useBlockUser, useCancelFriendRequest, useDeclineFriendRequest } from '../../hooks/useFriends'
+import {
+  useAcceptFriendRequest,
+  useBlockUser,
+  useCancelFriendRequest,
+  useDeclineFriendRequest,
+} from '../../hooks/useFriends'
 import type { FriendRequest } from '../../types/chat.types'
 import { Avatar } from './kit'
 
@@ -19,7 +24,8 @@ export function RequestRow({ request }: { request: FriendRequest }) {
   const block = useBlockUser()
   const isIncoming = request.direction === 'incoming'
 
-  const onError = (error: unknown) => toast.error(error instanceof Error ? error.message : t('common.error'))
+  const onError = (error: unknown) =>
+    toast.error(error instanceof Error ? error.message : t('common.error'))
   const handleAccept = () =>
     accept.mutate(request.id, {
       onSuccess: (conversation) => {

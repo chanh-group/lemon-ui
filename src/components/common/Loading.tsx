@@ -14,7 +14,10 @@ export function Loading({ label, className }: LoadingProps) {
     <div
       role="status"
       aria-live="polite"
-      className={cn('flex items-center justify-center gap-2 py-10 text-muted-foreground', className)}
+      className={cn(
+        'flex items-center justify-center gap-2 py-10 text-muted-foreground',
+        className,
+      )}
     >
       <Loader2Icon className="size-5 animate-spin" aria-hidden="true" />
       {label && <span className="text-sm">{label}</span>}
