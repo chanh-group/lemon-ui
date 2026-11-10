@@ -191,6 +191,8 @@ export interface ConversationResponse {
   lastMessageAt: string | null
   unreadCount: number
   createdAt: string
+  /** Client-side metadata, populated only when the corresponding message is known. */
+  lastMessageDetail?: MessageResponse
 }
 
 export interface MessageResponse {

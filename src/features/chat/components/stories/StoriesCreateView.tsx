@@ -19,8 +19,8 @@ import { useAuth } from '@/features/auth/api'
 import type { StoryEntry } from '../../types/chat.types'
 import type { CreateMediaStoryPayload, CreateTextStoryPayload } from '../../api/stories.api'
 import { useCreateMediaStory, useCreateTextStory, useStoriesList } from '../../hooks/useStories'
-import { StoryViewer } from '../StoryViewer'
 import { SideNav } from '../SideNav'
+import { StoryViewer } from '../StoryViewer'
 import { ChooseStoryType } from './ChooseStoryType'
 import { TextStoryEditor } from './TextStoryEditor'
 import { MediaStoryEditor } from './MediaStoryEditor'
@@ -116,7 +116,7 @@ export function StoriesCreateView() {
             name={userName}
             src={user?.avatarUrl}
             className="size-14"
-            fallbackClassName="text-base font-bold text-foreground"
+            fallbackClassName="text-base font-bold text-[#172b20]"
           />
           <div className="min-w-0">
             <p className="truncate text-sm font-bold text-foreground">{userName}</p>
@@ -222,7 +222,6 @@ export function StoriesCreateView() {
         </div>
       )}
 
-      {/* Xem lại tin của mình từ panel trái */}
       {viewingOwn && (
         <StoryViewer
           key={viewingOwn.id}

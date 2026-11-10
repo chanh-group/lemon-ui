@@ -26,7 +26,7 @@ import {
 } from '../api/chat.api'
 import { getKindFromMime, isImage } from '../utils/fileTypes'
 import { useAuth } from '@/features/auth/api'
-import { mapConversationResponse } from '../utils/chat.mapper'
+import { mapConversationResponse, updateConversationLastMessage } from '../utils/chat.mapper'
 import type {
   Conversation,
   ConversationResponse,
@@ -70,7 +70,7 @@ export function useConversationsQuery() {
   return useQuery<ConversationResponse[], Error, Conversation[]>({
     queryKey: CHAT_QUERY_KEYS.conversations,
     queryFn: () => getConversations(50),
-    select: (data) => data.map((item) => mapConversationResponse(item)),
+    select: (data) => data.map(mapConversationResponse),
     staleTime: 1000 * 30, // 30s
   })
 }
@@ -188,6 +188,31 @@ export function useConversationMessagesQuery(conversationId: string | null) {
   useEffect(() => {
     const loadedMessages = data?.pages.flatMap((page) => page.items)
     if (!loadedMessages?.length) return
+    // Hydrate only a unique newest loaded message that is not older than the
+    // inbox entry. Never infer metadata for conversations without a timeline.
+    const newestTime = Math.max(
+      ...loadedMessages.map((message) => Date.parse(message.createdAt)).filter(Number.isFinite),
+    )
+    const newest = loadedMessages.filter((message) => Date.parse(message.createdAt) === newestTime)
+    if (newest.length === 1) {
+      queryClient.setQueryData<ConversationResponse[]>(
+        CHAT_QUERY_KEYS.conversations,
+        (conversations) =>
+          conversations?.map((conversation) => {
+            if (conversation.id !== conversationId || !conversation.lastMessageAt)
+              return conversation
+            const inboxTime = Date.parse(conversation.lastMessageAt)
+            if (!Number.isFinite(inboxTime) || newestTime < inboxTime) return conversation
+            if (
+              newestTime === inboxTime &&
+              conversation.lastMessageDetail &&
+              conversation.lastMessageDetail.id !== newest[0].id
+            )
+              return conversation
+            return updateConversationLastMessage(conversation, newest[0])
+          }),
+      )
+    }
     const loadedIds = new Set(loadedMessages.map((message) => message.id))
     const loadedClientIds = new Set(
       loadedMessages.flatMap((message) => (message.clientMsgId ? [message.clientMsgId] : [])),
@@ -525,22 +550,7 @@ export function useSendMessageMutation(conversationId: string | null) {
       // Cập nhật preview trong conversations cache
       queryClient.setQueryData<ConversationResponse[]>(CHAT_QUERY_KEYS.conversations, (old) => {
         if (!old) return old
-        return old.map((conv) => {
-          if (conv.id === targetConversationId) {
-            const preview = newMessage.body
-              ? newMessage.body
-              : newMessage.attachments && newMessage.attachments.length > 0
-                ? '[attachment]'
-                : ''
-            return {
-              ...conv,
-              lastMessagePreview: preview,
-              lastMessageSenderId: newMessage.senderId,
-              lastMessageAt: newMessage.createdAt,
-            }
-          }
-          return conv
-        })
+        return old.map((conv) => updateConversationLastMessage(conv, newMessage))
       })
     },
   })

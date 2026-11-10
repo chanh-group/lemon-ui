@@ -11,6 +11,7 @@ import {
 } from '@/lib/socket'
 import { CHAT_QUERY_KEYS, type MessagePageParam } from './useChatQueries'
 import { getConversationMessages, markConversationRead } from '../api/chat.api'
+import { updateConversationLastMessage } from '../utils/chat.mapper'
 import { fetchMissedMessages } from '../utils/messageSync'
 import type {
   ConversationResponse,
@@ -176,14 +177,8 @@ export function useChatRealtime(activeConversationId: string | null) {
           old?.map((conversation) => {
             if (conversation.id !== convId) return conversation
             const isCurrentActive = convId === activeConversationId
-            const preview = msg.deletedAt
-              ? '[message-revoked]'
-              : (msg.body ?? (msg.attachments && msg.attachments.length > 0 ? '[attachment]' : ''))
             return {
-              ...conversation,
-              lastMessagePreview: preview,
-              lastMessageSenderId: msg.senderId,
-              lastMessageAt: msg.createdAt,
+              ...updateConversationLastMessage(conversation, msg),
               unreadCount:
                 isCurrentActive || msg.senderId === userId
                   ? conversation.unreadCount

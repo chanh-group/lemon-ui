@@ -72,7 +72,7 @@ export function StoryViewer({
   const items = stories.length ? stories : [story]
   const index = items.findIndex((item) => item.id === story.id)
   const sameAuthor = items.filter((item) =>
-    item.authorId ? item.authorId === story.authorId : item.id === story.id,
+    story.authorId ? item.authorId === story.authorId : item.id === story.id,
   )
   const media = useStoryMedia(story)
   const mediaUrl = story.mediaUrl || media.data

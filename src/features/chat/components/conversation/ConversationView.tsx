@@ -33,6 +33,8 @@ interface ConversationViewProps {
   isTyping?: boolean
   onTypingStart?: () => void
   onTypingStop?: () => void
+  onVoiceCall?: () => void
+  onVideoCall?: () => void
 }
 
 export function ConversationView({
@@ -54,6 +56,8 @@ export function ConversationView({
   isTyping,
   onTypingStart,
   onTypingStop,
+  onVoiceCall,
+  onVideoCall,
 }: ConversationViewProps) {
   const { t } = useTranslation()
   const [draft, setDraft] = useState('')
@@ -187,6 +191,8 @@ export function ConversationView({
           isTyping={isTyping}
           onToggleInfo={() => setIsInfoOpen((prev) => !prev)}
           isInfoOpen={isInfoOpen}
+          onVoiceCall={onVoiceCall}
+          onVideoCall={onVideoCall}
         />
 
         {/* Nội dung hội thoại */}
