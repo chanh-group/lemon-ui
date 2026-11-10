@@ -1,26 +1,25 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArchiveIcon, ArrowLeft01Icon, EyeIcon, HeartIcon } from '@hugeicons/core-free-icons'
+import { ArchiveIcon, ArrowLeft01Icon } from '@hugeicons/core-free-icons'
 import { createIcon } from '@/components/icons/hugeIcon'
 import { ROUTES } from '@/config/constants'
 import { StoryViewer } from '@/features/chat/components/StoryViewer'
 import { SideNav } from '@/features/chat/components/SideNav'
-import { useArchivedStories } from '@/features/chat/hooks/useStories'
+import { useArchivedStories, useStoryMedia } from '@/features/chat/hooks/useStories'
 import type { StoryEntry } from '@/features/chat/types/chat.types'
 import { TEXT_STORY_BG } from '@/features/chat/data/storiesData'
 import { cn } from '@/lib/utils'
 
 const ArrowLeft = createIcon(ArrowLeft01Icon)
 const Archive = createIcon(ArchiveIcon)
-const Eye = createIcon(EyeIcon)
-const Heart = createIcon(HeartIcon)
 
 export function StoriesArchivePage() {
   const navigate = useNavigate()
-  const { data, isLoading } = useArchivedStories()
+  const { data, isLoading, isError, refetch, hasNextPage, fetchNextPage, isFetchingNextPage } =
+    useArchivedStories()
   const [selectedStory, setSelectedStory] = useState<StoryEntry | null>(null)
 
-  const items = data?.items ?? []
+  const items = data?.pages.flatMap((page) => page.items) ?? []
 
   const backToStories = () => {
     navigate(ROUTES.messages, { state: { tab: 'stories' } })
@@ -69,6 +68,14 @@ export function StoriesArchivePage() {
                   <div key={i} className="aspect-[9/16] rounded-xl bg-[#252728] animate-pulse" />
                 ))}
               </div>
+            ) : isError && !data ? (
+              <button
+                type="button"
+                onClick={() => void refetch()}
+                className="rounded-lg bg-white/10 px-4 py-2 text-sm"
+              >
+                Không thể tải kho lưu trữ. Thử lại
+              </button>
             ) : items.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 text-center">
                 <div className="grid size-16 place-items-center rounded-full bg-[#252728] text-[#8a8d91] mb-3">
@@ -93,12 +100,8 @@ export function StoriesArchivePage() {
                   >
                     {/* Media or Text Background */}
                     <div className="absolute inset-0">
-                      {item.kind === 'MEDIA' && item.mediaUrl ? (
-                        <img
-                          src={item.mediaUrl}
-                          alt={item.caption || 'Archived story'}
-                          className="h-full w-full object-cover"
-                        />
+                      {item.kind === 'MEDIA' ? (
+                        <ArchiveMedia story={item} />
                       ) : (
                         <div
                           className={cn(
@@ -118,21 +121,19 @@ export function StoriesArchivePage() {
                         {item.time || 'Đã lưu trữ'}
                       </span>
                     </div>
-
-                    {/* Bottom stats badge */}
-                    <div className="relative z-10 p-2.5 flex items-center gap-2.5 text-xs text-white/90 font-medium">
-                      <span className="flex items-center gap-1">
-                        <Eye className="size-3.5 text-[#2e89ff]" />
-                        <span>{item.viewsCount ?? 0}</span>
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Heart className="size-3.5 text-rose-500 fill-rose-500" />
-                        <span>{item.reactionsCount ?? 0}</span>
-                      </span>
-                    </div>
                   </button>
                 ))}
               </div>
+            )}
+            {hasNextPage && (
+              <button
+                type="button"
+                onClick={() => void fetchNextPage()}
+                disabled={isFetchingNextPage}
+                className="mt-4 rounded-lg bg-white/10 px-4 py-2 text-sm"
+              >
+                Xem thêm
+              </button>
             )}
           </div>
         </div>
@@ -140,6 +141,7 @@ export function StoriesArchivePage() {
 
       {selectedStory && (
         <StoryViewer
+          key={selectedStory.id}
           story={selectedStory}
           stories={items}
           onSelectStory={setSelectedStory}
@@ -147,5 +149,16 @@ export function StoriesArchivePage() {
         />
       )}
     </main>
+  )
+}
+
+function ArchiveMedia({ story }: { story: StoryEntry }) {
+  const media = useStoryMedia(story)
+  const url = story.mediaUrl || media.data
+  if (!url) return <div className="h-full w-full bg-neutral-800" />
+  return story.mediaType === 'video' ? (
+    <video src={url} muted preload="metadata" className="h-full w-full object-cover" />
+  ) : (
+    <img src={url} alt={story.caption || ''} className="h-full w-full object-cover" />
   )
 }

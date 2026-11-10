@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ImagePlusIcon as MediaData } from '@hugeicons/core-free-icons'
 import { createIcon } from '@/components/icons/hugeIcon'
@@ -7,11 +7,7 @@ const Media = createIcon(MediaData)
 interface MediaStoryActorProps {
   onDiscard: () => void
   /** Nhận kèm captionText để gửi API. */
-  onShare: (
-    mediaKind: 'photo' | 'gif' | 'sticker' | 'video',
-    label: string,
-    captionText: string,
-  ) => void
+  onShare: (file: File, captionText: string) => void
   isSharing: boolean
 }
 
@@ -22,20 +18,45 @@ export function MediaStoryEditor({ onDiscard, onShare, isSharing }: MediaStoryAc
   const [file, setFile] = useState<File | null>(null)
   const [objectUrl, setObjectUrl] = useState<string | null>(null)
   const [caption, setCaption] = useState('')
+  const [fileError, setFileError] = useState('')
 
   const handleFile = (selected: File | undefined | null) => {
-    if (selected) {
-      setFile(selected)
-      setObjectUrl(URL.createObjectURL(selected))
+    if (!selected) return
+    const allowed = [
+      'image/jpeg',
+      'image/png',
+      'image/webp',
+      'image/gif',
+      'video/mp4',
+      'video/webm',
+      'video/quicktime',
+    ]
+    const max = (selected.type.startsWith('video/') ? 50 : 10) * 1024 * 1024
+    if (!allowed.includes(selected.type) || selected.size === 0 || selected.size > max) {
+      setFileError(t('chat.storyFileInvalid'))
+      setFile(null)
+      setObjectUrl(null)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      return
     }
+    setFileError('')
+    setFile(selected)
+    setObjectUrl(URL.createObjectURL(selected))
   }
+
+  useEffect(
+    () => () => {
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    },
+    [objectUrl],
+  )
 
   const isVideo = file?.type.startsWith('video') ?? false
   const canShare = Boolean(file)
 
   const share = () => {
     if (!file) return
-    onShare(isVideo ? 'video' : 'photo', file.name, caption.trim())
+    onShare(file, caption.trim())
   }
 
   return (
@@ -62,13 +83,19 @@ export function MediaStoryEditor({ onDiscard, onShare, isSharing }: MediaStoryAc
             ref={fileInputRef}
             id="stories-media-file"
             type="file"
-            accept="image/*,video/*"
+            accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime"
             className="sr-only"
             onChange={(e) => handleFile(e.target.files?.[0])}
           />
         </label>
 
+        {fileError && (
+          <p role="alert" className="text-sm text-red-500">
+            {fileError}
+          </p>
+        )}
         <input
+          maxLength={500}
           value={caption}
           onChange={(e) => setCaption(e.target.value)}
           placeholder={t('chat.storyCaptionPlaceholder')}

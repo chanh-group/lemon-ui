@@ -119,6 +119,7 @@ export function mapBackendStoryToEntry(
     kind: item.kind === 'TEXT' ? 'TEXT' : 'MEDIA',
     caption: item.caption,
     mediaUrl: item.mediaUrl,
+    mediaType: item.kind === 'VIDEO' ? 'video' : item.kind === 'IMAGE' ? 'image' : undefined,
     background: item.background,
     viewsCount: item.viewsCount ?? 0,
     reactionsCount: item.reactionsCount ?? 0,
@@ -137,8 +138,7 @@ export function mapBackendStoryToEntry(
 /* ------------------------------------------------------------------ */
 
 export interface CreateMediaStoryPayload {
-  mediaKind: 'photo' | 'gif' | 'sticker' | 'video'
-  label: string
+  file: File
   captionText: string
   allowReplies?: boolean
   allowReactions?: boolean
@@ -180,7 +180,7 @@ export async function listStories(currentUserId?: string): Promise<StoryEntry[]>
     await delay(150)
     return storyStore.map((s) => ({ ...s }))
   }
-  try {
+  {
     const res = await api.get<any[]>('/stories/feed')
     const raw = res.data ?? []
     const flattened: StoryEntry[] = []
@@ -205,6 +205,8 @@ export async function listStories(currentUserId?: string): Promise<StoryEntry[]>
             kind: item.kind === 'TEXT' ? 'TEXT' : 'MEDIA',
             caption: item.caption,
             background: item.background,
+            mediaType:
+              item.kind === 'VIDEO' ? 'video' : item.kind === 'IMAGE' ? 'image' : undefined,
             viewsCount: 0,
             reactionsCount: item.reactionsCount ?? 0,
             viewerReaction: item.myReaction ?? null,
@@ -220,9 +222,6 @@ export async function listStories(currentUserId?: string): Promise<StoryEntry[]>
       }
     }
     return flattened
-  } catch {
-    const res = await api.get<BackendStoryResponse[]>('/stories')
-    return (res.data ?? []).map((item) => mapBackendStoryToEntry(item, currentUserId))
   }
 }
 
@@ -267,7 +266,9 @@ export async function createMediaStory(payload: CreateMediaStoryPayload): Promis
     await delay()
     const entry: StoryEntry = {
       id: `story-${Date.now()}`,
-      name: payload.captionText.trim().slice(0, 18) || payload.label,
+      name: payload.captionText.trim().slice(0, 18) || payload.file.name,
+      mediaUrl: URL.createObjectURL(payload.file),
+      mediaType: payload.file.type.startsWith('video/') ? 'video' : 'image',
       time: 'Vừa xong',
       viewed: false,
       online: false,
@@ -284,10 +285,35 @@ export async function createMediaStory(payload: CreateMediaStoryPayload): Promis
     storyStore = [entry, ...storyStore]
     return { ...entry }
   }
+  const isVideo = payload.file.type.startsWith('video/')
+  const kind = isVideo ? 'STORY_VIDEO' : 'STORY_IMAGE'
+  const signed = await api.post<{ uploadUrl: string; objectKey: string }>('/files/presign', {
+    kind,
+    sizeBytes: payload.file.size,
+    mimeType: payload.file.type,
+    fileName: payload.file.name,
+  })
+  let objectKey = signed.data.objectKey
+  try {
+    const upload = await fetch(signed.data.uploadUrl, {
+      method: 'PUT',
+      headers: { 'Content-Type': payload.file.type },
+      body: payload.file,
+    })
+    if (!upload.ok) throw new Error('Upload failed')
+  } catch {
+    const form = new FormData()
+    form.append('file', payload.file)
+    form.append('kind', kind)
+    const uploaded = await api.post<{ objectKey: string }>('/files/upload', form, {
+      headers: { 'Content-Type': undefined },
+    })
+    objectKey = uploaded.data.objectKey
+  }
   const res = await api.post<BackendStoryResponse>('/stories', {
-    kind: payload.mediaKind === 'video' ? 'VIDEO' : 'IMAGE',
+    kind: isVideo ? 'VIDEO' : 'IMAGE',
     caption: payload.captionText.trim() || undefined,
-    objectKey: payload.label,
+    objectKey,
     allowReplies: payload.allowReplies ?? true,
     allowReactions: payload.allowReactions ?? true,
     audienceMode: payload.audienceMode ?? 'ALL_FRIENDS',
@@ -319,7 +345,6 @@ export async function reactStory(
     `/stories/${storyId}/react`,
     {
       emoji: reaction,
-      reaction,
     },
   )
   return { success: true, reaction: res.data?.emoji ?? res.data?.reaction ?? reaction }
@@ -365,8 +390,17 @@ export async function getStoryReactions(storyId: string): Promise<StoryReactionI
       },
     ]
   }
-  const res = await api.get<StoryReactionItem[]>(`/stories/${storyId}/reactions`)
-  return res.data ?? []
+  const res = await api.get<{
+    items: Array<{ user: StoryReactionItem['user']; emoji: string; createdAt: string }>
+  }>(`/stories/${storyId}/reactions`)
+  return res.data.items.map((item) => ({
+    id: item.user.id,
+    userId: item.user.id,
+    storyId,
+    reaction: item.emoji,
+    createdAt: item.createdAt,
+    user: item.user,
+  }))
 }
 
 /** Phản hồi (reply) story bằng tin nhắn, tự động gửi vào hội thoại 1:1 với tác giả. */
@@ -400,7 +434,6 @@ export async function replyStory(
   }
   const res = await api.post<StoryReplyResponse>(`/stories/${storyId}/reply`, {
     body: payload.content,
-    content: payload.content,
   })
   return res.data
 }
@@ -418,18 +451,26 @@ export async function viewStory(storyId: string): Promise<{ success: boolean }> 
 }
 
 /** Danh sách người đã xem Story (chỉ chủ sở hữu story xem được). */
-export async function getStoryViews(storyId: string): Promise<StoryViewerItem[]> {
+export async function getStoryViews(
+  storyId: string,
+  cursor?: string,
+): Promise<{
+  items: StoryViewerItem[]
+  totalViewsCount: number
+  nextCursor: string | null
+  hasMore: boolean
+}> {
   if (isAuthBypass()) {
     await delay(100)
-    return []
+    return { items: [], totalViewsCount: 0, nextCursor: null, hasMore: false }
   }
-  try {
-    const res = await api.get<StoryViewerItem[]>(`/stories/${storyId}/viewers`)
-    return res.data ?? []
-  } catch {
-    const res = await api.get<StoryViewerItem[]>(`/stories/${storyId}/views`)
-    return res.data ?? []
-  }
+  const res = await api.get<{
+    items: StoryViewerItem[]
+    totalViewsCount: number
+    nextCursor: string | null
+    hasMore: boolean
+  }>(`/stories/${storyId}/views`, { params: { cursor } })
+  return res.data
 }
 
 /** Thích story im lặng (silent like - chỉ hiện ở viewer list, không gửi tin nhắn DM). */
@@ -538,7 +579,40 @@ export async function getArchivedStories(
   const res = await api.get<any>(`/stories/archive?${params.toString()}`)
   const raw = res.data?.items ?? res.data ?? []
   return {
-    items: raw.map((item: any) => mapBackendStoryToEntry(item)),
+    items: raw.map((item: BackendStoryResponse) => ({
+      ...mapBackendStoryToEntry(item),
+      mine: true,
+      archived: true,
+    })),
     nextCursor: res.data?.nextCursor ?? null,
   }
+}
+
+export async function getStoryMediaUrl(storyId: string): Promise<string> {
+  const res = await api.get<{ url: string }>(`/stories/${storyId}/media`)
+  return res.data.url
+}
+
+export interface UpdateStoryPayload {
+  caption?: string
+  allowReplies?: boolean
+  allowReactions?: boolean
+}
+
+export async function updateStory(storyId: string, payload: UpdateStoryPayload): Promise<void> {
+  if (isAuthBypass()) {
+    storyStore = storyStore.map((story) =>
+      story.id === storyId ? { ...story, ...payload } : story,
+    )
+    return
+  }
+  await api.patch(`/stories/${storyId}`, payload)
+}
+
+export async function deleteStory(storyId: string): Promise<void> {
+  if (isAuthBypass()) {
+    storyStore = storyStore.filter((story) => story.id !== storyId)
+    return
+  }
+  await api.delete(`/stories/${storyId}`)
 }

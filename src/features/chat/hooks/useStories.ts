@@ -1,13 +1,17 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@/infrastructure/query/keys'
 import {
   createMediaStory,
+  deleteStory,
+  updateStory,
+  type UpdateStoryPayload,
   createTextStory,
   getArchivedStories,
   getMutedAuthors,
   getStoryReactions,
   getStorySettings,
   getStoryViews,
+  getStoryMediaUrl,
   likeStory,
   listStories,
   muteAuthor,
@@ -118,9 +122,11 @@ export function useViewStory() {
 }
 
 export function useStoryViews(storyId?: string) {
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: STORY_VIEWS_KEY(storyId ?? ''),
-    queryFn: () => (storyId ? getStoryViews(storyId) : Promise.resolve([])),
+    initialPageParam: undefined as string | undefined,
+    queryFn: ({ pageParam }) => getStoryViews(storyId!, pageParam),
+    getNextPageParam: (page) => (page.hasMore ? (page.nextCursor ?? undefined) : undefined),
     enabled: Boolean(storyId),
   })
 }
@@ -202,9 +208,43 @@ export function useUnmuteAuthor() {
 
 export const STORY_ARCHIVE_KEY = ['stories', 'archive'] as const
 
-export function useArchivedStories(cursor?: string) {
+export function useArchivedStories() {
+  return useInfiniteQuery({
+    queryKey: STORY_ARCHIVE_KEY,
+    initialPageParam: undefined as string | undefined,
+    queryFn: ({ pageParam }) => getArchivedStories(pageParam),
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
+  })
+}
+
+export function useStoryMedia(story: { id: string; kind?: string; mediaUrl?: string | null }) {
   return useQuery({
-    queryKey: [...STORY_ARCHIVE_KEY, cursor ?? 'initial'],
-    queryFn: () => getArchivedStories(cursor),
+    queryKey: ['story-media', story.id],
+    queryFn: () => getStoryMediaUrl(story.id),
+    enabled: story.kind === 'MEDIA' && !story.mediaUrl && !story.id.startsWith('story-'),
+    staleTime: 60_000,
+  })
+}
+
+export function useUpdateStory() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: UpdateStoryPayload }) =>
+      updateStory(id, payload),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: STORIES_KEY })
+      void client.invalidateQueries({ queryKey: STORY_ARCHIVE_KEY })
+    },
+  })
+}
+
+export function useDeleteStory() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: deleteStory,
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: STORIES_KEY })
+      void client.invalidateQueries({ queryKey: STORY_ARCHIVE_KEY })
+    },
   })
 }

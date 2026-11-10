@@ -4,11 +4,13 @@ import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import {
   ArrowLeft01Icon as BackData,
+  ArchiveIcon as ArchiveData,
   ChevronRightIcon as ChevronRightData,
   Settings01Icon as GearData,
 } from '@hugeicons/core-free-icons'
 import { createIcon } from '@/components/icons/hugeIcon'
 const Back = createIcon(BackData)
+const Archive = createIcon(ArchiveData)
 const Gear = createIcon(GearData)
 const ChevronRight = createIcon(ChevronRightData)
 import { UserAvatar } from '@/components/common/UserAvatar'
@@ -46,6 +48,7 @@ export function StoriesCreateView() {
 
   const shareText = (payload: CreateTextStoryPayload) => {
     createText.mutate(payload, {
+      onError: (error) => toast.error(error.message),
       onSuccess: () => {
         toast.success(t('chat.storyCreated'))
         backToStories()
@@ -55,6 +58,7 @@ export function StoriesCreateView() {
 
   const shareMedia = (payload: CreateMediaStoryPayload) => {
     createMedia.mutate(payload, {
+      onError: (error) => toast.error(error.message),
       onSuccess: () => {
         toast.success(t('chat.storyCreated'))
         backToStories()
@@ -62,11 +66,7 @@ export function StoriesCreateView() {
     })
   }
 
-  const shareMediaPayload = (
-    mediaKind: 'photo' | 'gif' | 'sticker' | 'video',
-    label: string,
-    captionText: string,
-  ) => shareMedia({ mediaKind, label, captionText })
+  const shareMediaPayload = (file: File, captionText: string) => shareMedia({ file, captionText })
   return (
     <main className="flex h-dvh w-full overflow-hidden bg-background pb-16 text-foreground md:pb-0">
       <SideNav
@@ -89,14 +89,25 @@ export function StoriesCreateView() {
           <h1 className="text-lg font-bold tracking-tight text-foreground">
             {t('chat.yourStory')}
           </h1>
-          <button
-            type="button"
-            aria-label={t('chat.settingsTitle')}
-            onClick={() => setIsSettingsOpen(true)}
-            className="grid size-9 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground cursor-pointer"
-          >
-            <Gear className="size-4.5" aria-hidden="true" />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              aria-label={t('chat.storyArchive')}
+              title={t('chat.storyArchive')}
+              onClick={() => navigate(ROUTES.storiesArchive)}
+              className="grid size-9 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              <Archive className="size-4.5" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              aria-label={t('chat.settingsTitle')}
+              onClick={() => setIsSettingsOpen(true)}
+              className="grid size-9 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground cursor-pointer"
+            >
+              <Gear className="size-4.5" aria-hidden="true" />
+            </button>
+          </div>
         </header>
 
         {/* Tài khoản đích */}
@@ -212,7 +223,15 @@ export function StoriesCreateView() {
       )}
 
       {/* Xem lại tin của mình từ panel trái */}
-      {viewingOwn && <StoryViewer story={viewingOwn} onClose={() => setViewingOwn(null)} />}
+      {viewingOwn && (
+        <StoryViewer
+          key={viewingOwn.id}
+          story={myStories.find((s) => s.id === viewingOwn.id) ?? viewingOwn}
+          stories={myStories}
+          onSelectStory={setViewingOwn}
+          onClose={() => setViewingOwn(null)}
+        />
+      )}
       <StorySettingsModal open={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
     </main>
   )

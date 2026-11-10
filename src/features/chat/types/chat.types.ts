@@ -93,6 +93,7 @@ export interface StoryViewerItem {
   storyId: string
   userId: string
   viewedAt: string
+  reaction?: string | null
   user: {
     id: string
     fullName: string
@@ -152,6 +153,8 @@ export interface StoryEntry {
   kind?: 'text' | 'media' | 'TEXT' | 'MEDIA'
   caption?: string | null
   mediaUrl?: string | null
+  mediaType?: 'image' | 'video'
+  archived?: boolean
   background?: string | null
   viewsCount?: number
   reactionsCount?: number
