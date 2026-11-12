@@ -86,9 +86,10 @@ export function ChatShell() {
       )
     }
   }, [storiesQuery.isError, storiesQuery.error, t])
+  const allStories = useMemo(() => storiesQuery.data ?? [], [storiesQuery.data])
   const stories = useMemo(
-    () => (storiesQuery.data ?? []).filter((s) => !q || s.name.toLowerCase().includes(q)),
-    [storiesQuery.data, q],
+    () => allStories.filter((s) => !q || s.name.toLowerCase().includes(q)),
+    [allStories, q],
   )
 
   const totalUnread = useMemo(
@@ -96,7 +97,11 @@ export function ChatShell() {
     [rawConversations],
   )
 
-  const currentStory = tab === 'stories' ? (viewingStory ?? stories[0] ?? null) : null
+  // Tìm trong danh sách chưa lọc: gõ ô tìm kiếm không được làm viewer đang mở biến mất.
+  const currentStory =
+    tab === 'stories' && viewingStory
+      ? (allStories.find((item) => item.id === viewingStory.id) ?? null)
+      : null
 
   // Fallback khi URL trỏ tới hội thoại không có trong trang inbox đầu tiên.
   const selectedFromList = rawConversations.find((c) => c.id === selectedId) ?? null
@@ -232,7 +237,7 @@ export function ChatShell() {
       {/* Panel B — danh sách (tin nhắn / cuộc gọi / story) */}
       <div
         className={cn(
-          selectedId || (tab === 'stories' && viewingStory)
+          selectedId || (tab === 'stories' && currentStory)
             ? 'hidden h-full min-h-0 md:flex md:h-full md:min-w-0'
             : 'flex h-full min-h-0 min-w-0 flex-1 md:flex-none',
           !sidebarOpen && 'hidden md:hidden',
@@ -263,7 +268,7 @@ export function ChatShell() {
       {/* Panel C — Hội thoại hoặc Story Viewer trực tiếp trên màn hình chính */}
       <div
         className={
-          selectedId || (tab === 'stories' && viewingStory)
+          selectedId || (tab === 'stories' && currentStory)
             ? 'flex h-full min-h-0 w-full min-w-0 flex-1'
             : 'hidden h-full min-h-0 w-full min-w-0 flex-1 md:flex'
         }
@@ -271,8 +276,9 @@ export function ChatShell() {
         {tab === 'stories' ? (
           currentStory ? (
             <StoryViewer
+              key={currentStory.id}
               story={currentStory}
-              stories={stories}
+              stories={allStories}
               embedded={true}
               onSelectStory={setViewingStory}
               onClose={() => setViewingStory(null)}

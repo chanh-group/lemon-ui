@@ -97,8 +97,8 @@ export function StorySettingsModal({ open, onOpenChange }: StorySettingsModalPro
               <div className="space-y-1">
                 <p className="text-sm font-semibold text-white">Kho lưu trữ tin (Story Archive)</p>
                 <p className="text-xs text-[#b0b3b8] leading-relaxed">
-                  Tự động lưu tin vào kho lưu trữ sau khi hết hạn 24 giờ. Cảm xúc và tổng số lượt
-                  xem của tin sẽ được giữ lại vĩnh viễn.
+                  Tự động lưu tin vào kho lưu trữ sau khi hết hạn 24 giờ. Tin sẽ được lưu theo thời
+                  hạn lưu trữ đã cấu hình.
                 </p>
               </div>
               <Switch

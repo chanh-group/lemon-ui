@@ -88,13 +88,14 @@ export interface StoryReactionItem {
   }
 }
 
+/** Một lượt xem story — khớp `StoryViewerResponse` của backend. */
 export interface StoryViewerItem {
-  id: string
-  storyId: string
-  userId: string
   viewedAt: string
+  reaction?: string | null
+  reactionKind?: 'REACTION' | 'LIKE' | null
   user: {
     id: string
+    username?: string
     fullName: string
     avatarUrl?: string | null
   }
@@ -152,6 +153,8 @@ export interface StoryEntry {
   kind?: 'text' | 'media' | 'TEXT' | 'MEDIA'
   caption?: string | null
   mediaUrl?: string | null
+  mediaType?: 'image' | 'video'
+  archived?: boolean
   background?: string | null
   viewsCount?: number
   reactionsCount?: number
