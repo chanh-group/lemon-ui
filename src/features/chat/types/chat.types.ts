@@ -80,6 +80,7 @@ export interface StoryReactionItem {
   storyId: string
   userId: string
   reaction: string
+  kind: 'REACTION' | 'LIKE'
   createdAt: string
   user: {
     id: string

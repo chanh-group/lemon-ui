@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it, mock } from 'bun:test'
 import { api } from '@/infrastructure/api/client'
-import { createMediaStory, getStoryViews, listStories, replyStory } from './stories.api'
+import {
+  createMediaStory,
+  getStoryReactions,
+  getStoryViews,
+  listStories,
+  replyStory,
+} from './stories.api'
 
 const originalGet = api.get
 const originalPost = api.post
@@ -97,6 +103,37 @@ describe('story API contract', () => {
     })
     expect(calls.map((call) => call.path)).toEqual(['/files/presign', '/files/upload', '/stories'])
     expect(calls.at(-1)).toMatchObject({ path: '/stories', body: { objectKey: 'fallback' } })
+  })
+
+  it('preserves reaction identities, kinds and pagination from the backend', async () => {
+    const get = mock(() =>
+      Promise.resolve({
+        data: {
+          items: [
+            {
+              user: { id: 'u', fullName: 'Alice', avatarUrl: null },
+              emoji: '❤️',
+              kind: 'LIKE',
+              createdAt: '2026-01-01T00:00:00Z',
+            },
+          ],
+          nextCursor: 'next',
+          hasMore: true,
+          totalCount: 3,
+          summary: [{ emoji: '❤️', count: 3 }],
+        },
+      }),
+    )
+    api.get = get as unknown as typeof api.get
+    const result = await getStoryReactions('s', 'cursor')
+    expect(get).toHaveBeenCalledWith('/stories/s/reactions', { params: { cursor: 'cursor' } })
+    expect(result).toMatchObject({
+      items: [{ userId: 'u', reaction: '❤️', kind: 'LIKE', user: { fullName: 'Alice' } }],
+      nextCursor: 'next',
+      hasMore: true,
+      totalCount: 3,
+      summary: [{ emoji: '❤️', count: 3 }],
+    })
   })
 
   it('uses backend view pagination and reply body', async () => {
