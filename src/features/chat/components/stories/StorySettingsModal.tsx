@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import {
   Dialog,
   DialogContent,
@@ -21,6 +22,7 @@ interface StorySettingsModalProps {
 }
 
 export function StorySettingsModal({ open, onOpenChange }: StorySettingsModalProps) {
+  const { t } = useTranslation()
   const { data: settings, isLoading } = useStorySettings()
   const updateSettings = useUpdateStorySettings()
   const { data: mutedAuthors = [] } = useMutedAuthors()
@@ -32,57 +34,53 @@ export function StorySettingsModal({ open, onOpenChange }: StorySettingsModalPro
   const handleToggleReceipts = async (checked: boolean) => {
     try {
       await updateSettings.mutateAsync({ viewedReceiptsEnabled: checked })
-      toast.success(
-        checked ? 'Đã bật biên nhận đã xem tin' : 'Đã tắt biên nhận đã xem tin (chế độ ẩn danh)',
-      )
+      toast.success(checked ? t('chat.receiptsEnabled') : t('chat.receiptsDisabled'))
     } catch {
-      toast.error('Không thể cập nhật cài đặt')
+      toast.error(t('chat.storySettingsError'))
     }
   }
 
   const handleToggleArchive = async (checked: boolean) => {
     try {
       await updateSettings.mutateAsync({ archiveEnabled: checked })
-      toast.success(checked ? 'Đã bật tự động lưu trữ tin' : 'Đã tắt tự động lưu trữ tin')
+      toast.success(checked ? t('chat.storyArchiveEnabled') : t('chat.storyArchiveDisabled'))
     } catch {
-      toast.error('Không thể cập nhật cài đặt')
+      toast.error(t('chat.storySettingsError'))
     }
   }
 
   const handleUnmute = async (authorId: string) => {
     try {
       await unmuteMutation.mutateAsync(authorId)
-      toast.success('Đã bỏ ẩn tin của tác giả')
+      toast.success(t('chat.storyUnmuted'))
     } catch {
-      toast.error('Không thể bỏ ẩn tin')
+      toast.error(t('chat.storyUnmuteError'))
     }
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[480px] bg-[#1c1e21] text-white border-[#3a3b3c]">
+      <DialogContent className="sm:max-w-[480px]">
         <DialogHeader>
-          <DialogTitle className="text-lg font-bold text-white">Cài đặt tin (Stories)</DialogTitle>
-          <DialogDescription className="text-xs text-[#b0b3b8]">
-            Tuỳ chỉnh quyền riêng tư, biên nhận đã xem và lưu trữ tin
-          </DialogDescription>
+          <DialogTitle className="text-lg font-bold">{t('chat.storySettingsTitle')}</DialogTitle>
+          <DialogDescription>{t('chat.storySettingsDescription')}</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6 py-2">
           {/* Section: Quyền riêng tư */}
           <div className="space-y-4">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-[#b0b3b8]">
-              Quyền riêng tư & Xem tin
+            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              {t('chat.storyPrivacyTitle')}
             </h3>
 
             {/* Toggle 1: View receipts */}
-            <div className="flex items-start justify-between gap-3 p-3 rounded-xl bg-[#252728]">
+            <div className="flex items-start justify-between gap-3 rounded-xl border border-border bg-card p-3">
               <div className="space-y-1">
-                <p className="text-sm font-semibold text-white">Biên nhận đã xem (View Receipts)</p>
-                <p className="text-xs text-[#b0b3b8] leading-relaxed">
-                  Khi bật, tác giả sẽ thấy bạn trong danh sách người đã xem. Khi tắt, bạn xem tin ẩn
-                  danh (không hiện tên trong danh sách của họ), đồng thời bạn cũng sẽ không thấy ai
-                  đã xem tin của mình.
+                <p className="text-sm font-semibold text-card-foreground">
+                  {t('chat.storyReceiptsTitle')}
+                </p>
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  {t('chat.storyReceiptsDescription')}
                 </p>
               </div>
               <Switch
@@ -93,12 +91,13 @@ export function StorySettingsModal({ open, onOpenChange }: StorySettingsModalPro
             </div>
 
             {/* Toggle 2: Archiving */}
-            <div className="flex items-start justify-between gap-3 p-3 rounded-xl bg-[#252728]">
+            <div className="flex items-start justify-between gap-3 rounded-xl border border-border bg-card p-3">
               <div className="space-y-1">
-                <p className="text-sm font-semibold text-white">Kho lưu trữ tin (Story Archive)</p>
-                <p className="text-xs text-[#b0b3b8] leading-relaxed">
-                  Tự động lưu tin vào kho lưu trữ sau khi hết hạn 24 giờ. Tin sẽ được lưu theo thời
-                  hạn lưu trữ đã cấu hình.
+                <p className="text-sm font-semibold text-card-foreground">
+                  {t('chat.storyArchiveSettingTitle')}
+                </p>
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  {t('chat.storyArchiveSettingDescription')}
                 </p>
               </div>
               <Switch
@@ -111,29 +110,31 @@ export function StorySettingsModal({ open, onOpenChange }: StorySettingsModalPro
 
           {/* Section: Danh sách tác giả đã ẩn */}
           <div className="space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-[#b0b3b8]">
-              Tin đã ẩn ({mutedAuthors.length})
+            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              {t('chat.mutedStoriesTitle')} ({mutedAuthors.length})
             </h3>
             {mutedAuthors.length === 0 ? (
-              <p className="text-xs text-[#8a8d91] italic px-1">Bạn chưa ẩn tin của ai.</p>
+              <p className="px-1 text-xs italic text-muted-foreground">
+                {t('chat.noMutedStories')}
+              </p>
             ) : (
               <div className="max-h-40 overflow-y-auto space-y-2 pr-1">
                 {mutedAuthors.map((authorId) => (
                   <div
                     key={authorId}
-                    className="flex items-center justify-between gap-2 p-2.5 rounded-lg bg-[#252728]"
+                    className="flex items-center justify-between gap-2 rounded-lg border border-border bg-card p-2.5"
                   >
-                    <span className="text-xs font-medium text-[#e4e6eb] truncate">
-                      ID: {authorId.slice(0, 8)}...
+                    <span className="truncate text-xs font-medium text-card-foreground">
+                      {t('chat.storyAuthorId', { id: authorId.slice(0, 8) })}
                     </span>
                     <Button
                       size="sm"
                       variant="outline"
                       disabled={unmuteMutation.isPending}
                       onClick={() => handleUnmute(authorId)}
-                      className="h-7 text-xs border-[#4e4f50] text-white hover:bg-[#3a3b3c]"
+                      className="h-7 text-xs"
                     >
-                      Bỏ ẩn
+                      {t('chat.unmuteStory')}
                     </Button>
                   </div>
                 ))}
