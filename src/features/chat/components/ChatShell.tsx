@@ -86,9 +86,10 @@ export function ChatShell() {
       )
     }
   }, [storiesQuery.isError, storiesQuery.error, t])
+  const allStories = useMemo(() => storiesQuery.data ?? [], [storiesQuery.data])
   const stories = useMemo(
-    () => (storiesQuery.data ?? []).filter((s) => !q || s.name.toLowerCase().includes(q)),
-    [storiesQuery.data, q],
+    () => allStories.filter((s) => !q || s.name.toLowerCase().includes(q)),
+    [allStories, q],
   )
 
   const totalUnread = useMemo(
@@ -96,9 +97,10 @@ export function ChatShell() {
     [rawConversations],
   )
 
+  // Tìm trong danh sách chưa lọc: gõ ô tìm kiếm không được làm viewer đang mở biến mất.
   const currentStory =
     tab === 'stories' && viewingStory
-      ? (stories.find((item) => item.id === viewingStory.id) ?? null)
+      ? (allStories.find((item) => item.id === viewingStory.id) ?? null)
       : null
 
   // Fallback khi URL trỏ tới hội thoại không có trong trang inbox đầu tiên.
@@ -276,7 +278,7 @@ export function ChatShell() {
             <StoryViewer
               key={currentStory.id}
               story={currentStory}
-              stories={stories}
+              stories={allStories}
               embedded={true}
               onSelectStory={setViewingStory}
               onClose={() => setViewingStory(null)}

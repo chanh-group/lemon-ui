@@ -33,6 +33,7 @@ export const STORIES_KEY = queryKeys.chat.stories
 export const STORY_REACTIONS_KEY = (storyId: string) =>
   [...STORIES_KEY, storyId, 'reactions'] as const
 export const STORY_VIEWS_KEY = (storyId: string) => [...STORIES_KEY, storyId, 'views'] as const
+export const STORY_MEDIA_KEY = (storyId: string) => ['stories', 'media', storyId] as const
 
 export function useStoriesList(currentUserId?: string) {
   return useQuery({
@@ -219,9 +220,10 @@ export function useArchivedStories() {
 
 export function useStoryMedia(story: { id: string; kind?: string; mediaUrl?: string | null }) {
   return useQuery({
-    queryKey: ['story-media', story.id],
+    queryKey: STORY_MEDIA_KEY(story.id),
     queryFn: () => getStoryMediaUrl(story.id),
-    enabled: story.kind === 'MEDIA' && !story.mediaUrl && !story.id.startsWith('story-'),
+    enabled:
+      story.kind?.toUpperCase() === 'MEDIA' && !story.mediaUrl && !story.id.startsWith('story-'),
     staleTime: 60_000,
   })
 }

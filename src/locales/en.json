@@ -87,7 +87,9 @@
     "notFoundTitle": "Page not found",
     "notFoundMessage": "The page you're looking for doesn't exist or has been moved.",
     "backToLogin": "Back to sign in",
-    "networkError": "Something went wrong, please try again"
+    "networkError": "Something went wrong, please try again",
+    "close": "Close",
+    "save": "Save"
   },
   "layout": {
     "brandTagline": "Easy messaging, fun chats every day.",
@@ -416,7 +418,8 @@
     "unmuteVideo": "Unmute video",
     "muteStory": "Mute stories from this person",
     "storyMuted": "Stories muted",
-    "storyArchive": "Story archive"
+    "storyArchive": "Story archive",
+    "send": "Send"
   },
   "theme": {
     "toLight": "Switch to light mode",

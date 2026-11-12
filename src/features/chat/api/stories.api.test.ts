@@ -78,9 +78,9 @@ describe('story API contract', () => {
   })
 
   it('uses the fallback object key after direct upload fails', async () => {
-    const paths: string[] = []
-    api.post = mock((path: string) => {
-      paths.push(path)
+    const calls: Array<{ path: string; body: unknown }> = []
+    api.post = mock((path: string, body: unknown) => {
+      calls.push({ path, body })
       return Promise.resolve({
         data:
           path === '/files/presign'
@@ -95,7 +95,8 @@ describe('story API contract', () => {
       file: new File(['video'], 'video.mp4', { type: 'video/mp4' }),
       captionText: '',
     })
-    expect(paths).toEqual(['/files/presign', '/files/upload', '/stories'])
+    expect(calls.map((call) => call.path)).toEqual(['/files/presign', '/files/upload', '/stories'])
+    expect(calls.at(-1)).toMatchObject({ path: '/stories', body: { objectKey: 'fallback' } })
   })
 
   it('uses backend view pagination and reply body', async () => {

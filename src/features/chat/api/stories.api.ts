@@ -1,6 +1,7 @@
 import { isAuthBypass } from '@/config/env'
 import { api } from '@/infrastructure/api/client'
 import { MOCK_STORIES } from '../data/mockData'
+import { presignFile, uploadBinaryToUrl, uploadFileViaBackend } from './chat.api'
 import type {
   StoryEntry,
   StoryReactionItem,
@@ -180,49 +181,41 @@ export async function listStories(currentUserId?: string): Promise<StoryEntry[]>
     await delay(150)
     return storyStore.map((s) => ({ ...s }))
   }
-  {
-    const res = await api.get<any[]>('/stories/feed')
-    const raw = res.data ?? []
-    const flattened: StoryEntry[] = []
+  const res = await api.get<any[]>('/stories/feed')
+  const raw = res.data ?? []
+  const flattened: StoryEntry[] = []
 
-    for (const group of raw) {
-      if (
-        group &&
-        typeof group === 'object' &&
-        'stories' in group &&
-        Array.isArray(group.stories)
-      ) {
-        for (const item of group.stories) {
-          flattened.push({
-            id: item.id,
-            name: group.user?.fullName || item.caption?.slice(0, 18) || 'Story',
-            time: formatRelativeTime(item.createdAt),
-            viewed: Boolean(item.hasViewed),
-            mine: currentUserId ? item.userId === currentUserId : false,
-            online: true,
-            authorId: item.userId,
-            authorAvatar: group.user?.avatarUrl,
-            kind: item.kind === 'TEXT' ? 'TEXT' : 'MEDIA',
-            caption: item.caption,
-            background: item.background,
-            mediaType:
-              item.kind === 'VIDEO' ? 'video' : item.kind === 'IMAGE' ? 'image' : undefined,
-            viewsCount: 0,
-            reactionsCount: item.reactionsCount ?? 0,
-            viewerReaction: item.myReaction ?? null,
-            viewerHasViewed: Boolean(item.hasViewed),
-            allowReplies: item.allowReplies ?? true,
-            allowReactions: item.allowReactions ?? true,
-            audienceMode: item.audienceMode ?? 'ALL_FRIENDS',
-            myReactionKind: item.myReactionKind ?? null,
-          })
-        }
-      } else {
-        flattened.push(mapBackendStoryToEntry(group as BackendStoryResponse, currentUserId))
+  for (const group of raw) {
+    if (group && typeof group === 'object' && 'stories' in group && Array.isArray(group.stories)) {
+      for (const item of group.stories) {
+        flattened.push({
+          id: item.id,
+          name: group.user?.fullName || item.caption?.slice(0, 18) || 'Story',
+          time: formatRelativeTime(item.createdAt),
+          viewed: Boolean(item.hasViewed),
+          mine: currentUserId ? item.userId === currentUserId : false,
+          online: true,
+          authorId: item.userId,
+          authorAvatar: group.user?.avatarUrl,
+          kind: item.kind === 'TEXT' ? 'TEXT' : 'MEDIA',
+          caption: item.caption,
+          background: item.background,
+          mediaType: item.kind === 'VIDEO' ? 'video' : item.kind === 'IMAGE' ? 'image' : undefined,
+          viewsCount: 0,
+          reactionsCount: item.reactionsCount ?? 0,
+          viewerReaction: item.myReaction ?? null,
+          viewerHasViewed: Boolean(item.hasViewed),
+          allowReplies: item.allowReplies ?? true,
+          allowReactions: item.allowReactions ?? true,
+          audienceMode: item.audienceMode ?? 'ALL_FRIENDS',
+          myReactionKind: item.myReactionKind ?? null,
+        })
       }
+    } else {
+      flattened.push(mapBackendStoryToEntry(group as BackendStoryResponse, currentUserId))
     }
-    return flattened
   }
+  return flattened
 }
 
 /** Đăng tin dạng văn bản — nền cố định, không chủ đề/không tùy chọn kiểu chữ. */
@@ -287,28 +280,18 @@ export async function createMediaStory(payload: CreateMediaStoryPayload): Promis
   }
   const isVideo = payload.file.type.startsWith('video/')
   const kind = isVideo ? 'STORY_VIDEO' : 'STORY_IMAGE'
-  const signed = await api.post<{ uploadUrl: string; objectKey: string }>('/files/presign', {
+  const signed = await presignFile({
     kind,
     sizeBytes: payload.file.size,
     mimeType: payload.file.type,
     fileName: payload.file.name,
   })
-  let objectKey = signed.data.objectKey
+  let objectKey = signed.objectKey
   try {
-    const upload = await fetch(signed.data.uploadUrl, {
-      method: 'PUT',
-      headers: { 'Content-Type': payload.file.type },
-      body: payload.file,
-    })
-    if (!upload.ok) throw new Error('Upload failed')
+    await uploadBinaryToUrl(signed.uploadUrl, payload.file, payload.file.type)
   } catch {
-    const form = new FormData()
-    form.append('file', payload.file)
-    form.append('kind', kind)
-    const uploaded = await api.post<{ objectKey: string }>('/files/upload', form, {
-      headers: { 'Content-Type': undefined },
-    })
-    objectKey = uploaded.data.objectKey
+    const uploaded = await uploadFileViaBackend(payload.file, kind, undefined, payload.file.name)
+    objectKey = uploaded.objectKey
   }
   const res = await api.post<BackendStoryResponse>('/stories', {
     kind: isVideo ? 'VIDEO' : 'IMAGE',
@@ -393,7 +376,7 @@ export async function getStoryReactions(storyId: string): Promise<StoryReactionI
   const res = await api.get<{
     items: Array<{ user: StoryReactionItem['user']; emoji: string; createdAt: string }>
   }>(`/stories/${storyId}/reactions`)
-  return res.data.items.map((item) => ({
+  return (res.data?.items ?? []).map((item) => ({
     id: item.user.id,
     userId: item.user.id,
     storyId,
@@ -470,7 +453,7 @@ export async function getStoryViews(
     nextCursor: string | null
     hasMore: boolean
   }>(`/stories/${storyId}/views`, { params: { cursor } })
-  return res.data
+  return res.data ?? { items: [], totalViewsCount: 0, nextCursor: null, hasMore: false }
 }
 
 /** Thích story im lặng (silent like - chỉ hiện ở viewer list, không gửi tin nhắn DM). */

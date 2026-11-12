@@ -87,7 +87,9 @@
     "notFoundTitle": "Không tìm thấy trang",
     "notFoundMessage": "Trang bạn đang tìm không tồn tại hoặc đã được di chuyển.",
     "backToLogin": "Về trang đăng nhập",
-    "networkError": "Đã có lỗi xảy ra, vui lòng thử lại"
+    "networkError": "Đã có lỗi xảy ra, vui lòng thử lại",
+    "close": "Đóng",
+    "save": "Lưu"
   },
   "layout": {
     "brandTagline": "Nhắn tin dễ dàng, trò chuyện vui vẻ mỗi ngày.",
@@ -415,7 +417,8 @@
     "unmuteVideo": "Bật âm thanh",
     "muteStory": "Ẩn tin của người này",
     "storyMuted": "Đã ẩn tin của người này",
-    "storyArchive": "Kho lưu trữ tin"
+    "storyArchive": "Kho lưu trữ tin",
+    "send": "Gửi"
   },
   "theme": {
     "toLight": "Chuyển sang chế độ sáng",

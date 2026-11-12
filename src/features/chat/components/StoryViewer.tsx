@@ -62,6 +62,10 @@ export function StoryViewer({
   const [caption, setCaption] = useState(story.caption ?? '')
   const [allowReplies, setAllowReplies] = useState(story.allowReplies !== false)
   const [allowReactions, setAllowReactions] = useState(story.allowReactions !== false)
+  // Bản nháp riêng cho dialog sửa: đóng dialog không làm đổi nội dung đang hiển thị.
+  const [editCaption, setEditCaption] = useState('')
+  const [editAllowReplies, setEditAllowReplies] = useState(true)
+  const [editAllowReactions, setEditAllowReactions] = useState(true)
   const [showViews, setShowViews] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -85,6 +89,7 @@ export function StoryViewer({
   const [reaction, setReaction] = useState(story.viewerReaction ?? null)
   const [reactionKind, setReactionKind] = useState(story.myReactionKind ?? null)
   const isVideo = story.mediaType === 'video'
+  const isMedia = story.kind === 'MEDIA' || story.kind === 'media' || Boolean(story.mediaUrl)
   const stopped = paused || editing || showViews || confirmDelete || Boolean(draft)
 
   const next = () => {
@@ -112,13 +117,14 @@ export function StoryViewer({
   }, [story.id])
 
   useEffect(() => {
-    if (stopped || isVideo || (story.kind === 'MEDIA' && !mediaUrl)) return
+    if (stopped || isVideo || (isMedia && !mediaUrl)) return
     const timer = window.setInterval(() => setProgress((value) => Math.min(100, value + 2)), 100)
     return () => window.clearInterval(timer)
-  }, [stopped, isVideo, story.id, story.kind, mediaUrl])
+  }, [stopped, isVideo, isMedia, story.id, mediaUrl])
   useEffect(() => {
     if (progress >= 100) next()
-  })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [progress])
   useEffect(() => {
     const video = videoRef.current
     if (!video) return
@@ -185,13 +191,26 @@ export function StoryViewer({
       toast.error(t('chat.replyStoryError'))
     }
   }
+  function openEdit() {
+    setEditCaption(caption)
+    setEditAllowReplies(allowReplies)
+    setEditAllowReactions(allowReactions)
+    setEditing(true)
+  }
   async function saveEdit() {
-    if (story.kind === 'TEXT' && !caption.trim()) return
+    if (story.kind === 'TEXT' && !editCaption.trim()) return
     try {
       await update.mutateAsync({
         id: story.id,
-        payload: { caption: caption.trim(), allowReplies, allowReactions },
+        payload: {
+          caption: editCaption.trim(),
+          allowReplies: editAllowReplies,
+          allowReactions: editAllowReactions,
+        },
       })
+      setCaption(editCaption.trim())
+      setAllowReplies(editAllowReplies)
+      setAllowReactions(editAllowReactions)
       setEditing(false)
       toast.success(t('chat.storySaved', { defaultValue: 'Đã cập nhật tin' }))
     } catch {
@@ -229,11 +248,13 @@ export function StoryViewer({
   }
 
   const name = storyDisplayName(story, t)
-  const isMedia = story.kind === 'MEDIA'
   const actionClass =
     'grid size-10 place-items-center rounded-full bg-black/45 text-white hover:bg-black/70 focus-visible:outline-2 focus-visible:outline-white'
   return (
     <div
+      role={embedded ? undefined : 'dialog'}
+      aria-modal={embedded ? undefined : true}
+      aria-label={embedded ? undefined : name}
       className={cn(
         'z-40 flex min-h-0 w-full items-center justify-center bg-[#101114] text-white',
         embedded ? 'relative h-full' : 'fixed inset-0',
@@ -358,7 +379,7 @@ export function StoryViewer({
               <>
                 <button
                   type="button"
-                  onClick={() => setEditing(true)}
+                  onClick={openEdit}
                   className={actionClass}
                   aria-label={t('chat.editStory', { defaultValue: 'Chỉnh sửa tin' })}
                 >
@@ -474,8 +495,8 @@ export function StoryViewer({
             <DialogTitle>{t('chat.editStory', { defaultValue: 'Chỉnh sửa tin' })}</DialogTitle>
           </DialogHeader>
           <textarea
-            value={caption}
-            onChange={(e) => setCaption(e.target.value)}
+            value={editCaption}
+            onChange={(e) => setEditCaption(e.target.value)}
             maxLength={500}
             rows={4}
             className="w-full rounded-lg border border-border bg-background p-3"
@@ -483,22 +504,22 @@ export function StoryViewer({
           <label className="flex items-center gap-2">
             <input
               type="checkbox"
-              checked={allowReplies}
-              onChange={(e) => setAllowReplies(e.target.checked)}
+              checked={editAllowReplies}
+              onChange={(e) => setEditAllowReplies(e.target.checked)}
             />
             {t('chat.allowStoryReplies', { defaultValue: 'Cho phép trả lời' })}
           </label>
           <label className="flex items-center gap-2">
             <input
               type="checkbox"
-              checked={allowReactions}
-              onChange={(e) => setAllowReactions(e.target.checked)}
+              checked={editAllowReactions}
+              onChange={(e) => setEditAllowReactions(e.target.checked)}
             />
             {t('chat.allowStoryReactions', { defaultValue: 'Cho phép bày tỏ cảm xúc' })}
           </label>
           <button
             type="button"
-            disabled={update.isPending || (story.kind === 'TEXT' && !caption.trim())}
+            disabled={update.isPending || (story.kind === 'TEXT' && !editCaption.trim())}
             onClick={() => void saveEdit()}
             className="rounded-lg bg-primary p-2 font-semibold text-primary-foreground disabled:opacity-50"
           >
