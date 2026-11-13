@@ -347,10 +347,7 @@ const MessageRowView = memo(function MessageRowView({
         {/* Reactions floating independently outside the bubble, matching image 2 & Messenger */}
         {msg.reactions && msg.reactions.length > 0 && (
           <div
-            className={cn(
-              '-mt-2 z-10 flex flex-wrap gap-1 select-none',
-              isMe ? 'justify-end pr-1' : 'justify-start pl-1',
-            )}
+            className="-mt-2.5 z-10 flex max-w-full flex-wrap justify-end gap-1 select-none self-end mr-1.5"
             aria-label={t('chat.reactions')}
           >
             {msg.reactions.map((r, i) => {
@@ -369,10 +366,10 @@ const MessageRowView = memo(function MessageRowView({
                     onReact?.(msg.id, emoji)
                   }}
                   className={cn(
-                    'flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs shadow-xs transition-all active:scale-95 cursor-pointer',
+                    'flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs shadow-xs transition-all active:scale-95 cursor-pointer select-none',
                     myReaction
-                      ? 'border-primary/50 bg-primary/10 text-primary font-semibold ring-1 ring-primary/20'
-                      : 'border-border/80 bg-card hover:bg-muted text-foreground',
+                      ? 'border-primary/80 bg-secondary text-brand-ink font-semibold ring-1 ring-primary/30 shadow-xs'
+                      : 'border-border/80 bg-card hover:bg-muted text-foreground shadow-xs',
                   )}
                   title={myReaction ? t('chat.removeReaction', 'Bỏ cảm xúc') : emoji}
                 >

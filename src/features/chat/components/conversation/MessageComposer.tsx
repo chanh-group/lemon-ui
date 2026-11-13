@@ -366,10 +366,13 @@ export function MessageComposer({
       />
 
       {isRecording ? (
-        <div className="flex w-full items-center justify-between gap-3 min-h-11 rounded-full border border-red-500/30 bg-red-500/5 px-4 animate-in fade-in duration-200">
+        <div className="flex w-full items-center justify-between gap-3 min-h-11 rounded-full border border-blue-500/30 bg-blue-500/10 dark:bg-blue-950/40 px-4 animate-in fade-in duration-200">
           <div className="flex items-center gap-2.5">
-            <span className="size-2.5 rounded-full bg-red-500 animate-ping" />
-            <span className="text-xs font-semibold text-red-600 dark:text-red-400 font-mono">
+            <span className="relative flex size-2.5 items-center justify-center">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-500 opacity-75" />
+              <span className="relative inline-flex size-2 rounded-full bg-blue-500" />
+            </span>
+            <span className="text-xs font-semibold text-blue-600 dark:text-blue-400 font-mono">
               {formatTimer(recordingSeconds)}
             </span>
             <span className="text-xs text-muted-foreground hidden sm:inline">
@@ -381,7 +384,7 @@ export function MessageComposer({
             <button
               type="button"
               onClick={handleCancelRecording}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors"
+              className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
               title={t('chat.cancelRecording', 'Hủy')}
             >
               <TrashIcon className="size-4" />
