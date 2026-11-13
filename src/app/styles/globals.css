@@ -347,6 +347,18 @@
   }
 }
 
+@keyframes call-eq {
+  0%,
+  100% {
+    transform: scaleY(0.35);
+    opacity: 0.45;
+  }
+  50% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
 @utility animate-fade-in-up {
   animation: fade-in-up 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
@@ -377,4 +389,52 @@
 
 @utility animate-wave-shimmer {
   animation: wave-shimmer 3.2s ease-in-out infinite;
+}
+
+/* ============================================================
+   Custom Scrollbar (Transparent track, theme-aware thumb)
+   Eliminates jarring white scrollbar in Dark mode and OS defaults
+   ============================================================ */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(120, 120, 120, 0.3) transparent;
+}
+
+.dark * {
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(120, 120, 120, 0.3);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(120, 120, 120, 0.5);
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+@utility animate-call-eq {
+  animation: call-eq 1.1s ease-in-out infinite;
+  transform-origin: center;
 }

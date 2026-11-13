@@ -5,6 +5,7 @@ import {
   getShortName,
   mapConversationResponse,
   mapMessageResponse,
+  updateConversationLastMessage,
 } from './chat.mapper'
 import type { Conversation, ConversationResponse, MessageResponse } from '../types/chat.types'
 import vi from '@/locales/vi.json'
@@ -25,7 +26,81 @@ function makeMockT(lang: 'vi' | 'en') {
   }
 }
 
+describe('conversation cache updates', () => {
+  const conversation: ConversationResponse = {
+    id: 'c',
+    kind: 'DIRECT',
+    partner: { id: 'other', fullName: 'Alex', username: 'alex', avatarUrl: null, isOnline: false },
+    lastMessagePreview: 'server preview',
+    lastMessageAt: '2026-01-01T00:00:00Z',
+    unreadCount: 0,
+    createdAt: '2026-01-01T00:00:00Z',
+  }
+  const message: MessageResponse = {
+    id: 'm',
+    conversationId: 'c',
+    senderId: 'me',
+    kind: 'IMAGE',
+    body: null,
+    replyToId: null,
+    createdAt: '2026-01-02T00:00:00Z',
+    editedAt: null,
+    deletedAt: null,
+  }
+
+  it('preserves sender and attachment metadata for previews', () => {
+    expect(updateConversationLastMessage(conversation, message)).toMatchObject({
+      lastMessagePreview: '[attachment]',
+      lastMessageSenderId: 'me',
+      lastMessageDetail: message,
+    })
+  })
+
+  it('does not let older or unrelated messages overwrite the inbox', () => {
+    expect(
+      updateConversationLastMessage(conversation, {
+        ...message,
+        createdAt: '2025-01-01T00:00:00Z',
+      }),
+    ).toBe(conversation)
+    expect(
+      updateConversationLastMessage(conversation, { ...message, conversationId: 'other' }),
+    ).toBe(conversation)
+  })
+
+  it('keeps story reaction previews and attachment captions consistent with the server', () => {
+    expect(
+      updateConversationLastMessage(conversation, {
+        ...message,
+        kind: 'STORY_REACTION',
+        body: '🔥',
+      }).lastMessagePreview,
+    ).toBe('[story-reaction]')
+    expect(
+      updateConversationLastMessage(conversation, {
+        ...message,
+        body: 'caption',
+      }).lastMessagePreview,
+    ).toBe('caption')
+  })
+})
+
 describe('chat.mapper', () => {
+  it('shows an uncertain send without presenting it as confirmed', () => {
+    const message: MessageResponse = {
+      id: 'temp-1',
+      conversationId: 'conv',
+      senderId: 'me',
+      kind: 'TEXT',
+      body: 'hello',
+      replyToId: null,
+      createdAt: '2026-01-01T00:00:00Z',
+      editedAt: null,
+      deletedAt: null,
+      sendState: 'uncertain',
+    }
+    expect(mapMessageResponse(message, 'me').status).toBe('uncertain')
+  })
   it('maps an image attachment message correctly', () => {
     const raw: MessageResponse = {
       id: 'msg-1',
@@ -220,6 +295,41 @@ describe('chat.mapper', () => {
     expect(mapped.reactions).toHaveLength(2)
     expect(mapped.reactions![0].emoji).toBe('❤️')
     expect(mapped.reactions![0].count).toBe(2)
+  })
+
+  it('maps temp optimistic message to status sending and preserved clientMsgId', () => {
+    const raw: MessageResponse = {
+      id: 'temp-c123',
+      clientMsgId: 'c123',
+      conversationId: 'conv-1',
+      senderId: 'user-me',
+      body: 'Optimistic text',
+      kind: 'TEXT',
+      replyToId: null,
+      editedAt: null,
+      deletedAt: null,
+      createdAt: '2026-11-09T10:00:00Z',
+    }
+
+    const mapped = mapMessageResponse(raw, 'user-me')
+    expect(mapped.id).toBe('temp-c123')
+    expect(mapped.status).toBe('sending')
+    expect(mapped.fromMe).toBe(true)
+
+    const sentMessage: MessageResponse = {
+      ...raw,
+      id: 'real-msg-id-123',
+    }
+    const mappedSent = mapMessageResponse(sentMessage, 'user-me')
+    expect(mappedSent.status).toBe('sent')
+
+    const partnerMessage: MessageResponse = {
+      ...raw,
+      id: 'partner-msg-id',
+      senderId: 'user-partner',
+    }
+    const mappedPartner = mapMessageResponse(partnerMessage, 'user-me')
+    expect(mappedPartner.status).toBeUndefined()
   })
 
   describe('getShortName', () => {

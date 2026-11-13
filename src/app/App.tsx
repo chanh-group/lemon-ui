@@ -4,6 +4,7 @@ import { CursorGlow } from '@/components/common/CursorGlow'
 import { ThemeProvider } from '@/app/providers/ThemeProvider'
 import { LanguageProvider } from '@/app/providers/LanguageProvider'
 import { SessionProvider } from '@/app/providers/SessionProvider'
+import { CallWindowProvider } from '@/features/chat/components/call/CallWindowProvider'
 import { router } from '@/app/router'
 import { FriendRequestRealtime } from '@/features/chat/hooks/FriendRequestRealtime'
 
@@ -12,10 +13,12 @@ export default function App() {
     <ThemeProvider>
       <LanguageProvider>
         <SessionProvider>
-          <CursorGlow />
-          <FriendRequestRealtime />
-          <RouterProvider router={router} />
-          <Toaster position="top-center" richColors closeButton />
+          <CallWindowProvider>
+            <CursorGlow />
+            <FriendRequestRealtime />
+            <RouterProvider router={router} />
+            <Toaster position="top-center" richColors closeButton />
+          </CallWindowProvider>
         </SessionProvider>
       </LanguageProvider>
     </ThemeProvider>
