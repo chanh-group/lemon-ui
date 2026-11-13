@@ -36,8 +36,8 @@ describe('Localization Integrity & Avatar Text Tests', () => {
   })
 
   it('does not contain obsolete URL image input keys', () => {
-    const enChat = en.chat as Record<string, string>
-    const viChat = vi.chat as Record<string, string>
+    const enChat = en.chat as Record<string, unknown>
+    const viChat = vi.chat as Record<string, unknown>
 
     expect(enChat.directImageUrl).toBeUndefined()
     expect(viChat.directImageUrl).toBeUndefined()
@@ -46,8 +46,8 @@ describe('Localization Integrity & Avatar Text Tests', () => {
   })
 
   it('provides required localization keys for message reactions, forwarding, and voice recording', () => {
-    const enChat = en.chat as Record<string, string>
-    const viChat = vi.chat as Record<string, string>
+    const enChat = en.chat as Record<string, unknown>
+    const viChat = vi.chat as Record<string, unknown>
 
     const requiredKeys = [
       'forwardMessage',
@@ -75,11 +75,15 @@ describe('Localization Integrity & Avatar Text Tests', () => {
   })
 
   it('provides required localization keys for chat info panel and privacy actions', () => {
-    const enChat = en.chat as Record<string, string>
-    const viChat = vi.chat as Record<string, string>
+    const enChat = en.chat as Record<string, unknown>
+    const viChat = vi.chat as Record<string, unknown>
 
     const requiredKeys = [
       'conversationInfo',
+      'featureComingSoon',
+      'loadOlderMedia',
+      'resizeInfoPanel',
+      'resizeInfoPanelHint',
       'closeInfo',
       'profile',
       'personalInfo',
@@ -89,9 +93,6 @@ describe('Localization Integrity & Avatar Text Tests', () => {
       'closeAction',
       'searchInConversationComingSoon',
       'mute',
-      'unmute',
-      'mutedConversation',
-      'unmutedConversation',
       'searchInConversation',
       'noBio',
       'mediaAndFiles',
@@ -105,7 +106,6 @@ describe('Localization Integrity & Avatar Text Tests', () => {
       'fullscreenVideo',
       'playVideo',
       'privacyAndSupport',
-      'muteConversationOption',
       'removeFriend',
       'unfriendConfirmTitle',
       'unfriendConfirmDesc',

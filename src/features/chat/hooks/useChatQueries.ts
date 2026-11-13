@@ -44,6 +44,22 @@ const MAX_MESSAGE_PAGES = 3
 /** Mở hội thoại tải sẵn trang hiện tại + 2 trang cũ để cuộn không chạm mép. */
 const INITIAL_MESSAGE_BUFFER_PAGES = 3
 
+export function rollbackOptimisticConversationPreview(
+  current: ConversationResponse[] | undefined,
+  previous: ConversationResponse[] | undefined,
+  conversationId: string | undefined,
+  optimisticCreatedAt: string | undefined,
+) {
+  if (!current || !previous || !conversationId || !optimisticCreatedAt) return current
+  const previousConversation = previous.find((conversation) => conversation.id === conversationId)
+  if (!previousConversation) return current
+  return current.map((conversation) =>
+    conversation.id === conversationId && conversation.lastMessageAt === optimisticCreatedAt
+      ? previousConversation
+      : conversation,
+  )
+}
+
 export interface MessagePageParam {
   cursor?: string
   after?: string
@@ -206,6 +222,34 @@ export function useConversationMessagesQuery(conversationId: string | null) {
   return { ...query, liveMessages: liveMessagesQuery.data }
 }
 
+/** Paginate the full message history for the media archive without expanding the chat window. */
+export function useConversationMediaArchiveQuery(conversationId: string, enabled: boolean) {
+  return useInfiniteQuery({
+    queryKey: CHAT_QUERY_KEYS.mediaArchive(conversationId),
+    queryFn: async ({ pageParam }: { pageParam: MessagePageParam }) => {
+      const page = await getConversationMessages(
+        conversationId,
+        pageParam.cursor,
+        MESSAGE_PAGE_SIZE,
+        pageParam.after,
+      )
+      return {
+        ...page,
+        items: page.items.map(({ id, createdAt, attachments }) => ({
+          id,
+          createdAt,
+          attachments,
+        })),
+      }
+    },
+    initialPageParam: {} as MessagePageParam,
+    getNextPageParam: (lastPage): MessagePageParam | undefined =>
+      lastPage.hasMore && lastPage.nextCursor ? { cursor: lastPage.nextCursor } : undefined,
+    enabled,
+    staleTime: 1000 * 60,
+  })
+}
+
 export interface SendMessagePendingFile {
   id: string
   file: File
@@ -244,9 +288,6 @@ export function useSendMessageMutation(conversationId: string | null) {
       })
       await queryClient.cancelQueries({ queryKey: CHAT_QUERY_KEYS.conversations })
 
-      const previousLive = queryClient.getQueryData<MessageResponse[]>(
-        CHAT_QUERY_KEYS.liveMessages(targetConversationId),
-      )
       const previousConversations = queryClient.getQueryData<ConversationResponse[]>(
         CHAT_QUERY_KEYS.conversations,
       )
@@ -336,7 +377,12 @@ export function useSendMessageMutation(conversationId: string | null) {
         })
       })
 
-      return { previousLive, previousConversations, clientMsgId, targetConversationId }
+      return {
+        previousConversations,
+        clientMsgId,
+        targetConversationId,
+        optimisticCreatedAt: optimisticMessage.createdAt,
+      }
     },
 
     mutationFn: async (arg: SendMessageArg) => {
@@ -418,7 +464,14 @@ export function useSendMessageMutation(conversationId: string | null) {
         )
       }
       if (context?.previousConversations) {
-        queryClient.setQueryData(CHAT_QUERY_KEYS.conversations, context.previousConversations)
+        queryClient.setQueryData<ConversationResponse[]>(CHAT_QUERY_KEYS.conversations, (current) =>
+          rollbackOptimisticConversationPreview(
+            current,
+            context.previousConversations,
+            context.targetConversationId,
+            context.optimisticCreatedAt,
+          ),
+        )
       }
       toast.error(error instanceof Error ? error.message : t('chat.sendMessageError'))
     },

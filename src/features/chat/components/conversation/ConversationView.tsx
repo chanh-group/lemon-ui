@@ -258,7 +258,6 @@ export function ConversationView({
           onSubmit={submit}
           disabled={messagesLoading || Boolean(messagesError)}
           isSending={isSending}
-          conversationId={conversation.id}
           onTypingStart={onTypingStart}
           onTypingStop={onTypingStop}
         />

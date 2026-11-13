@@ -42,7 +42,6 @@ interface MessageComposerProps {
   ) => boolean | void | Promise<boolean | void>
   disabled?: boolean
   isSending?: boolean
-  conversationId?: string
   onTypingStart?: () => void
   onTypingStop?: () => void
 }
@@ -53,7 +52,6 @@ export function MessageComposer({
   onSubmit,
   disabled = false,
   isSending = false,
-  conversationId: _conversationId,
   onTypingStart,
   onTypingStop,
 }: MessageComposerProps) {
@@ -161,7 +159,13 @@ export function MessageComposer({
       const file = new File([audioBlob], `voice-note-${Date.now()}.${ext}`, { type: mimeType })
       const previewUrl = URL.createObjectURL(file)
 
-      await onSubmit('', undefined, [{ id: generateUUID(), file, previewUrl }])
+      const pendingFile = { id: generateUUID(), file, previewUrl }
+      const sent = await onSubmit('', undefined, [pendingFile])
+      if (sent === false) {
+        setPendingFiles((prev) => [...prev, pendingFile])
+        return
+      }
+      URL.revokeObjectURL(previewUrl)
       toast.success(t('chat.voiceNoteSent', 'Đã gửi tin nhắn thoại'))
     }
 
@@ -295,13 +299,19 @@ export function MessageComposer({
 
     const textToSend = text
     const filesToSend = [...pendingFiles]
+    const sent = await onSubmit(
+      textToSend,
+      undefined,
+      filesToSend.length > 0 ? filesToSend : undefined,
+    )
+    if (sent === false) return
 
-    // Ngay lập tức xoá draft và giải phóng pending files trên composer để người dùng gõ tiếp
-    onDraftChange('')
-    setPendingFiles([])
+    filesToSend.forEach((file) => {
+      if (file.previewUrl) URL.revokeObjectURL(file.previewUrl)
+    })
+    const sentIds = new Set(filesToSend.map((file) => file.id))
+    setPendingFiles((current) => current.filter((file) => !sentIds.has(file.id)))
     requestAnimationFrame(() => inputRef.current?.focus())
-
-    await onSubmit(textToSend, undefined, filesToSend.length > 0 ? filesToSend : undefined)
   }
 
   const canSubmit = (draft.trim().length > 0 || pendingFiles.length > 0) && !disabled && !isSending
@@ -320,7 +330,7 @@ export function MessageComposer({
               key={p.id}
               className="group relative flex items-center gap-2 rounded-lg border border-border bg-card p-1.5 pr-2.5 shadow-xs text-xs"
             >
-              {p.previewUrl ? (
+              {p.previewUrl && isImage(p.file.type, p.file.name) ? (
                 <img
                   src={p.previewUrl}
                   alt={p.file.name}

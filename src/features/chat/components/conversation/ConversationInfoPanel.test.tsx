@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import { renderToString } from 'react-dom/server'
 import { MemoryRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { CHAT_QUERY_KEYS } from '../../hooks/useChatQueries'
 import { ConversationInfoPanel, UserProfileCardContent } from './ConversationInfoPanel'
 import { ConversationHeader } from './ConversationHeader'
 import { ImageLightboxModal } from './ImageLightboxModal'
@@ -101,7 +102,7 @@ describe('ConversationInfoPanel & Header Integration Tests', () => {
       />,
     )
 
-    expect(html).toContain('Trang cá nhân')
+    expect(html).toContain('Hồ sơ')
     expect(html).toContain('Tắt thông báo')
     expect(html).toContain('Tìm kiếm')
   })
@@ -132,6 +133,7 @@ describe('ConversationInfoPanel & Header Integration Tests', () => {
 
     expect(html).toContain('role="separator"')
     expect(html).toContain('cursor-col-resize')
+    expect(html).toContain('tabindex="0"')
   })
 
   it('ConversationHeader renders more options button and highlights when isInfoOpen is true', () => {
@@ -369,6 +371,48 @@ describe('ConversationInfoPanel & Header Integration Tests', () => {
     // while photo-0 and photo-1 are cut off in the initial collapsed state
     expect(html).toContain('photo-7.jpg')
     expect(html).not.toContain('photo-0.jpg')
+  })
+
+  it('loads older archive items independently from the visible message groups', () => {
+    const conversation = { ...dummyConversation, id: 'archive-conversation' }
+    queryClient.setQueryData(CHAT_QUERY_KEYS.mediaArchive(conversation.id), {
+      pages: [
+        {
+          items: [
+            {
+              id: 'old-message',
+              createdAt: '2026-01-01T10:00:00Z',
+              attachments: [
+                {
+                  id: 'old-attachment',
+                  kind: 'IMAGE' as const,
+                  fileName: 'older-archive-photo.jpg',
+                  mimeType: 'image/jpeg',
+                  sizeBytes: 1024,
+                  previewUrl: 'https://example.com/older-archive-photo.jpg',
+                  downloadUrl: 'https://example.com/older-archive-photo.jpg',
+                },
+              ],
+            },
+          ],
+          hasMore: true,
+          nextCursor: 'older-cursor',
+        },
+      ],
+      pageParams: [{}],
+    })
+
+    const html = renderWithProviders(
+      <ConversationInfoPanel
+        conversation={conversation}
+        groups={[]}
+        onClose={() => {}}
+        defaultMediaOpen={true}
+      />,
+    )
+
+    expect(html).toContain('older-archive-photo.jpg')
+    expect(html).toContain('Tải thêm mục cũ hơn')
   })
 
   it('ImageLightboxModal renders video player with controls for video attachments', () => {

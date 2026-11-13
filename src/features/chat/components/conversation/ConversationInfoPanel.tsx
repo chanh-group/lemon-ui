@@ -10,7 +10,6 @@ import {
   Logout01Icon as LeaveData,
   MultiplicationSignIcon as CloseData,
   Notification01Icon as BellData,
-  NotificationOff01Icon as BellOffData,
   PlayIcon as PlayData,
   Search01Icon as SearchData,
   Tick01Icon as CheckData,
@@ -34,7 +33,7 @@ import {
 import { ROUTES } from '@/config/constants'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { cn } from '@/lib/utils'
-import { useConversationMute } from '../../hooks/useConversationMute'
+import { useConversationMediaArchiveQuery } from '../../hooks/useChatQueries'
 import { useBlockUser, useFriends, useRemoveFriend } from '../../hooks/useFriends'
 import type { Conversation, DayGroup, MessageAttachmentItem } from '../../types/chat.types'
 import { formatBytes, isImage, isVideo } from '../../utils/fileTypes'
@@ -43,7 +42,6 @@ import { ImageLightboxModal } from './ImageLightboxModal'
 const CloseIcon = createIcon(CloseData)
 const UserIcon = createIcon(UserData)
 const BellIcon = createIcon(BellData)
-const BellOffIcon = createIcon(BellOffData)
 const SearchIcon = createIcon(SearchData)
 const PlayIcon = createIcon(PlayData)
 const FileIcon = createIcon(FileData)
@@ -256,7 +254,8 @@ export function ConversationInfoPanel({
   const { t } = useTranslation()
   const navigate = useNavigate()
   const isDesktop = useMediaQuery('(min-width: 768px)')
-  const { isMuted, toggleMute } = useConversationMute(conversation.id)
+  const [mediaOpen, setMediaOpen] = useState(defaultMediaOpen)
+  const archiveQuery = useConversationMediaArchiveQuery(conversation.id, mediaOpen)
 
   const removeFriend = useRemoveFriend()
   const blockUser = useBlockUser()
@@ -271,7 +270,6 @@ export function ConversationInfoPanel({
   const bio = conversation.partnerBio || null
 
   // Mặc định cả 2 ngăn đều ĐÓNG theo yêu cầu người dùng
-  const [mediaOpen, setMediaOpen] = useState(defaultMediaOpen)
   const [privacyOpen, setPrivacyOpen] = useState(defaultPrivacyOpen)
   const [mediaTab, setMediaTab] = useState<'media' | 'files'>('media')
   const [showAllMedia, setShowAllMedia] = useState(false)
@@ -353,34 +351,54 @@ export function ConversationInfoPanel({
     setPanelWidth(DEFAULT_PANEL_WIDTH)
   }
 
-  // Trích xuất ảnh, video và file từ các tin nhắn hiện có trong hội thoại (mới nhất lên đầu)
+  // Merge the bounded chat window with the separately paginated archive history.
   const { mediaItems, fileItems } = useMemo(() => {
     const media: MessageAttachmentItem[] = []
     const files: MessageAttachmentItem[] = []
+    const messages = new Map<
+      string,
+      {
+        message: { attachments?: MessageAttachmentItem[]; createdAt?: string }
+        order: number
+      }
+    >()
+    let order = 0
 
-    for (const group of groups) {
-      for (const msg of group.messages) {
-        if (!msg.attachments || msg.attachments.length === 0) continue
-        for (const att of msg.attachments) {
-          if (
-            att.kind === 'IMAGE' ||
-            att.kind === 'VIDEO' ||
-            isImage(att.mimeType, att.fileName) ||
-            isVideo(att.mimeType, att.fileName)
-          ) {
-            media.push(att)
-          } else {
-            files.push(att)
-          }
+    for (const page of archiveQuery.data?.pages ?? []) {
+      for (const message of page.items) messages.set(message.id, { message, order: order++ })
+    }
+    for (const group of groups.slice().reverse()) {
+      for (const message of group.messages.slice().reverse()) {
+        if (!messages.has(message.id)) messages.set(message.id, { message, order: order++ })
+      }
+    }
+
+    const seenAttachments = new Set<string>()
+    const sortedMessages = [...messages.values()].sort((a, b) => {
+      const aTime = Date.parse(a.message.createdAt ?? '')
+      const bTime = Date.parse(b.message.createdAt ?? '')
+      return Number.isFinite(aTime) && Number.isFinite(bTime) ? bTime - aTime : a.order - b.order
+    })
+
+    for (const { message } of sortedMessages) {
+      for (const att of message.attachments ?? []) {
+        if (seenAttachments.has(att.id)) continue
+        seenAttachments.add(att.id)
+        if (
+          att.kind === 'IMAGE' ||
+          att.kind === 'VIDEO' ||
+          isImage(att.mimeType, att.fileName) ||
+          isVideo(att.mimeType, att.fileName)
+        ) {
+          media.push(att)
+        } else {
+          files.push(att)
         }
       }
     }
 
-    return {
-      mediaItems: media.reverse(),
-      fileItems: files.reverse(),
-    }
-  }, [groups])
+    return { mediaItems: media, fileItems: files }
+  }, [archiveQuery.data, groups])
 
   const displayedMedia = useMemo(() => {
     return showAllMedia ? mediaItems : mediaItems.slice(0, MEDIA_DISPLAY_LIMIT)
@@ -389,15 +407,6 @@ export function ConversationInfoPanel({
   const displayedFiles = useMemo(() => {
     return showAllFiles ? fileItems : fileItems.slice(0, FILES_DISPLAY_LIMIT)
   }, [fileItems, showAllFiles])
-
-  const handleToggleMute = () => {
-    const nextMuted = toggleMute()
-    if (nextMuted) {
-      toast.success(t('chat.mutedConversation'))
-    } else {
-      toast.info(t('chat.unmutedConversation'))
-    }
-  }
 
   const handleConfirmUnfriend = () => {
     if (!conversation.partnerId) return
@@ -444,10 +453,28 @@ export function ConversationInfoPanel({
       <div
         role="separator"
         aria-orientation="vertical"
-        aria-label="Kéo để thay đổi kích thước"
-        title="Kéo sang trái/phải để thay đổi chiều rộng, nhấp đúp để đặt lại 340px"
+        aria-label={t('chat.resizeInfoPanel')}
+        aria-valuemin={MIN_PANEL_WIDTH}
+        aria-valuemax={
+          typeof window === 'undefined'
+            ? MAX_PANEL_WIDTH
+            : Math.min(MAX_PANEL_WIDTH, Math.floor(window.innerWidth * 0.55))
+        }
+        aria-valuenow={panelWidth}
+        title={t('chat.resizeInfoPanelHint')}
+        tabIndex={0}
         onMouseDown={startResizing}
         onDoubleClick={resetWidth}
+        onKeyDown={(event) => {
+          const step = event.shiftKey ? 32 : 8
+          const maxAllowed = Math.min(MAX_PANEL_WIDTH, Math.floor(window.innerWidth * 0.55))
+          if (event.key === 'ArrowLeft')
+            setPanelWidth((width) => Math.min(maxAllowed, width + step))
+          else if (event.key === 'ArrowRight')
+            setPanelWidth((width) => Math.max(MIN_PANEL_WIDTH, width - step))
+          else return
+          event.preventDefault()
+        }}
         className={cn(
           'group absolute -left-1.5 top-0 z-30 hidden h-full w-3 cursor-col-resize select-none items-center justify-center md:flex',
           isResizing && 'cursor-col-resize',
@@ -525,26 +552,13 @@ export function ConversationInfoPanel({
           {/* Nút 2: Tắt / Bật thông báo */}
           <button
             type="button"
-            onClick={handleToggleMute}
+            onClick={() => toast.info(t('chat.featureComingSoon'))}
             className="flex flex-col items-center group focus-visible:outline-hidden"
           >
-            <div
-              className={cn(
-                'grid size-10 place-items-center rounded-full transition-colors',
-                isMuted
-                  ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-400'
-                  : 'bg-muted text-brand-ink group-hover:bg-accent',
-              )}
-            >
-              {isMuted ? (
-                <BellOffIcon className="size-5" aria-hidden="true" />
-              ) : (
-                <BellIcon className="size-5" aria-hidden="true" />
-              )}
+            <div className="grid size-10 place-items-center rounded-full bg-muted text-brand-ink transition-colors group-hover:bg-accent">
+              <BellIcon className="size-5" aria-hidden="true" />
             </div>
-            <span className="mt-1.5 text-xs font-medium text-foreground">
-              {isMuted ? t('chat.unmute') : t('chat.mute')}
-            </span>
+            <span className="mt-1.5 text-xs font-medium text-foreground">{t('chat.mute')}</span>
           </button>
 
           {/* Nút 3: Tìm kiếm */}
@@ -617,7 +631,20 @@ export function ConversationInfoPanel({
               {/* Nội dung Tab Ảnh & Video */}
               {mediaTab === 'media' && (
                 <div className="mt-3">
-                  {mediaItems.length === 0 ? (
+                  {archiveQuery.isError && (
+                    <button
+                      type="button"
+                      onClick={() => void archiveQuery.refetch()}
+                      className="mb-2 w-full text-center text-xs text-destructive hover:underline"
+                    >
+                      {t('chat.messagesLoadError')} · {t('common.retry')}
+                    </button>
+                  )}
+                  {archiveQuery.isPending && mediaItems.length === 0 ? (
+                    <p className="py-6 text-center text-xs text-muted-foreground">
+                      {t('chat.pending')}
+                    </p>
+                  ) : mediaItems.length === 0 ? (
                     <p className="py-6 text-center text-xs text-muted-foreground">
                       {t('chat.noMediaYet')}
                     </p>
@@ -683,13 +710,38 @@ export function ConversationInfoPanel({
                       )}
                     </>
                   )}
+                  {archiveQuery.hasNextPage && (
+                    <button
+                      type="button"
+                      disabled={archiveQuery.isFetchingNextPage}
+                      onClick={() => void archiveQuery.fetchNextPage()}
+                      className="mt-2.5 w-full rounded-md border border-border/60 bg-muted/40 py-1.5 text-center text-xs font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-60"
+                    >
+                      {archiveQuery.isFetchingNextPage
+                        ? t('common.loading')
+                        : t('chat.loadOlderMedia')}
+                    </button>
+                  )}
                 </div>
               )}
 
               {/* Nội dung Tab Tệp tin & Tài liệu */}
               {mediaTab === 'files' && (
                 <div className="mt-3">
-                  {fileItems.length === 0 ? (
+                  {archiveQuery.isError && (
+                    <button
+                      type="button"
+                      onClick={() => void archiveQuery.refetch()}
+                      className="mb-2 w-full text-center text-xs text-destructive hover:underline"
+                    >
+                      {t('chat.messagesLoadError')} · {t('common.retry')}
+                    </button>
+                  )}
+                  {archiveQuery.isPending && fileItems.length === 0 ? (
+                    <p className="py-6 text-center text-xs text-muted-foreground">
+                      {t('chat.pending')}
+                    </p>
+                  ) : fileItems.length === 0 ? (
                     <p className="py-6 text-center text-xs text-muted-foreground">
                       {t('chat.noFilesYet')}
                     </p>
@@ -738,6 +790,18 @@ export function ConversationInfoPanel({
                         </button>
                       )}
                     </>
+                  )}
+                  {archiveQuery.hasNextPage && (
+                    <button
+                      type="button"
+                      disabled={archiveQuery.isFetchingNextPage}
+                      onClick={() => void archiveQuery.fetchNextPage()}
+                      className="mt-2.5 w-full rounded-md border border-border/60 bg-muted/40 py-1.5 text-center text-xs font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-60"
+                    >
+                      {archiveQuery.isFetchingNextPage
+                        ? t('common.loading')
+                        : t('chat.loadOlderMedia')}
+                    </button>
                   )}
                 </div>
               )}
@@ -790,9 +854,7 @@ export function ConversationInfoPanel({
               {conversation.isGroup && (
                 <button
                   type="button"
-                  onClick={() =>
-                    toast.info(t('chat.featureUnderDevelopment') || 'Tính năng đang phát triển')
-                  }
+                  onClick={() => toast.info(t('chat.featureComingSoon'))}
                   className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium text-destructive transition-colors hover:bg-destructive/10 dark:hover:bg-destructive/20"
                 >
                   <LeaveIcon className="size-4" aria-hidden="true" />
