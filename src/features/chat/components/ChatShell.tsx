@@ -6,7 +6,6 @@ import { BrandMark } from '@/components/common/BrandMark'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { cn } from '@/lib/utils'
 import { callPath, conversationPath, ROUTES, type CallMedia } from '@/config/constants'
-import { isCallPreviewEnabled } from '@/config/env'
 import { emitTypingStart, emitTypingStop } from '@/lib/socket'
 import { MOCK_CALLS } from '../data/mockData'
 import type {
@@ -183,10 +182,6 @@ export function ChatShell() {
 
   const startCall = (media: CallMedia) => {
     if (!selected) return
-    if (!isCallPreviewEnabled()) {
-      toast.info(t('chat.callsNotAvailable'))
-      return
-    }
     navigate(callPath(selected.id, { media, state: 'ringing' }), {
       state: {
         peerName: selected.name,
@@ -317,10 +312,7 @@ export function ChatShell() {
             setViewingStory(s)
             setTab('stories')
           }}
-          onCall={() => {
-            if (isCallPreviewEnabled()) navigate(ROUTES.calls)
-            else toast.info(t('chat.callsNotAvailable'))
-          }}
+          onCall={() => navigate(ROUTES.calls)}
           onNewCall={() => navigate(ROUTES.newCall)}
           onNewChat={() => navigate(ROUTES.newChat)}
         />

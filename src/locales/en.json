@@ -126,7 +126,6 @@
     "calls": "Calls",
     "newCall": "New Call",
     "backToCalls": "Back to calls",
-    "callsNotAvailable": "Calling will be available soon.",
     "clearCallHistory": "Clear call history",
     "clearCallHistoryUnavailable": "Call history clearing is not available yet.",
     "startVoiceCallWith": "Start a voice call with {{name}}",

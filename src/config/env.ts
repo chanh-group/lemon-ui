@@ -9,7 +9,3 @@ export const env = {
 export function isAuthBypass(): boolean {
   return env.APP_ENV === 'dev'
 }
-
-export function isCallPreviewEnabled(appEnv: string = env.APP_ENV): boolean {
-  return appEnv === 'dev'
-}

@@ -9,7 +9,6 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { createIcon } from '@/components/icons/hugeIcon'
 import { callPath, ROUTES, type CallMedia } from '@/config/constants'
-import { isCallPreviewEnabled } from '@/config/env'
 import { SideNav } from './SideNav'
 import { useConversationsQuery, useCreateDirectChatMutation } from '../hooks/useChatQueries'
 import { useFriends } from '../hooks/useFriends'
@@ -54,10 +53,6 @@ export function NewCallView() {
     [conversationsQuery.data, normalizedQuery],
   )
   const startDirectCall = async (friend: ChatUser, media: CallMedia) => {
-    if (!isCallPreviewEnabled()) {
-      toast.info(t('chat.callsNotAvailable'))
-      return
-    }
     try {
       const conversation = await createDirectChat.mutateAsync(friend.id)
       navigate(callPath(conversation.id, { media, state: 'ringing' }), {
@@ -68,15 +63,11 @@ export function NewCallView() {
         },
       })
     } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : t('chat.callsNotAvailable'))
+      toast.error(error instanceof Error ? error.message : t('common.error'))
     }
   }
 
   const startGroupCall = (group: Conversation, media: CallMedia) => {
-    if (!isCallPreviewEnabled()) {
-      toast.info(t('chat.callsNotAvailable'))
-      return
-    }
     navigate(callPath(group.id, { media, state: 'ringing' }), {
       state: {
         peerName: group.name,

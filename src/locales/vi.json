@@ -126,7 +126,6 @@
     "calls": "Gọi điện",
     "newCall": "Cuộc gọi mới",
     "backToCalls": "Quay lại lịch sử cuộc gọi",
-    "callsNotAvailable": "Tính năng gọi sẽ sớm được hỗ trợ.",
     "clearCallHistory": "Xóa lịch sử cuộc gọi",
     "clearCallHistoryUnavailable": "Chưa thể xóa lịch sử cuộc gọi vì backend chưa hỗ trợ.",
     "startVoiceCallWith": "Gọi thoại cho {{name}}",
