@@ -33,7 +33,7 @@ export function TextStoryEditor({ onDiscard, onShare, isSharing }: TextStoryEdit
           aria-label={t('chat.addTextHint')}
           rows={8}
           maxLength={140}
-          className="my-2 w-full flex-1 resize-none bg-transparent text-center text-2xl font-bold text-foreground outline-none placeholder:font-semibold placeholder:text-white/60"
+          className="my-2 w-full flex-1 resize-none bg-transparent text-center text-2xl font-bold text-white outline-none placeholder:font-semibold placeholder:text-white/70"
         />
       </div>
 

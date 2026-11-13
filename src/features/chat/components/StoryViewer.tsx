@@ -263,7 +263,7 @@ export function StoryViewer({
 
   const name = storyDisplayName(story, t)
   const actionClass =
-    'grid size-10 place-items-center rounded-full bg-black/45 text-white hover:bg-black/70 focus-visible:outline-2 focus-visible:outline-white'
+    'grid size-10 place-items-center rounded-full bg-background/75 text-foreground shadow-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring'
   return (
     <div
       role={embedded ? undefined : 'dialog'}
@@ -293,7 +293,7 @@ export function StoryViewer({
         </button>
       )}
       <section
-        className="relative flex h-full w-full max-w-[460px] flex-col overflow-hidden bg-neutral-950 text-white shadow-2xl sm:my-4 sm:h-[min(90vh,820px)] sm:rounded-2xl"
+        className="relative flex h-full w-full max-w-[460px] flex-col overflow-hidden bg-card shadow-2xl sm:my-4 sm:h-[min(90vh,820px)] sm:rounded-2xl"
         aria-label={name}
       >
         <div className="absolute inset-0 flex items-center justify-center overflow-hidden">
@@ -336,17 +336,19 @@ export function StoryViewer({
                 story.background || TEXT_STORY_BG,
               )}
             >
-              <p className="whitespace-pre-wrap break-words text-2xl font-bold">{caption}</p>
+              <p className="whitespace-pre-wrap break-words text-2xl font-bold text-white drop-shadow-md">
+                {caption}
+              </p>
             </div>
           )}
         </div>
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/65 via-transparent to-black/75" />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-background/65 via-transparent to-background/75" />
         <header className="relative z-10 p-3">
           <div className="mb-3 flex gap-1">
             {sameAuthor.map((item) => (
-              <div key={item.id} className="h-1 flex-1 overflow-hidden rounded-full bg-white/35">
+              <div key={item.id} className="h-1 flex-1 overflow-hidden rounded-full bg-muted/70">
                 <div
-                  className="h-full bg-white"
+                  className="h-full bg-primary"
                   style={{
                     width:
                       item.id === story.id
@@ -363,7 +365,7 @@ export function StoryViewer({
             <UserAvatar name={name} src={story.authorAvatar} className="size-10" />
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-bold">{name}</p>
-              <p className="text-xs text-white/75">{story.time}</p>
+              <p className="text-xs text-muted-foreground">{story.time}</p>
             </div>
             <button
               type="button"
@@ -448,7 +450,7 @@ export function StoryViewer({
             <button
               type="button"
               onClick={() => setShowViews(true)}
-              className="flex items-center gap-2 rounded-full bg-black/50 px-4 py-2 text-sm"
+              className="flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm text-card-foreground"
             >
               <Eye size={18} />
               {t('chat.storyViewers', { defaultValue: 'Người xem' })}
@@ -475,8 +477,8 @@ export function StoryViewer({
                       aria-label={emoji}
                       aria-pressed={reaction === emoji}
                       className={cn(
-                        'grid size-10 place-items-center rounded-full bg-black/45 text-2xl hover:bg-white/25',
-                        reaction === emoji && 'ring-2 ring-white',
+                        'grid size-10 place-items-center rounded-full bg-muted text-2xl hover:bg-accent',
+                        reaction === emoji && 'ring-2 ring-primary',
                       )}
                     >
                       {emoji}
@@ -491,7 +493,7 @@ export function StoryViewer({
                     onChange={(e) => setDraft(e.target.value)}
                     maxLength={4000}
                     placeholder={t('chat.replyPlaceholder', { defaultValue: 'Trả lời tin...' })}
-                    className="min-w-0 flex-1 rounded-full border border-white/40 bg-black/45 px-4 py-2 text-sm outline-none focus:border-white"
+                    className="min-w-0 flex-1 rounded-full border border-border bg-background px-4 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-ring"
                   />
                   <button
                     type="submit"
@@ -569,7 +571,7 @@ export function StoryViewer({
             type="button"
             disabled={remove.isPending}
             onClick={() => void deleteCurrent()}
-            className="rounded-lg bg-red-600 p-2 font-semibold text-white disabled:opacity-50"
+            className="rounded-lg bg-destructive p-2 font-semibold text-destructive-foreground disabled:opacity-50"
           >
             {t('chat.deleteStory', { defaultValue: 'Xóa tin' })}
           </button>
