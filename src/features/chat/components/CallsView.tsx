@@ -20,7 +20,9 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { UserAvatar } from '@/components/common/UserAvatar'
 import { ROUTES } from '@/config/constants'
+import { isCallPreviewEnabled } from '@/config/env'
 import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
 import { MOCK_CALLS } from '../data/mockData'
 import { useConversationsQuery } from '../hooks/useChatQueries'
 import type { CallEntry } from '../types/chat.types'
@@ -149,9 +151,11 @@ export function CallsView() {
                 <li key={call.id} role="listitem">
                   <CallRow
                     call={call}
-                    onCall={(selectedCall) =>
-                      navigate(ROUTES.newCall, { state: { query: selectedCall.name } })
-                    }
+                    onCall={(selectedCall) => {
+                      if (isCallPreviewEnabled())
+                        navigate(ROUTES.newCall, { state: { query: selectedCall.name } })
+                      else toast.info(t('chat.callsNotAvailable'))
+                    }}
                   />
                 </li>
               ))}

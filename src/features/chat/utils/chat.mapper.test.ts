@@ -67,9 +67,40 @@ describe('conversation cache updates', () => {
       updateConversationLastMessage(conversation, { ...message, conversationId: 'other' }),
     ).toBe(conversation)
   })
+
+  it('keeps story reaction previews and attachment captions consistent with the server', () => {
+    expect(
+      updateConversationLastMessage(conversation, {
+        ...message,
+        kind: 'STORY_REACTION',
+        body: '🔥',
+      }).lastMessagePreview,
+    ).toBe('[story-reaction]')
+    expect(
+      updateConversationLastMessage(conversation, {
+        ...message,
+        body: 'caption',
+      }).lastMessagePreview,
+    ).toBe('caption')
+  })
 })
 
 describe('chat.mapper', () => {
+  it('shows an uncertain send without presenting it as confirmed', () => {
+    const message: MessageResponse = {
+      id: 'temp-1',
+      conversationId: 'conv',
+      senderId: 'me',
+      kind: 'TEXT',
+      body: 'hello',
+      replyToId: null,
+      createdAt: '2026-01-01T00:00:00Z',
+      editedAt: null,
+      deletedAt: null,
+      sendState: 'uncertain',
+    }
+    expect(mapMessageResponse(message, 'me').status).toBe('uncertain')
+  })
   it('maps an image attachment message correctly', () => {
     const raw: MessageResponse = {
       id: 'msg-1',

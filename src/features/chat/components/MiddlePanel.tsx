@@ -330,6 +330,15 @@ export function MiddlePanel({
                           </span>
                         </span>
                       </button>
+                      {contactStory && (
+                        <button
+                          type="button"
+                          aria-label={t('chat.viewStoryOf', { name: c.name })}
+                          title={t('chat.viewStoryOf', { name: c.name })}
+                          onClick={() => onOpenStory(contactStory)}
+                          className="absolute top-1/2 left-3 z-10 size-11 -translate-y-1/2 rounded-full transition-transform duration-150 hover:scale-105 active:scale-95 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                        />
+                      )}
                     </li>
                   )
                 })}

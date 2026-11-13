@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { ArrowDown01Icon as ArrowDownData } from '@hugeicons/core-free-icons'
@@ -22,6 +22,12 @@ interface ConversationViewProps {
   hasNewerMessages: boolean
   isLoadingNewerMessages: boolean
   onLoadNewerMessages: () => Promise<unknown>
+  hasLatest: boolean
+  onLoadLatest: () => Promise<void>
+  onVisibleMessage: (messageId: string) => void
+  onRetryMessage: (messageId: string) => void
+  restoreMessageId?: string
+  onPositionChange: (messageId: string | undefined) => void
   onSend: (
     text: string,
     attachments?: MessageAttachmentInput[],
@@ -50,6 +56,12 @@ export function ConversationView({
   hasNewerMessages,
   isLoadingNewerMessages,
   onLoadNewerMessages,
+  hasLatest,
+  onLoadLatest,
+  onVisibleMessage,
+  onRetryMessage,
+  restoreMessageId,
+  onPositionChange,
   onSend,
   isSending,
   onBack,
@@ -62,13 +74,16 @@ export function ConversationView({
   onOpenStory,
 }: ConversationViewProps) {
   const { t } = useTranslation()
+  const [initialRestoreMessageId] = useState(restoreMessageId)
   const [draft, setDraft] = useState('')
   const [isInfoOpen, setIsInfoOpen] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const messageListRef = useRef<MessageListHandle>(null)
   const [showJump, setShowJump] = useState(false)
-  const [atBottom, setAtBottom] = useState(true)
-  const atBottomRef = useRef(true)
+  const [atBottom, setAtBottom] = useState(!initialRestoreMessageId)
+  const [jumpPending, setJumpPending] = useState(false)
+  const [jumpReady, setJumpReady] = useState(false)
+  const atBottomRef = useRef(!initialRestoreMessageId)
   const olderRequestPending = useRef(false)
   const newerRequestPending = useRef(false)
   const latestMessage = groups.at(-1)?.messages.at(-1)
@@ -91,12 +106,27 @@ export function ConversationView({
     messageListRef.current?.scrollToEnd(smooth ? 'smooth' : 'auto')
   }
 
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
-    }
+  useLayoutEffect(() => {
+    if (!jumpReady || !hasLatest) return
     scrollToBottom(false)
-  }, [conversation.id])
+    setJumpReady(false)
+    setShowJump(false)
+    atBottomRef.current = true
+    setAtBottom(true)
+  }, [jumpReady, hasLatest, groups])
+
+  const goToLatest = async () => {
+    if (jumpPending) return
+    setJumpPending(true)
+    try {
+      if (!hasLatest) await onLoadLatest()
+      setJumpReady(true)
+    } catch {
+      toast.error(t('chat.messagesLoadError'))
+    } finally {
+      setJumpPending(false)
+    }
+  }
 
   const loadOlderMessages = () => {
     const el = scrollRef.current
@@ -136,7 +166,12 @@ export function ConversationView({
     const scrollingUp = el.scrollTop < previousScrollTop
     const scrollingDown = el.scrollTop > previousScrollTop
     const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120
-    if (nearBottom) setShowJump(false)
+    if (nearBottom && hasLatest) onPositionChange(undefined)
+    else {
+      const visibleMessage = messageListRef.current?.firstVisibleMessage()
+      if (visibleMessage) onPositionChange(visibleMessage)
+    }
+    setShowJump(!nearBottom)
     if (atBottomRef.current !== nearBottom) {
       atBottomRef.current = nearBottom
       setAtBottom(nearBottom)
@@ -175,8 +210,7 @@ export function ConversationView({
     if (!sent) return false
     // Giữ text người dùng gõ thêm trong lúc tin trước đang gửi.
     setDraft((current) => (current === text ? '' : current))
-    setShowJump(false)
-    scrollToBottom()
+    await goToLatest()
     return true
   }
 
@@ -241,22 +275,23 @@ export function ConversationView({
               senderAvatarUrl={conversation.partnerAvatar}
               scrollRef={scrollRef}
               conversationId={conversation.id}
-              followBottom={atBottom}
+              followBottom={atBottom && hasLatest}
+              onVisibleMessage={onVisibleMessage}
+              onRetryMessage={onRetryMessage}
+              restoreMessageId={initialRestoreMessageId}
             />
           )}
 
-          {showJump && (
+          {(showJump || (!hasLatest && groups.length > 0)) && (
             <button
               type="button"
-              onClick={() => {
-                setShowJump(false)
-                scrollToBottom()
-              }}
+              onClick={() => void goToLatest()}
+              disabled={jumpPending}
               aria-label={t('chat.jumpToLatest')}
               className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-md transition-transform duration-150 hover:scale-105"
             >
               <ArrowDown className="size-3.5" aria-hidden="true" />
-              {t('chat.newMessages')}
+              {t('chat.jumpToLatest')}
             </button>
           )}
         </div>

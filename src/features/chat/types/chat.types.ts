@@ -118,7 +118,7 @@ export interface ChatMessage {
   photoLabel?: string
   attachments?: MessageAttachmentItem[]
   time: string
-  status?: 'sent' | 'read' | 'sending' | 'failed'
+  status?: 'sent' | 'read' | 'sending' | 'failed' | 'uncertain'
   reactions?: MessageReactionItem[]
   isForwarded?: boolean
   storyId?: string | null
@@ -199,10 +199,12 @@ export interface MessageResponse {
   id: string
   conversationId: string
   senderId: string
-  kind: 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE' | 'SYSTEM'
+  kind: 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE' | 'SYSTEM' | 'STORY_REPLY' | 'STORY_REACTION'
   body: string | null
   replyToId: string | null
   clientMsgId?: string | null
+  sendState?: 'uncertain'
+  retryPayload?: SendMessageDto
   attachments?: MessageAttachmentItem[]
   reactions?: MessageReactionItem[]
   isForwarded?: boolean

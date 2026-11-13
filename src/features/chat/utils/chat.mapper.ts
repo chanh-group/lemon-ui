@@ -67,9 +67,13 @@ export function updateConversationLastMessage(
     lastMessageDetail: message,
     lastMessagePreview: message.deletedAt
       ? '[message-revoked]'
-      : hasAttachment
-        ? '[attachment]'
-        : message.body,
+      : message.kind === 'STORY_REACTION'
+        ? '[story-reaction]'
+        : message.body
+          ? message.body.slice(0, 80)
+          : hasAttachment
+            ? '[attachment]'
+            : message.body,
   }
 }
 
@@ -273,7 +277,14 @@ export function mapMessageResponse(raw: MessageResponse, currentUserId?: string)
     attachments: raw.attachments,
     photoLabel: raw.attachments?.[0]?.fileName,
     time: formatTimeHHmm(raw.createdAt),
-    status: raw.id.startsWith('temp-') ? 'sending' : isMe ? 'sent' : undefined,
+    status:
+      raw.sendState === 'uncertain'
+        ? 'uncertain'
+        : raw.id.startsWith('temp-')
+          ? 'sending'
+          : isMe
+            ? 'sent'
+            : undefined,
     reactions: raw.reactions,
     isForwarded: raw.isForwarded,
     createdAt:
