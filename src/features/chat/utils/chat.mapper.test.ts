@@ -28,8 +28,15 @@ function makeMockT(lang: 'vi' | 'en') {
 describe('chat.mapper', () => {
   it('shows an uncertain send without presenting it as confirmed', () => {
     const message: MessageResponse = {
-      id: 'temp-1', conversationId: 'conv', senderId: 'me', kind: 'TEXT', body: 'hello',
-      replyToId: null, createdAt: '2026-01-01T00:00:00Z', editedAt: null, deletedAt: null,
+      id: 'temp-1',
+      conversationId: 'conv',
+      senderId: 'me',
+      kind: 'TEXT',
+      body: 'hello',
+      replyToId: null,
+      createdAt: '2026-01-01T00:00:00Z',
+      editedAt: null,
+      deletedAt: null,
       sendState: 'uncertain',
     }
     expect(mapMessageResponse(message, 'me').status).toBe('uncertain')

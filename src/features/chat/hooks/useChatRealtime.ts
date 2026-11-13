@@ -213,7 +213,7 @@ export function useChatRealtime(activeConversationId: string | null) {
               lastMessageSenderId: msg.senderId,
               lastMessageAt: msg.createdAt,
               unreadCount:
-                  msg.senderId === userId
+                msg.senderId === userId
                   ? conversation.unreadCount
                   : (conversation.unreadCount || 0) + 1,
             }

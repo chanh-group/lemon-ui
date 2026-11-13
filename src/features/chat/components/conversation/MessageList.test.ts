@@ -4,13 +4,19 @@ import type { ChatMessage } from '../../types/chat.types'
 
 describe('newestVisibleIncoming', () => {
   it('selects the newest incoming message whose bottom is visible', () => {
-    expect(newestVisibleIncoming([
-      { id: 'above', fromMe: false, bottom: 0 },
-      { id: 'seen', fromMe: false, bottom: 50 },
-      { id: 'outgoing', fromMe: true, bottom: 60 },
-      { id: 'temp-1', fromMe: false, bottom: 70 },
-      { id: 'below', fromMe: false, bottom: 101 },
-    ], 0, 100)).toBe('seen')
+    expect(
+      newestVisibleIncoming(
+        [
+          { id: 'above', fromMe: false, bottom: 0 },
+          { id: 'seen', fromMe: false, bottom: 50 },
+          { id: 'outgoing', fromMe: true, bottom: 60 },
+          { id: 'temp-1', fromMe: false, bottom: 70 },
+          { id: 'below', fromMe: false, bottom: 101 },
+        ],
+        0,
+        100,
+      ),
+    ).toBe('seen')
   })
 })
 

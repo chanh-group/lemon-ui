@@ -43,11 +43,7 @@ export function visibleLiveMessages(
   const compare = (a: MessageResponse, b: MessageResponse) =>
     Date.parse(a.createdAt) - Date.parse(b.createdAt) || a.id.localeCompare(b.id)
   const oldest = timeline.reduce((a, b) => (compare(a, b) <= 0 ? a : b))
-  return live.filter(
-    (message) =>
-      message.id.startsWith('temp-') ||
-      compare(message, oldest) >= 0,
-  )
+  return live.filter((message) => message.id.startsWith('temp-') || compare(message, oldest) >= 0)
 }
 
 export function ChatShell() {
@@ -160,7 +156,8 @@ export function ChatShell() {
       }
     }
     return [...uniqueMap.values()].sort(
-      (left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt) || left.id.localeCompare(right.id),
+      (left, right) =>
+        Date.parse(left.createdAt) - Date.parse(right.createdAt) || left.id.localeCompare(right.id),
     )
   }, [messagesQuery.data, messagesQuery.liveMessages, messagesQuery.hasLatest])
 
@@ -184,7 +181,11 @@ export function ChatShell() {
     lastReadAttempt.current = attempt
     markReadMutation.mutate(
       { conversationId: selectedId, lastReadMessageId: messageId },
-      { onError: () => { if (lastReadAttempt.current === attempt) lastReadAttempt.current = null } },
+      {
+        onError: () => {
+          if (lastReadAttempt.current === attempt) lastReadAttempt.current = null
+        },
+      },
     )
   }
 
@@ -357,13 +358,16 @@ export function ChatShell() {
             onVisibleMessage={markVisibleMessageRead}
             onRetryMessage={handleRetrySend}
             restoreMessageId={
-              !selected.unread && messageItems.some((message) => message.id === scrollPositions[selected.id])
+              !selected.unread &&
+              messageItems.some((message) => message.id === scrollPositions[selected.id])
                 ? scrollPositions[selected.id]
                 : undefined
             }
             onPositionChange={(messageId) => {
               setScrollPositions((positions) =>
-                positions[selected.id] === messageId ? positions : { ...positions, [selected.id]: messageId },
+                positions[selected.id] === messageId
+                  ? positions
+                  : { ...positions, [selected.id]: messageId },
               )
             }}
             isLoadingNewerMessages={messagesQuery.isFetchingPreviousPage}

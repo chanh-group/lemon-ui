@@ -9,7 +9,11 @@ import {
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { generateUUID } from '@/lib/utils'
-import { isUncertainSendError, resolveSendMessageKind, retryUncertainSend } from '../utils/messageSend'
+import {
+  isUncertainSendError,
+  resolveSendMessageKind,
+  retryUncertainSend,
+} from '../utils/messageSend'
 import { queryKeys } from '@/infrastructure/query/keys'
 import {
   getConversationById,
@@ -67,7 +71,8 @@ export function upsertOptimisticMessage(
   const exists = messages.some((message) => message.clientMsgId === optimistic.clientMsgId)
   if (!exists) return [...messages, optimistic]
   return messages.map((message) => {
-    if (message.clientMsgId !== optimistic.clientMsgId || !message.id.startsWith('temp-')) return message
+    if (message.clientMsgId !== optimistic.clientMsgId || !message.id.startsWith('temp-'))
+      return message
     return { ...message, sendState: undefined }
   })
 }
@@ -251,11 +256,17 @@ export function useConversationMessagesQuery(conversationId: string | null) {
     try {
       await request
     } finally {
-      if (latestRequests.current.get(conversationId) === request) latestRequests.current.delete(conversationId)
+      if (latestRequests.current.get(conversationId) === request)
+        latestRequests.current.delete(conversationId)
     }
   }
 
-  return { ...query, liveMessages: liveMessagesQuery.data, hasLatest: windowHasLatest(data), loadLatest }
+  return {
+    ...query,
+    liveMessages: liveMessagesQuery.data,
+    hasLatest: windowHasLatest(data),
+    loadLatest,
+  }
 }
 
 /** Paginate the full message history for the media archive without expanding the chat window. */
@@ -332,9 +343,12 @@ export function useSendMessageMutation(conversationId: string | null) {
       if (typeof arg !== 'string') {
         arg.clientMsgId = clientMsgId
       }
-      const wasUncertain = queryClient.getQueryData<MessageResponse[]>(
-        CHAT_QUERY_KEYS.liveMessages(targetConversationId),
-      )?.some((message) => message.clientMsgId === clientMsgId && message.sendState === 'uncertain') ?? false
+      const wasUncertain =
+        queryClient
+          .getQueryData<MessageResponse[]>(CHAT_QUERY_KEYS.liveMessages(targetConversationId))
+          ?.some(
+            (message) => message.clientMsgId === clientMsgId && message.sendState === 'uncertain',
+          ) ?? false
 
       // Chuẩn bị attachments tạm thời cho UI lạc quan (dùng local blob URL cho media)
       let optimisticAttachments: MessageAttachmentItem[] | undefined
@@ -490,32 +504,42 @@ export function useSendMessageMutation(conversationId: string | null) {
       }
       queryClient.setQueryData<MessageResponse[]>(
         CHAT_QUERY_KEYS.liveMessages(targetConversationId),
-        (old) => old?.map((message) =>
-          message.clientMsgId === clientMsgId ? { ...message, retryPayload: payload } : message,
-        ),
+        (old) =>
+          old?.map((message) =>
+            message.clientMsgId === clientMsgId ? { ...message, retryPayload: payload } : message,
+          ),
       )
       return retryUncertainSend(() => sendMessage(targetConversationId, payload))
     },
 
     onError: (error: unknown, _arg: SendMessageArg, context) => {
       // Nếu gửi thất bại thì hiển thị thông báo lỗi và xoá tin nhắn đó đi
-      const confirmed = context?.targetConversationId && context.clientMsgId
-        ? [
-            ...(queryClient.getQueryData<MessageResponse[]>(
-              CHAT_QUERY_KEYS.liveMessages(context.targetConversationId),
-            ) ?? []),
-            ...(queryClient.getQueryData<InfiniteData<MessageTimelineResponse>>(
-              CHAT_QUERY_KEYS.messages(context.targetConversationId),
-            )?.pages.flatMap((page) => page.items) ?? []),
-          ].some((message) => message.clientMsgId === context.clientMsgId && !message.id.startsWith('temp-'))
-        : false
+      const confirmed =
+        context?.targetConversationId && context.clientMsgId
+          ? [
+              ...(queryClient.getQueryData<MessageResponse[]>(
+                CHAT_QUERY_KEYS.liveMessages(context.targetConversationId),
+              ) ?? []),
+              ...(queryClient
+                .getQueryData<InfiniteData<MessageTimelineResponse>>(
+                  CHAT_QUERY_KEYS.messages(context.targetConversationId),
+                )
+                ?.pages.flatMap((page) => page.items) ?? []),
+            ].some(
+              (message) =>
+                message.clientMsgId === context.clientMsgId && !message.id.startsWith('temp-'),
+            )
+          : false
       if (confirmed) return
       if ((context?.wasUncertain || isUncertainSendError(error)) && context?.targetConversationId) {
         queryClient.setQueryData<MessageResponse[]>(
           CHAT_QUERY_KEYS.liveMessages(context.targetConversationId),
-          (old) => old?.map((message) =>
-            message.clientMsgId === context.clientMsgId ? { ...message, sendState: 'uncertain' } : message,
-          ),
+          (old) =>
+            old?.map((message) =>
+              message.clientMsgId === context.clientMsgId
+                ? { ...message, sendState: 'uncertain' }
+                : message,
+            ),
         )
         toast.error(t('chat.sendUncertain'))
         return

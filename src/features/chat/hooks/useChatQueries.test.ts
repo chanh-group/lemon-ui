@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'bun:test'
-import { rollbackOptimisticConversationPreview, upsertOptimisticMessage, windowHasLatest } from './useChatQueries'
+import {
+  rollbackOptimisticConversationPreview,
+  upsertOptimisticMessage,
+  windowHasLatest,
+} from './useChatQueries'
 import type { ConversationResponse, MessageResponse } from '../types/chat.types'
 
 const previousConversation: ConversationResponse = {
@@ -67,17 +71,30 @@ describe('windowHasLatest', () => {
     expect(windowHasLatest({ pages: [page], pageParams: [{}] })).toBe(true)
     expect(windowHasLatest({ pages: [page], pageParams: [{ cursor: 'old' }] })).toBe(false)
     expect(windowHasLatest({ pages: [page], pageParams: [{ after: 'old' }] })).toBe(true)
-    expect(windowHasLatest({ pages: [{ ...page, hasMore: true }], pageParams: [{ after: 'old' }] })).toBe(false)
+    expect(
+      windowHasLatest({ pages: [{ ...page, hasMore: true }], pageParams: [{ after: 'old' }] }),
+    ).toBe(false)
   })
 })
 
 describe('upsertOptimisticMessage', () => {
   it('reuses an uncertain message and its retry data rather than appending a duplicate', () => {
     const message: MessageResponse = {
-      id: 'temp-key', conversationId: 'c', senderId: 'me', kind: 'TEXT', body: 'hi',
-      clientMsgId: 'key', sendState: 'uncertain', retryPayload: { clientMsgId: 'key', body: 'hi' },
-      replyToId: null, createdAt: '2026-01-01T00:00:00Z', editedAt: null, deletedAt: null,
+      id: 'temp-key',
+      conversationId: 'c',
+      senderId: 'me',
+      kind: 'TEXT',
+      body: 'hi',
+      clientMsgId: 'key',
+      sendState: 'uncertain',
+      retryPayload: { clientMsgId: 'key', body: 'hi' },
+      replyToId: null,
+      createdAt: '2026-01-01T00:00:00Z',
+      editedAt: null,
+      deletedAt: null,
     }
-    expect(upsertOptimisticMessage([message], message)).toEqual([{ ...message, sendState: undefined }])
+    expect(upsertOptimisticMessage([message], message)).toEqual([
+      { ...message, sendState: undefined },
+    ])
   })
 })

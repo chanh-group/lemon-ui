@@ -58,9 +58,15 @@ export function newestVisibleIncoming(
   top: number,
   bottom: number,
 ): string | undefined {
-  return messages.filter((message) =>
-    !message.fromMe && !message.id.startsWith('temp-') && message.bottom > top && message.bottom <= bottom,
-  ).at(-1)?.id
+  return messages
+    .filter(
+      (message) =>
+        !message.fromMe &&
+        !message.id.startsWith('temp-') &&
+        message.bottom > top &&
+        message.bottom <= bottom,
+    )
+    .at(-1)?.id
 }
 
 function toMinutes(time: string): number {
@@ -409,7 +415,12 @@ const MessageRowView = memo(function MessageRowView({
                   aria-label={t('chat.sending', 'Đang gửi')}
                 />
               ) : msg.status === 'uncertain' ? (
-                <button type="button" onClick={() => onRetryMessage?.(msg.id)} title={t('chat.sendUncertain')} className="text-destructive underline">
+                <button
+                  type="button"
+                  onClick={() => onRetryMessage?.(msg.id)}
+                  title={t('chat.sendUncertain')}
+                  className="text-destructive underline"
+                >
                   {t('chat.retrySend')}
                 </button>
               ) : msg.status === 'read' ? (
@@ -468,7 +479,17 @@ function estimateRowHeight(row: MessageListRow | undefined): number {
 }
 
 export const MessageList = forwardRef<MessageListHandle, MessageListProps>(function MessageList(
-  { groups, senderLabel, senderAvatarUrl, scrollRef, conversationId, followBottom = true, onVisibleMessage, onRetryMessage, restoreMessageId },
+  {
+    groups,
+    senderLabel,
+    senderAvatarUrl,
+    scrollRef,
+    conversationId,
+    followBottom = true,
+    onVisibleMessage,
+    onRetryMessage,
+    restoreMessageId,
+  },
   ref,
 ) {
   'use no memo'
@@ -555,7 +576,8 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
         for (const element of root.querySelectorAll<HTMLElement>('[data-index]')) {
           const row = rows[Number(element.dataset.index)]
           const rect = element.getBoundingClientRect()
-          if (row?.kind === 'message' && rect.bottom > bounds.top && rect.top < bounds.bottom) return row.key
+          if (row?.kind === 'message' && rect.bottom > bounds.top && rect.top < bounds.bottom)
+            return row.key
         }
         return undefined
       },

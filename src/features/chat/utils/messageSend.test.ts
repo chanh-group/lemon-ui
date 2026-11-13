@@ -38,19 +38,23 @@ describe('resolveSendMessageKind', () => {
 describe('retryUncertainSend', () => {
   it('retries a network failure with the same send operation', async () => {
     let attempts = 0
-    expect(await retryUncertainSend(async () => {
-      if (++attempts === 1) throw new ApiError('NETWORK_ERROR', 0, 'offline')
-      return 'sent'
-    })).toBe('sent')
+    expect(
+      await retryUncertainSend(async () => {
+        if (++attempts === 1) throw new ApiError('NETWORK_ERROR', 0, 'offline')
+        return 'sent'
+      }),
+    ).toBe('sent')
     expect(attempts).toBe(2)
   })
 
   it('does not retry a definite server rejection', async () => {
     let attempts = 0
-    await expect(retryUncertainSend(async () => {
-      attempts += 1
-      throw new ApiError('BAD_REQUEST', 400, 'rejected')
-    })).rejects.toThrow('rejected')
+    await expect(
+      retryUncertainSend(async () => {
+        attempts += 1
+        throw new ApiError('BAD_REQUEST', 400, 'rejected')
+      }),
+    ).rejects.toThrow('rejected')
     expect(attempts).toBe(1)
   })
 
