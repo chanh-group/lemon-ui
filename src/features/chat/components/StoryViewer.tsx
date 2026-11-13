@@ -72,7 +72,7 @@ export function StoryViewer({
   const items = stories.length ? stories : [story]
   const index = items.findIndex((item) => item.id === story.id)
   const sameAuthor = items.filter((item) =>
-    item.authorId ? item.authorId === story.authorId : item.id === story.id,
+    story.authorId ? item.authorId === story.authorId : item.id === story.id,
   )
   const media = useStoryMedia(story)
   const mediaUrl = story.mediaUrl || media.data
@@ -256,7 +256,7 @@ export function StoryViewer({
       aria-modal={embedded ? undefined : true}
       aria-label={embedded ? undefined : name}
       className={cn(
-        'z-40 flex min-h-0 w-full items-center justify-center bg-background text-foreground',
+        'z-40 flex min-h-0 w-full items-center justify-center bg-background text-foreground [container-type:size]',
         embedded ? 'relative h-full' : 'fixed inset-0',
       )}
     >
@@ -281,7 +281,7 @@ export function StoryViewer({
         <ArrowLeft size={20} />
       </button>
       <section
-        className="relative flex h-full w-full max-w-[460px] flex-col overflow-hidden bg-card shadow-2xl sm:my-4 sm:h-[min(90vh,820px)] sm:rounded-2xl"
+        className="relative flex aspect-[9/16] w-[min(100%,460px,56.25cqh)] shrink-0 flex-col overflow-hidden bg-card shadow-2xl sm:rounded-2xl"
         aria-label={name}
       >
         <div className="absolute inset-0 flex items-center justify-center overflow-hidden">
