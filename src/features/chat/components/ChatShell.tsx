@@ -30,6 +30,7 @@ import { MiddlePanel } from './MiddlePanel'
 import { ConversationView } from './conversation'
 import { StoryViewer } from './StoryViewer'
 import { useAuth } from '@/features/auth/api'
+import { useCallWindow } from './call/CallWindowProvider'
 
 const TYPING_HEARTBEAT_MS = 1_500
 
@@ -80,6 +81,7 @@ export function ChatShell() {
   const messagesQuery = useConversationMessagesQuery(selectedId)
   const sendMessageMutation = useSendMessageMutation(selectedId)
   const markReadMutation = useMarkReadMutation()
+  const callWindow = useCallWindow()
   const lastTypingSentAt = useRef(0)
   const lastReadAttempt = useRef<string | null>(null)
   const [scrollPositions, setScrollPositions] = useState<Record<string, string | undefined>>({})
@@ -182,13 +184,27 @@ export function ChatShell() {
 
   const startCall = (media: CallMedia) => {
     if (!selected) return
-    navigate(callPath(selected.id, { media, state: 'ringing' }), {
-      state: {
-        peerName: selected.name,
-        peerAvatar: selected.partnerAvatar,
-        from: conversationPath(selected.id),
-      },
-    })
+    const fallback = () =>
+      navigate(callPath(selected.id, { media, state: 'ringing' }), {
+        state: {
+          peerName: selected.name,
+          peerAvatar: selected.partnerAvatar,
+          from: conversationPath(selected.id),
+        },
+      })
+    if (
+      !callWindow.openCall(
+        {
+          conversationId: selected.id,
+          media,
+          peerName: selected.name,
+          peerAvatar: selected.partnerAvatar,
+          isGroup: selected.isGroup,
+        },
+        fallback,
+      )
+    )
+      fallback()
   }
 
   const markVisibleMessageRead = (messageId: string) => {

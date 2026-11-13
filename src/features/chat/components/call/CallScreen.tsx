@@ -17,7 +17,7 @@ import { cn } from '@/lib/utils'
 import { CallControls } from './CallControls'
 import { VoiceCallStage } from './VoiceCallStage'
 import { VideoCallStage } from './VideoCallStage'
-import type { CallRouteState } from './types'
+import type { CallPreview, CallRouteState } from './types'
 import { formatCallDuration } from './utils'
 
 const ArrowLeft = createIcon(ArrowLeftData)
@@ -43,28 +43,52 @@ interface CallPatch {
   reason?: CallEndReason | null
 }
 
-export function CallScreen() {
+export function CallScreen({
+  previewCall,
+  previewWindow,
+  onPreviewClose,
+}: {
+  previewCall?: CallPreview
+  previewWindow?: Window
+  onPreviewClose?: () => void
+} = {}) {
   const { t, i18n } = useTranslation()
   const { user } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const { conversationId } = useParams<{ conversationId: string }>()
+  const { conversationId: routeConversationId } = useParams<{ conversationId: string }>()
+  const conversationId = previewCall?.conversationId ?? routeConversationId
   const [searchParams, setSearchParams] = useSearchParams()
 
   const routeState = (location.state as CallRouteState | null) ?? null
   const returnTo = routeState?.from
-  const conversationQuery = useConversationQuery(conversationId ?? null, Boolean(conversationId))
-  const media = parseMedia(searchParams.get('media'))
-  const phase = parsePhase(searchParams.get('state'))
-  const endReason = parseReason(searchParams.get('reason'))
+  const conversationQuery = useConversationQuery(
+    conversationId ?? null,
+    Boolean(conversationId) && !previewCall,
+  )
+  const [previewState, setPreviewState] = useState<{
+    media: CallMedia
+    phase: CallPhase
+    reason: CallEndReason | null
+  }>(() => ({ media: previewCall?.media ?? 'voice', phase: 'ringing', reason: null }))
+  const media = previewCall ? previewState.media : parseMedia(searchParams.get('media'))
+  const phase = previewCall ? previewState.phase : parsePhase(searchParams.get('state'))
+  const endReason = previewCall
+    ? (previewState.reason ?? 'ended')
+    : parseReason(searchParams.get('reason'))
 
-  const isGroup = conversationQuery.data?.isGroup ?? false
+  const isGroup = previewCall?.isGroup ?? conversationQuery.data?.isGroup ?? false
   const name =
+    previewCall?.peerName ||
     (isGroup && routeState?.peerName) ||
     conversationQuery.data?.name ||
     routeState?.peerName ||
     t('chat.callUnknownPeer')
-  const avatarUrl = conversationQuery.data?.partnerAvatar ?? routeState?.peerAvatar ?? null
+  const avatarUrl =
+    previewCall?.peerAvatar ??
+    conversationQuery.data?.partnerAvatar ??
+    routeState?.peerAvatar ??
+    null
   const localName = user?.fullName?.trim() || user?.username || t('chat.callYou')
 
   const [muted, setMuted] = useState(false)
@@ -76,6 +100,14 @@ export function CallScreen() {
 
   const updateCall = useCallback(
     (patch: CallPatch) => {
+      if (previewCall) {
+        setPreviewState((current) => ({
+          media: patch.media ?? current.media,
+          phase: patch.state ?? current.phase,
+          reason: patch.reason === null ? null : (patch.reason ?? current.reason),
+        }))
+        return
+      }
       setSearchParams(
         (prev) => {
           const next = new URLSearchParams(prev)
@@ -88,10 +120,14 @@ export function CallScreen() {
         { replace: true, state: location.state },
       )
     },
-    [location.state, setSearchParams],
+    [location.state, previewCall, setSearchParams],
   )
 
   const handleClose = useCallback(() => {
+    if (previewCall) {
+      onPreviewClose?.()
+      return
+    }
     if (returnTo) {
       navigate(returnTo)
       return
@@ -101,7 +137,7 @@ export function CallScreen() {
       return
     }
     navigate(ROUTES.calls)
-  }, [conversationId, navigate, returnTo])
+  }, [conversationId, navigate, onPreviewClose, previewCall, returnTo])
 
   // Đồng hồ cuộc gọi chỉ chạy khi đã kết nối.
   useEffect(() => {
@@ -128,9 +164,10 @@ export function CallScreen() {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') handleClose()
     }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [handleClose])
+    const callWindow = previewWindow ?? window
+    callWindow.addEventListener('keydown', onKeyDown)
+    return () => callWindow.removeEventListener('keydown', onKeyDown)
+  }, [handleClose, previewWindow])
 
   const endCall = () => {
     setFinalSeconds(phase === 'active' ? seconds : finalSeconds)
@@ -166,11 +203,11 @@ export function CallScreen() {
     toast.info(t('chat.callFlipCameraToast'))
   }
 
-  if (!conversationId) {
+  if (!conversationId && !previewCall) {
     return <CallErrorScreen title={t('chat.callNotFound')} onClose={() => navigate(ROUTES.calls)} />
   }
 
-  if (conversationQuery.isPending && !routeState?.peerName) {
+  if (conversationQuery.isPending && !routeState?.peerName && !previewCall) {
     return (
       <main className="relative flex h-dvh w-full flex-col overflow-hidden bg-[#07120c] text-white">
         <CallBackdrop />
@@ -185,7 +222,7 @@ export function CallScreen() {
     )
   }
 
-  if (conversationQuery.isError && !routeState?.peerName) {
+  if (conversationQuery.isError && !routeState?.peerName && !previewCall) {
     return (
       <CallErrorScreen
         title={t('chat.callNotFound')}

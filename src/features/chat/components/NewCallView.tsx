@@ -14,6 +14,7 @@ import { useConversationsQuery, useCreateDirectChatMutation } from '../hooks/use
 import { useFriends } from '../hooks/useFriends'
 import type { ChatUser, Conversation } from '../types/chat.types'
 import { Avatar, SearchBox } from './new-chat/kit'
+import { useCallWindow } from './call/CallWindowProvider'
 
 const ArrowLeft = createIcon(ArrowLeftData)
 const Phone = createIcon(PhoneData)
@@ -28,6 +29,7 @@ export function NewCallView() {
   const friendsQuery = useFriends()
   const conversationsQuery = useConversationsQuery()
   const createDirectChat = useCreateDirectChatMutation()
+  const callWindow = useCallWindow()
   const totalUnread = (conversationsQuery.data ?? []).reduce(
     (count, conversation) => count + conversation.unread,
     0,
@@ -53,8 +55,40 @@ export function NewCallView() {
     [conversationsQuery.data, normalizedQuery],
   )
   const startDirectCall = async (friend: ChatUser, media: CallMedia) => {
+    let conversationPromise: ReturnType<typeof createDirectChat.mutateAsync> | undefined
+    const getConversation = () => (conversationPromise ??= createDirectChat.mutateAsync(friend.id))
+    const fallback = () => {
+      void getConversation()
+        .then((conversation) =>
+          navigate(callPath(conversation.id, { media, state: 'ringing' }), {
+            state: {
+              peerName: friend.name,
+              peerAvatar: friend.avatarUrl,
+              from: ROUTES.calls,
+            },
+          }),
+        )
+        .catch((error: unknown) => {
+          toast.error(error instanceof Error ? error.message : t('chat.callsNotAvailable'))
+        })
+    }
+    const opened = callWindow.openCall(
+      {
+        media,
+        peerName: friend.name,
+        peerAvatar: friend.avatarUrl,
+        isGroup: false,
+      },
+      fallback,
+    )
+    if (opened) {
+      void getConversation().catch((error: unknown) => {
+        toast.error(error instanceof Error ? error.message : t('chat.callsNotAvailable'))
+      })
+      return
+    }
     try {
-      const conversation = await createDirectChat.mutateAsync(friend.id)
+      const conversation = await getConversation()
       navigate(callPath(conversation.id, { media, state: 'ringing' }), {
         state: {
           peerName: friend.name,
@@ -68,13 +102,27 @@ export function NewCallView() {
   }
 
   const startGroupCall = (group: Conversation, media: CallMedia) => {
-    navigate(callPath(group.id, { media, state: 'ringing' }), {
-      state: {
-        peerName: group.name,
-        peerAvatar: group.partnerAvatar,
-        from: ROUTES.calls,
-      },
-    })
+    const fallback = () =>
+      navigate(callPath(group.id, { media, state: 'ringing' }), {
+        state: {
+          peerName: group.name,
+          peerAvatar: group.partnerAvatar,
+          from: ROUTES.calls,
+        },
+      })
+    if (
+      !callWindow.openCall(
+        {
+          conversationId: group.id,
+          media,
+          peerName: group.name,
+          peerAvatar: group.partnerAvatar,
+          isGroup: true,
+        },
+        fallback,
+      )
+    )
+      fallback()
   }
 
   return (
