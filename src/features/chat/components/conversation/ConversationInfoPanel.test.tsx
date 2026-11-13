@@ -2,10 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import { renderToString } from 'react-dom/server'
 import { MemoryRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import {
-  ConversationInfoPanel,
-  UserProfileCardContent,
-} from './ConversationInfoPanel'
+import { ConversationInfoPanel, UserProfileCardContent } from './ConversationInfoPanel'
 import { ConversationHeader } from './ConversationHeader'
 import { ImageLightboxModal } from './ImageLightboxModal'
 import { AttachmentBubble } from './AttachmentBubble'
@@ -412,10 +409,7 @@ describe('ConversationInfoPanel & Header Integration Tests', () => {
     }
 
     const html = renderWithProviders(
-      <AttachmentBubble
-        attachment={videoAttachment}
-        onOpenLightbox={() => {}}
-      />,
+      <AttachmentBubble attachment={videoAttachment} onOpenLightbox={() => {}} />,
     )
 
     expect(html).toContain('<video')

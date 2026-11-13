@@ -138,9 +138,7 @@ export function UserProfileCardContent({
 
       {/* Bio / Tiểu sử nếu có */}
       {bio && (
-        <p className="mt-3 max-w-[260px] text-xs text-muted-foreground italic px-2">
-          {`"${bio}"`}
-        </p>
+        <p className="mt-3 max-w-[260px] text-xs text-muted-foreground italic px-2">{`"${bio}"`}</p>
       )}
 
       {/* 2 Nút hành động cốt lõi: Hủy kết bạn & Chặn người dùng */}
@@ -171,11 +169,7 @@ export function UserProfileCardContent({
 
       {onClose && (
         <div className="mt-4 w-full">
-          <Button
-            variant="secondary"
-            className="w-full text-xs"
-            onClick={onClose}
-          >
+          <Button variant="secondary" className="w-full text-xs" onClick={onClose}>
             {t('chat.closeAction')}
           </Button>
         </div>
@@ -289,7 +283,8 @@ export function ConversationInfoPanel({
   const [unfriendOpen, setUnfriendOpen] = useState(false)
   const [blockOpen, setBlockOpen] = useState(false)
   const [profileModalOpen, setProfileModalOpen] = useState(false)
-  const [selectedMediaAttachment, setSelectedMediaAttachment] = useState<MessageAttachmentItem | null>(null)
+  const [selectedMediaAttachment, setSelectedMediaAttachment] =
+    useState<MessageAttachmentItem | null>(null)
 
   // Khởi tạo độ rộng panel từ localStorage hoặc mặc định 340px
   const [panelWidth, setPanelWidth] = useState<number>(() => {
@@ -524,9 +519,7 @@ export function ConversationInfoPanel({
             <div className="grid size-10 place-items-center rounded-full bg-muted text-brand-ink transition-colors group-hover:bg-accent">
               <UserIcon className="size-5" aria-hidden="true" />
             </div>
-            <span className="mt-1.5 text-xs font-medium text-foreground">
-              {t('chat.profile')}
-            </span>
+            <span className="mt-1.5 text-xs font-medium text-foreground">{t('chat.profile')}</span>
           </button>
 
           {/* Nút 2: Tắt / Bật thông báo */}
@@ -797,7 +790,9 @@ export function ConversationInfoPanel({
               {conversation.isGroup && (
                 <button
                   type="button"
-                  onClick={() => toast.info(t('chat.featureUnderDevelopment') || 'Tính năng đang phát triển')}
+                  onClick={() =>
+                    toast.info(t('chat.featureUnderDevelopment') || 'Tính năng đang phát triển')
+                  }
                   className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium text-destructive transition-colors hover:bg-destructive/10 dark:hover:bg-destructive/20"
                 >
                   <LeaveIcon className="size-4" aria-hidden="true" />
@@ -830,9 +825,7 @@ export function ConversationInfoPanel({
       <Dialog open={unfriendOpen} onOpenChange={setUnfriendOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>
-              {t('chat.unfriendConfirmTitle', { name: conversation.name })}
-            </DialogTitle>
+            <DialogTitle>{t('chat.unfriendConfirmTitle', { name: conversation.name })}</DialogTitle>
             <DialogDescription>
               {t('chat.unfriendConfirmDesc', { name: conversation.name })}
             </DialogDescription>
@@ -860,9 +853,7 @@ export function ConversationInfoPanel({
       <Dialog open={blockOpen} onOpenChange={setBlockOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>
-              {t('chat.blockConfirmTitle', { name: conversation.name })}
-            </DialogTitle>
+            <DialogTitle>{t('chat.blockConfirmTitle', { name: conversation.name })}</DialogTitle>
             <DialogDescription>
               {t('chat.blockConfirmDesc', { name: conversation.name })}
             </DialogDescription>
