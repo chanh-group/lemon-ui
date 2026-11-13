@@ -251,6 +251,10 @@ export function mapMessageResponse(raw: MessageResponse, currentUserId?: string)
     status: raw.id.startsWith('temp-') ? 'sending' : isMe ? 'sent' : undefined,
     reactions: raw.reactions,
     isForwarded: raw.isForwarded,
+    storyId: raw.storyId,
+    storyPreview: isRevoked ? null : raw.storyPreview,
+    replyToId: raw.replyToId,
+    replyTarget: raw.replyTarget,
     createdAt:
       typeof raw.createdAt === 'string' ? raw.createdAt : new Date(raw.createdAt).toISOString(),
     editedAt: raw.editedAt

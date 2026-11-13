@@ -266,6 +266,7 @@ export type SendMessageArg =
       pendingFiles?: SendMessagePendingFile[]
       isForwarded?: boolean
       sourceMessageId?: string
+      replyToId?: string
       targetConversationId?: string
       clientMsgId?: string
     }
@@ -341,7 +342,7 @@ export function useSendMessageMutation(conversationId: string | null) {
         senderId: currentUserId,
         kind,
         body: bodyText || null,
-        replyToId: null,
+        replyToId: typeof arg !== 'string' ? (arg.replyToId ?? null) : null,
         clientMsgId,
         attachments:
           optimisticAttachments && optimisticAttachments.length > 0
@@ -447,6 +448,7 @@ export function useSendMessageMutation(conversationId: string | null) {
         attachments: finalAttachments,
         isForwarded: typeof arg !== 'string' ? arg.isForwarded : undefined,
         sourceMessageId: typeof arg !== 'string' ? arg.sourceMessageId : undefined,
+        replyToId: typeof arg !== 'string' ? arg.replyToId : undefined,
       }
       return sendMessage(targetConversationId, payload)
     },
@@ -608,7 +610,19 @@ export function useRevokeMessageMutation(conversationId: string | null) {
             pages: old.pages.map((page) => ({
               ...page,
               items: page.items.map((m) =>
-                m.id === revokedMsg.id ? { ...m, deletedAt: revokedMsg.deletedAt } : m,
+                m.id === revokedMsg.id
+                  ? { ...m, deletedAt: revokedMsg.deletedAt }
+                  : m.replyTarget?.id === revokedMsg.id
+                    ? {
+                        ...m,
+                        replyTarget: {
+                          ...m.replyTarget,
+                          body: null,
+                          storyPreview: null,
+                          deletedAt: revokedMsg.deletedAt,
+                        },
+                      }
+                    : m,
               ),
             })),
           }
@@ -620,7 +634,17 @@ export function useRevokeMessageMutation(conversationId: string | null) {
           old?.map((message) =>
             message.id === revokedMsg.id
               ? { ...message, deletedAt: revokedMsg.deletedAt }
-              : message,
+              : message.replyTarget?.id === revokedMsg.id
+                ? {
+                    ...message,
+                    replyTarget: {
+                      ...message.replyTarget,
+                      body: null,
+                      storyPreview: null,
+                      deletedAt: revokedMsg.deletedAt,
+                    },
+                  }
+                : message,
           ),
       )
     },

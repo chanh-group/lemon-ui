@@ -26,6 +26,35 @@ function makeMockT(lang: 'vi' | 'en') {
 }
 
 describe('chat.mapper', () => {
+  it('preserves story replies and the referenced message in the timeline', () => {
+    const target = {
+      id: 'original',
+      senderId: 'other',
+      kind: 'TEXT' as const,
+      body: 'hello',
+      deletedAt: null,
+    }
+    const story = { id: 'story', kind: 'TEXT' as const, caption: 'My day' }
+    const raw: MessageResponse = {
+      id: 'reply',
+      conversationId: 'conv',
+      senderId: 'me',
+      kind: 'STORY_REPLY',
+      body: 'answer',
+      replyToId: 'original',
+      replyTarget: target,
+      storyId: 'story',
+      storyPreview: story,
+      createdAt: '2026-10-25T10:00:00Z',
+      editedAt: null,
+      deletedAt: null,
+    }
+    expect(mapMessageResponse(raw, 'me')).toMatchObject({
+      replyToId: 'original',
+      replyTarget: target,
+      storyPreview: story,
+    })
+  })
   it('maps an image attachment message correctly', () => {
     const raw: MessageResponse = {
       id: 'msg-1',

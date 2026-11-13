@@ -41,6 +41,7 @@ export interface MessageActionPillProps {
   onRevoke?: (messageId: string) => void
   onReact?: (messageId: string, emoji: string) => void
   onForward?: (message: ChatMessage) => void
+  onReply?: (message: ChatMessage) => void
   className?: string
   align?: 'start' | 'end'
   onOpenChange?: (open: boolean) => void
@@ -54,6 +55,7 @@ export function MessageActionPill({
   onRevoke,
   onReact,
   onForward,
+  onReply,
   className,
   align = 'end',
   onOpenChange,
@@ -182,10 +184,14 @@ export function MessageActionPill({
       {/* 2. Chuyển tiếp / Trả lời Button */}
       <button
         type="button"
-        onClick={handleForward}
+        onClick={(e) => {
+          e.stopPropagation()
+          onReply?.(message)
+        }}
+        disabled={!onReply}
         className="grid size-7 sm:size-8 place-items-center rounded-full bg-white dark:bg-zinc-800 border border-border/80 text-foreground/80 shadow-sm transition-all hover:bg-muted hover:text-foreground active:scale-95 focus:outline-none"
-        title={t('chat.forward', 'Chuyển tiếp')}
-        aria-label={t('chat.forward', 'Chuyển tiếp')}
+        title={t('chat.replyMessage', 'Trả lời')}
+        aria-label={t('chat.replyMessage', 'Trả lời')}
       >
         <ReplyIcon className="size-4" aria-hidden="true" />
       </button>
