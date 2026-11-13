@@ -1,6 +1,24 @@
 import { describe, expect, it } from 'bun:test'
-import { buildMessageGroups } from './MessageList'
+import { buildMessageGroups, newestVisibleIncoming } from './MessageList'
 import type { ChatMessage } from '../../types/chat.types'
+
+describe('newestVisibleIncoming', () => {
+  it('selects the newest incoming message whose bottom is visible', () => {
+    expect(
+      newestVisibleIncoming(
+        [
+          { id: 'above', fromMe: false, bottom: 0 },
+          { id: 'seen', fromMe: false, bottom: 50 },
+          { id: 'outgoing', fromMe: true, bottom: 60 },
+          { id: 'temp-1', fromMe: false, bottom: 70 },
+          { id: 'below', fromMe: false, bottom: 101 },
+        ],
+        0,
+        100,
+      ),
+    ).toBe('seen')
+  })
+})
 
 describe('MessageList buildMessageGroups & interaction data', () => {
   it('groups consecutive messages from the same sender within 5 minutes', () => {
@@ -109,5 +127,27 @@ describe('MessageList buildMessageGroups & interaction data', () => {
     expect(msg.reactions![0].emoji).toBe('👍')
     expect(msg.reactions![0].count).toBe(3)
     expect(msg.reactions![1].emoji).toBe('❤️')
+  })
+
+  it('preserves status sending and clientMsgId for optimistic UI messages', () => {
+    const messages: ChatMessage[] = [
+      {
+        id: 'temp-client-123',
+        clientMsgId: 'client-123',
+        fromMe: true,
+        text: 'Optimistic message sending...',
+        kind: 'text',
+        time: '11:05',
+        status: 'sending',
+        createdAt: '2026-11-09T11:05:00Z',
+      },
+    ]
+
+    const groups = buildMessageGroups(messages)
+    expect(groups).toHaveLength(1)
+    const msg = groups[0].messages[0]
+    expect(msg.id).toBe('temp-client-123')
+    expect(msg.clientMsgId).toBe('client-123')
+    expect(msg.status).toBe('sending')
   })
 })

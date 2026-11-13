@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
   Cancel01Icon as CloseData,
   Download01Icon as DownloadData,
@@ -78,12 +79,12 @@ export function DocumentPreviewModal({ attachment, onClose }: DocumentPreviewMod
     document.body.removeChild(a)
   }
 
-  return (
+  const content = (
     <div
       role="dialog"
       aria-modal="true"
       onClick={onClose}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-4 sm:p-6 animate-in fade-in"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 backdrop-blur-xs p-4 sm:p-6 animate-in fade-in"
     >
       <div
         onClick={(e) => e.stopPropagation()}
@@ -172,4 +173,10 @@ export function DocumentPreviewModal({ attachment, onClose }: DocumentPreviewMod
       </div>
     </div>
   )
+
+  if (typeof document === 'undefined') {
+    return content
+  }
+
+  return createPortal(content, document.body)
 }

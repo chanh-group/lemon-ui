@@ -11,8 +11,7 @@ import {
 import { createIcon } from '@/components/icons/hugeIcon'
 import { toast } from 'sonner'
 import type { MessageAttachmentInput } from '../../types/chat.types'
-import { presignFile, uploadBinaryToUrl, uploadFileViaBackend } from '../../api/chat.api'
-import { formatBytes, getKindFromMime, isImage } from '../../utils/fileTypes'
+import { formatBytes, isImage } from '../../utils/fileTypes'
 import { compressVideoIfNeeded } from '../../utils/videoCompressor'
 import { generateUUID } from '@/lib/utils'
 
@@ -25,7 +24,7 @@ const TrashIcon = createIcon(TrashData)
 
 const MAX_FILE_SIZE = 25 * 1024 * 1024 // 25MB
 
-interface PendingFile {
+export interface PendingFile {
   id: string
   file: File
   previewUrl?: string
@@ -39,10 +38,10 @@ interface MessageComposerProps {
   onSubmit: (
     text: string,
     attachments?: MessageAttachmentInput[],
+    pendingFiles?: PendingFile[],
   ) => boolean | void | Promise<boolean | void>
   disabled?: boolean
   isSending?: boolean
-  conversationId?: string
   onTypingStart?: () => void
   onTypingStop?: () => void
 }
@@ -53,7 +52,6 @@ export function MessageComposer({
   onSubmit,
   disabled = false,
   isSending = false,
-  conversationId,
   onTypingStart,
   onTypingStop,
 }: MessageComposerProps) {
@@ -63,7 +61,6 @@ export function MessageComposer({
   const inputRef = useRef<HTMLInputElement>(null)
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([])
   const pendingFilesRef = useRef(pendingFiles)
-  const [isUploading, setIsUploading] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
   const [recordingSeconds, setRecordingSeconds] = useState(0)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
@@ -103,7 +100,7 @@ export function MessageComposer({
   }
 
   const handleStartRecording = async () => {
-    if (disabled || isUploading) return
+    if (disabled || isSending) return
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       streamRef.current = stream
@@ -160,54 +157,16 @@ export function MessageComposer({
 
       const ext = mimeType.includes('mp4') ? 'mp4' : mimeType.includes('ogg') ? 'ogg' : 'webm'
       const file = new File([audioBlob], `voice-note-${Date.now()}.${ext}`, { type: mimeType })
+      const previewUrl = URL.createObjectURL(file)
 
-      setIsUploading(true)
-      try {
-        let objectKey = ''
-        try {
-          const presign = await presignFile({
-            kind: 'CHAT_AUDIO',
-            fileName: file.name,
-            mimeType: file.type || 'audio/webm',
-            sizeBytes: file.size,
-            conversationId,
-          })
-          await uploadBinaryToUrl(presign.uploadUrl, file, file.type || 'audio/webm')
-          objectKey = presign.objectKey
-        } catch {
-          const fallback = await uploadFileViaBackend(file, 'CHAT_AUDIO', conversationId)
-          objectKey = fallback.objectKey
-        }
-
-        const attachmentInput: MessageAttachmentInput = {
-          objectKey,
-          fileName: file.name,
-          mimeType: file.type || 'audio/webm',
-          sizeBytes: file.size,
-          kind: 'AUDIO',
-          durationMs: duration * 1000,
-        }
-
-        const sent = await onSubmit('', [attachmentInput])
-        if (sent === false) {
-          setPendingFiles((prev) => [
-            ...prev,
-            {
-              id: generateUUID(),
-              file,
-              uploadedAttachment: attachmentInput,
-            },
-          ])
-          toast.error(t('chat.voiceNoteFailed', 'Gửi tin nhắn thoại thất bại'))
-          return
-        }
-        toast.success(t('chat.voiceNoteSent', 'Đã gửi tin nhắn thoại'))
-      } catch {
-        setPendingFiles((prev) => [...prev, { id: generateUUID(), file }])
-        toast.error(t('chat.voiceNoteFailed', 'Gửi tin nhắn thoại thất bại'))
-      } finally {
-        setIsUploading(false)
+      const pendingFile = { id: generateUUID(), file, previewUrl }
+      const sent = await onSubmit('', undefined, [pendingFile])
+      if (sent === false) {
+        setPendingFiles((prev) => [...prev, pendingFile])
+        return
       }
+      URL.revokeObjectURL(previewUrl)
+      toast.success(t('chat.voiceNoteSent', 'Đã gửi tin nhắn thoại'))
     }
 
     recorder.stop()
@@ -330,7 +289,7 @@ export function MessageComposer({
   const handleSubmit = async () => {
     const text = draft.trim()
     if (!text && pendingFiles.length === 0) return
-    if (disabled || isUploading || isSending) return
+    if (disabled || isSending) return
 
     if (typingTimer.current) {
       clearTimeout(typingTimer.current)
@@ -338,87 +297,24 @@ export function MessageComposer({
     }
     onTypingStop?.()
 
-    if (pendingFiles.length === 0) {
-      const sent = await onSubmit(text)
-      if (sent !== false) requestAnimationFrame(() => inputRef.current?.focus())
-      return
-    }
+    const textToSend = text
+    const filesToSend = [...pendingFiles]
+    const sent = await onSubmit(
+      textToSend,
+      undefined,
+      filesToSend.length > 0 ? filesToSend : undefined,
+    )
+    if (sent === false) return
 
-    // Upload các tệp đính kèm lên Cloudflare R2
-    setIsUploading(true)
-    const attachments: MessageAttachmentInput[] = []
-
-    try {
-      for (const item of pendingFiles) {
-        const file = item.file
-        if (item.uploadedAttachment) {
-          attachments.push(item.uploadedAttachment)
-          continue
-        }
-        const mimeType = file.type || 'application/octet-stream'
-        const kind = getKindFromMime(mimeType, file.name)
-
-        let objectKey: string
-        try {
-          // 1. Thử presigned upload trực tiếp lên Cloudflare R2
-          const presignRes = await presignFile({
-            kind,
-            sizeBytes: file.size,
-            mimeType,
-            fileName: file.name,
-            conversationId,
-          })
-          await uploadBinaryToUrl(presignRes.uploadUrl, file, mimeType)
-          objectKey = presignRes.objectKey
-        } catch (r2Err) {
-          // 2. Nếu R2 trực tiếp lỗi CORS hoặc mạng (Failed to fetch), tự động fallback qua backend
-          console.warn(
-            'R2 direct upload encountered an error, falling back to backend upload proxy:',
-            r2Err,
-          )
-          const fallbackRes = await uploadFileViaBackend(file, kind, conversationId, file.name)
-          objectKey = fallbackRes.objectKey
-        }
-
-        // 3. Gom attachment metadata
-        const attachment: MessageAttachmentInput = {
-          objectKey,
-          fileName: file.name,
-          mimeType,
-          sizeBytes: file.size,
-          kind: kind.replace('CHAT_', '') as 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE',
-        }
-        attachments.push(attachment)
-        setPendingFiles((prev) =>
-          prev.map((pending) =>
-            pending.id === item.id ? { ...pending, uploadedAttachment: attachment } : pending,
-          ),
-        )
-      }
-
-      // 4. Gửi tin nhắn kèm danh sách attachments
-      const sent = await onSubmit(text, attachments)
-      if (sent === false) return
-      requestAnimationFrame(() => inputRef.current?.focus())
-
-      // Xóa danh sách pending files sau khi gửi thành công
-      pendingFiles.forEach((p) => {
-        if (p.previewUrl) URL.revokeObjectURL(p.previewUrl)
-      })
-      setPendingFiles([])
-    } catch (err) {
-      toast.error(
-        err instanceof Error
-          ? err.message
-          : t('chat.uploadFailed', 'Tải tệp lên thất bại. Vui lòng thử lại.'),
-      )
-    } finally {
-      setIsUploading(false)
-    }
+    filesToSend.forEach((file) => {
+      if (file.previewUrl) URL.revokeObjectURL(file.previewUrl)
+    })
+    const sentIds = new Set(filesToSend.map((file) => file.id))
+    setPendingFiles((current) => current.filter((file) => !sentIds.has(file.id)))
+    requestAnimationFrame(() => inputRef.current?.focus())
   }
 
-  const canSubmit =
-    (draft.trim().length > 0 || pendingFiles.length > 0) && !disabled && !isUploading && !isSending
+  const canSubmit = (draft.trim().length > 0 || pendingFiles.length > 0) && !disabled && !isSending
 
   return (
     <footer
@@ -434,7 +330,7 @@ export function MessageComposer({
               key={p.id}
               className="group relative flex items-center gap-2 rounded-lg border border-border bg-card p-1.5 pr-2.5 shadow-xs text-xs"
             >
-              {p.previewUrl ? (
+              {p.previewUrl && isImage(p.file.type, p.file.name) ? (
                 <img
                   src={p.previewUrl}
                   alt={p.file.name}
@@ -452,7 +348,7 @@ export function MessageComposer({
               <button
                 type="button"
                 onClick={() => handleRemoveFile(p.id)}
-                disabled={isUploading}
+                disabled={isSending}
                 className="grid size-5 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                 title="Xóa bỏ"
               >
@@ -460,7 +356,7 @@ export function MessageComposer({
               </button>
             </div>
           ))}
-          {isUploading && (
+          {isSending && (
             <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground animate-pulse">
               <span className="size-2 rounded-full bg-primary animate-ping" />
               <span>{t('chat.uploadingFiles', 'Đang gửi tệp đính kèm…')}</span>
@@ -479,10 +375,13 @@ export function MessageComposer({
       />
 
       {isRecording ? (
-        <div className="flex w-full items-center justify-between gap-3 min-h-11 rounded-full border border-red-500/30 bg-red-500/5 px-4 animate-in fade-in duration-200">
+        <div className="flex w-full items-center justify-between gap-3 min-h-11 rounded-full border border-blue-500/30 bg-blue-500/10 dark:bg-blue-950/40 px-4 animate-in fade-in duration-200">
           <div className="flex items-center gap-2.5">
-            <span className="size-2.5 rounded-full bg-red-500 animate-ping" />
-            <span className="text-xs font-semibold text-red-600 dark:text-red-400 font-mono">
+            <span className="relative flex size-2.5 items-center justify-center">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-500 opacity-75" />
+              <span className="relative inline-flex size-2 rounded-full bg-blue-500" />
+            </span>
+            <span className="text-xs font-semibold text-blue-600 dark:text-blue-400 font-mono">
               {formatTimer(recordingSeconds)}
             </span>
             <span className="text-xs text-muted-foreground hidden sm:inline">
@@ -494,7 +393,7 @@ export function MessageComposer({
             <button
               type="button"
               onClick={handleCancelRecording}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors"
+              className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
               title={t('chat.cancelRecording', 'Hủy')}
             >
               <TrashIcon className="size-4" />
@@ -519,7 +418,7 @@ export function MessageComposer({
             <input
               ref={inputRef}
               value={draft}
-              disabled={disabled || isUploading}
+              disabled={disabled || isSending}
               onChange={(e) => handleChange(e.target.value)}
               onPaste={handlePaste}
               onKeyDown={(e) => {
@@ -539,7 +438,7 @@ export function MessageComposer({
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              disabled={disabled || isUploading || isSending}
+              disabled={disabled || isSending}
               aria-label={t('chat.attachFile')}
               title="Đính kèm tệp tin / ảnh (< 25MB)"
               className="grid size-9 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-border hover:text-foreground disabled:opacity-50"
@@ -551,7 +450,7 @@ export function MessageComposer({
             <button
               type="button"
               onClick={handleStartRecording}
-              disabled={disabled || isUploading || isSending}
+              disabled={disabled || isSending}
               aria-label={t('chat.recordVoiceNote', 'Ghi âm')}
               title={t('chat.recordVoiceNote', 'Ghi âm tin nhắn thoại')}
               className="grid size-9 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-border hover:text-foreground disabled:opacity-50"

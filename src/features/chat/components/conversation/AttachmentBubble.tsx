@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { useTranslation } from 'react-i18next'
-import { PauseIcon, PlayIcon } from '@hugeicons/core-free-icons'
+import { FullScreenIcon, PauseIcon, PlayIcon } from '@hugeicons/core-free-icons'
 import { createIcon } from '@/components/icons/hugeIcon'
 import { cn } from '@/lib/utils'
 import type { MessageAttachmentItem } from '../../types/chat.types'
@@ -17,6 +17,7 @@ import {
 
 const Play = createIcon(PlayIcon)
 const Pause = createIcon(PauseIcon)
+const FullScreen = createIcon(FullScreenIcon)
 
 export function AudioPlayerBubble({
   src,
@@ -83,7 +84,7 @@ export function AudioPlayerBubble({
   return (
     <div
       onClick={(e) => e.stopPropagation()}
-      className="flex items-center gap-3 py-1.5 px-0.5 min-w-[210px] sm:min-w-[250px] max-w-xs sm:max-w-sm select-none"
+      className="flex items-center gap-3 py-1.5 px-0.5 min-w-52.5 sm:min-w-62.5 max-w-xs sm:max-w-sm select-none"
     >
       <audio
         ref={audioRef}
@@ -133,7 +134,7 @@ export function AudioPlayerBubble({
             onChange={handleSeek}
             className="w-full h-1.5 bg-foreground/15 rounded-full appearance-none cursor-pointer accent-primary"
           />
-          <span className="tabular-nums font-mono text-[11px] text-foreground/80 shrink-0 min-w-[28px] text-right">
+          <span className="tabular-nums font-mono text-[11px] text-foreground/80 shrink-0 min-w-7 text-right">
             {formatSec(isPlaying ? currentTime : duration || currentTime)}
           </span>
         </div>
@@ -171,9 +172,9 @@ export function AttachmentBubble({
   hasCaption = false,
 }: AttachmentBubbleProps) {
   const { t } = useTranslation()
-  const isImg = isImage(attachment.mimeType, attachment.fileName)
-  const isVid = isVideo(attachment.mimeType, attachment.fileName)
-  const isAud = isAudio(attachment.mimeType, attachment.fileName)
+  const isImg = attachment.kind === 'IMAGE' || isImage(attachment.mimeType, attachment.fileName)
+  const isVid = attachment.kind === 'VIDEO' || isVideo(attachment.mimeType, attachment.fileName)
+  const isAud = attachment.kind === 'AUDIO' || isAudio(attachment.mimeType, attachment.fileName)
   const canPreview = isPreviewable(attachment.mimeType, attachment.fileName)
 
   const handleCardClick = (e: React.MouseEvent) => {
@@ -257,6 +258,20 @@ export function AttachmentBubble({
           preload="metadata"
           className="max-h-72 w-full"
         />
+        {onOpenLightbox && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              onOpenLightbox(attachment)
+            }}
+            className="absolute top-2 right-2 z-10 grid size-8 place-items-center rounded-full bg-black/60 text-white shadow-md opacity-80 hover:opacity-100 hover:bg-black/90 transition-all cursor-pointer"
+            title={t('chat.fullscreenVideo', 'Xem toàn màn hình')}
+            aria-label={t('chat.fullscreenVideo', 'Xem toàn màn hình')}
+          >
+            <FullScreen className="size-4" />
+          </button>
+        )}
       </div>
     )
   }
@@ -271,7 +286,7 @@ export function AttachmentBubble({
       onClick={handleCardClick}
       title={canPreview ? t('chat.preview', 'Xem trước') : t('chat.download', 'Tải xuống')}
       className={cn(
-        'flex items-center gap-3 py-1 px-0.5 transition-opacity cursor-pointer hover:opacity-90 select-none min-w-[200px] max-w-xs sm:max-w-sm',
+        'flex items-center gap-3 py-1 px-0.5 transition-opacity cursor-pointer hover:opacity-90 select-none min-w-50 max-w-xs sm:max-w-sm',
         hasCaption && 'pb-2 border-b border-foreground/15 mb-1.5',
       )}
     >

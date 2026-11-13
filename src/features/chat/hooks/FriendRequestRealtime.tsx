@@ -36,11 +36,18 @@ export function FriendRequestRealtime() {
       })
     }
 
+    const handleFriendRemoved = () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.chat.friends })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.chat.conversations })
+    }
+
     socket.on('friend:request:new', handleFriendRequest)
+    socket.on('friend:removed', handleFriendRemoved)
     connectChatSocket()
 
     return () => {
       socket.off('friend:request:new', handleFriendRequest)
+      socket.off('friend:removed', handleFriendRemoved)
     }
   }, [queryClient, status, t])
 
