@@ -536,8 +536,8 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
   useLayoutEffect(() => {
     if (rows.length === 0 || !followBottom) return
     const el = scrollRef.current
-    if (el) el.scrollTop = el.scrollHeight
     virtualizer.scrollToEnd({ behavior: 'auto' })
+    if (el) el.scrollTop = el.scrollHeight
   }, [rows.length, followBottom, virtualizer, scrollRef])
 
   const virtualRows = virtualizer.getVirtualItems()

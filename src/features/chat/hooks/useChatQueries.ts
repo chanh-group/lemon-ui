@@ -203,21 +203,14 @@ export function useConversationMessagesQuery(conversationId: string | null) {
     )
   }, [conversationId, data, queryClient])
 
-  // maxPages cắt trang mới nhất khi cuộn lên. Rời hội thoại lúc cửa sổ không
-  // còn neo ở trang mới nhất thì reset để lần mở sau vào đúng tin mới nhất.
+  // Keep the loaded window when switching conversations; allow an interrupted
+  // initial prefetch to continue if the conversation is reopened.
   useEffect(() => {
     const prefetched = initialPrefetches.current
     return () => {
-      if (!conversationId) return
-      const key = CHAT_QUERY_KEYS.messages(conversationId)
-      const cached =
-        queryClient.getQueryData<InfiniteData<MessageTimelineResponse, MessagePageParam>>(key)
-      const firstParam = cached?.pageParams[0]
-      if (!firstParam?.cursor && !firstParam?.after) return
-      prefetched.delete(conversationId)
-      void queryClient.resetQueries({ queryKey: key, exact: true })
+      if (conversationId) prefetched.delete(conversationId)
     }
-  }, [conversationId, queryClient])
+  }, [conversationId])
 
   return { ...query, liveMessages: liveMessagesQuery.data }
 }

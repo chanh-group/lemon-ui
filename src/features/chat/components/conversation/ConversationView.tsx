@@ -85,13 +85,6 @@ export function ConversationView({
     messageListRef.current?.scrollToEnd(smooth ? 'smooth' : 'auto')
   }
 
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
-    }
-    scrollToBottom(false)
-  }, [conversation.id])
-
   const loadOlderMessages = () => {
     const el = scrollRef.current
     if (!el || !hasOlderMessages || isLoadingOlderMessages || olderRequestPending.current) return
