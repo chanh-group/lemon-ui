@@ -6,6 +6,7 @@ import { createIcon } from '@/components/icons/hugeIcon'
 const ArrowDown = createIcon(ArrowDownData)
 import type { Conversation, DayGroup, MessageAttachmentInput } from '../../types/chat.types'
 import { ConversationHeader } from './ConversationHeader'
+import { ConversationInfoPanel } from './ConversationInfoPanel'
 import { MessageList, type MessageListHandle } from './MessageList'
 import { MessageComposer, type PendingFile } from './MessageComposer'
 
@@ -56,6 +57,7 @@ export function ConversationView({
 }: ConversationViewProps) {
   const { t } = useTranslation()
   const [draft, setDraft] = useState('')
+  const [isInfoOpen, setIsInfoOpen] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const messageListRef = useRef<MessageListHandle>(null)
   const [showJump, setShowJump] = useState(false)
@@ -173,18 +175,21 @@ export function ConversationView({
   }
 
   return (
-    <section
-      aria-label={t('chat.conversationWith', { name: conversation.name })}
-      className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col bg-background"
-    >
-      <ConversationHeader
-        conversation={conversation}
-        showBack={showBack}
-        onBack={onBack}
-        isTyping={isTyping}
-      />
+    <div className="relative flex h-full min-h-0 w-full min-w-0 flex-1 overflow-hidden">
+      <section
+        aria-label={t('chat.conversationWith', { name: conversation.name })}
+        className="flex h-full min-h-0 min-w-0 flex-1 flex-col bg-background"
+      >
+        <ConversationHeader
+          conversation={conversation}
+          showBack={showBack}
+          onBack={onBack}
+          isTyping={isTyping}
+          onToggleInfo={() => setIsInfoOpen((prev) => !prev)}
+          isInfoOpen={isInfoOpen}
+        />
 
-      {/* Nội dung hội thoại */}
+        {/* Nội dung hội thoại */}
       <div
         ref={scrollRef}
         onScroll={handleScroll}
@@ -258,5 +263,14 @@ export function ConversationView({
         onTypingStop={onTypingStop}
       />
     </section>
+
+    {isInfoOpen && (
+      <ConversationInfoPanel
+        conversation={conversation}
+        groups={groups}
+        onClose={() => setIsInfoOpen(false)}
+      />
+    )}
+  </div>
   )
 }

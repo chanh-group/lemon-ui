@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
   Cancel01Icon as CloseData,
   Download01Icon as DownloadData,
@@ -8,6 +9,7 @@ import {
 } from '@hugeicons/core-free-icons'
 import { createIcon } from '@/components/icons/hugeIcon'
 import type { MessageAttachmentItem } from '../../types/chat.types'
+import { isVideo } from '../../utils/fileTypes'
 
 const CloseIcon = createIcon(CloseData)
 const DownloadIcon = createIcon(DownloadData)
@@ -15,7 +17,7 @@ const RotateIcon = createIcon(RotateData)
 const ZoomIn = createIcon(ZoomInData)
 const ZoomOut = createIcon(ZoomOutData)
 
-interface ImageLightboxModalProps {
+export interface ImageLightboxModalProps {
   attachment: MessageAttachmentItem | null
   onClose: () => void
 }
@@ -42,6 +44,8 @@ export function ImageLightboxModal({ attachment, onClose }: ImageLightboxModalPr
 
   if (!attachment) return null
 
+  const isVid = attachment.kind === 'VIDEO' || isVideo(attachment.mimeType, attachment.fileName)
+
   const handleZoomIn = (e: React.MouseEvent) => {
     e.stopPropagation()
     setScale((prev) => Math.min(prev + 0.25, 3))
@@ -62,7 +66,7 @@ export function ImageLightboxModal({ attachment, onClose }: ImageLightboxModalPr
     const url = attachment.downloadUrl || attachment.previewUrl
     const a = document.createElement('a')
     a.href = url
-    a.download = attachment.fileName || 'image'
+    a.download = attachment.fileName || (isVid ? 'video' : 'image')
     a.target = '_blank'
     a.rel = 'noopener noreferrer'
     document.body.appendChild(a)
@@ -70,12 +74,12 @@ export function ImageLightboxModal({ attachment, onClose }: ImageLightboxModalPr
     document.body.removeChild(a)
   }
 
-  return (
+  const content = (
     <div
       role="dialog"
       aria-modal="true"
       onClick={onClose}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md transition-opacity duration-200 animate-in fade-in"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 backdrop-blur-md transition-opacity duration-200 animate-in fade-in"
     >
       {/* Top Header Controls */}
       <div
@@ -86,34 +90,38 @@ export function ImageLightboxModal({ attachment, onClose }: ImageLightboxModalPr
           {attachment.fileName}
         </span>
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handleZoomIn}
-            className="grid size-9 place-items-center rounded-full bg-white/10 hover:bg-white/20 transition-colors"
-            title="Phóng to"
-          >
-            <ZoomIn className="size-5" />
-          </button>
-          <button
-            type="button"
-            onClick={handleZoomOut}
-            className="grid size-9 place-items-center rounded-full bg-white/10 hover:bg-white/20 transition-colors"
-            title="Thu nhỏ"
-          >
-            <ZoomOut className="size-5" />
-          </button>
-          <button
-            type="button"
-            onClick={handleRotate}
-            className="grid size-9 place-items-center rounded-full bg-white/10 hover:bg-white/20 transition-colors"
-            title="Xoay ảnh"
-          >
-            <RotateIcon className="size-5" />
-          </button>
+          {!isVid && (
+            <>
+              <button
+                type="button"
+                onClick={handleZoomIn}
+                className="grid size-9 place-items-center rounded-full bg-white/10 hover:bg-white/20 transition-colors cursor-pointer"
+                title="Phóng to"
+              >
+                <ZoomIn className="size-5" />
+              </button>
+              <button
+                type="button"
+                onClick={handleZoomOut}
+                className="grid size-9 place-items-center rounded-full bg-white/10 hover:bg-white/20 transition-colors cursor-pointer"
+                title="Thu nhỏ"
+              >
+                <ZoomOut className="size-5" />
+              </button>
+              <button
+                type="button"
+                onClick={handleRotate}
+                className="grid size-9 place-items-center rounded-full bg-white/10 hover:bg-white/20 transition-colors cursor-pointer"
+                title="Xoay ảnh"
+              >
+                <RotateIcon className="size-5" />
+              </button>
+            </>
+          )}
           <button
             type="button"
             onClick={handleDownload}
-            className="grid size-9 place-items-center rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+            className="grid size-9 place-items-center rounded-full bg-white/10 hover:bg-white/20 transition-colors cursor-pointer"
             title="Tải về máy"
           >
             <DownloadIcon className="size-5" />
@@ -121,7 +129,7 @@ export function ImageLightboxModal({ attachment, onClose }: ImageLightboxModalPr
           <button
             type="button"
             onClick={onClose}
-            className="grid size-9 place-items-center rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+            className="grid size-9 place-items-center rounded-full bg-white/10 hover:bg-white/20 transition-colors cursor-pointer"
             title="Đóng (Esc)"
           >
             <CloseIcon className="size-5" />
@@ -129,22 +137,38 @@ export function ImageLightboxModal({ attachment, onClose }: ImageLightboxModalPr
         </div>
       </div>
 
-      {/* Main Image Container */}
+      {/* Main Container */}
       <div
         onClick={(e) => e.stopPropagation()}
         className="flex max-h-[85vh] max-w-[90vw] items-center justify-center overflow-hidden p-4 select-none"
       >
-        <img
-          src={attachment.previewUrl || attachment.downloadUrl}
-          alt={attachment.fileName}
-          style={{
-            transform: `scale(${scale}) rotate(${rotation}deg)`,
-            transition: 'transform 0.2s cubic-bezier(0.2, 0, 0, 1)',
-          }}
-          className="max-h-[80vh] max-w-[85vw] object-contain rounded-lg shadow-2xl cursor-grab active:cursor-grabbing"
-          draggable={false}
-        />
+        {isVid ? (
+          <video
+            src={attachment.previewUrl || attachment.downloadUrl}
+            controls
+            autoPlay
+            playsInline
+            className="max-h-[80vh] max-w-[85vw] rounded-lg shadow-2xl bg-black outline-hidden"
+          />
+        ) : (
+          <img
+            src={attachment.previewUrl || attachment.downloadUrl}
+            alt={attachment.fileName}
+            style={{
+              transform: `scale(${scale}) rotate(${rotation}deg)`,
+              transition: 'transform 0.2s cubic-bezier(0.2, 0, 0, 1)',
+            }}
+            className="max-h-[80vh] max-w-[85vw] object-contain rounded-lg shadow-2xl cursor-grab active:cursor-grabbing"
+            draggable={false}
+          />
+        )}
       </div>
     </div>
   )
+
+  if (typeof document === 'undefined') {
+    return content
+  }
+
+  return createPortal(content, document.body)
 }

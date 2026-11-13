@@ -73,4 +73,54 @@ describe('Localization Integrity & Avatar Text Tests', () => {
       expect(typeof viChat[key]).toBe('string')
     }
   })
+
+  it('provides required localization keys for chat info panel and privacy actions', () => {
+    const enChat = en.chat as Record<string, string>
+    const viChat = vi.chat as Record<string, string>
+
+    const requiredKeys = [
+      'conversationInfo',
+      'closeInfo',
+      'profile',
+      'personalInfo',
+      'copyUsername',
+      'usernameCopied',
+      'friendBadge',
+      'closeAction',
+      'searchInConversationComingSoon',
+      'mute',
+      'unmute',
+      'mutedConversation',
+      'unmutedConversation',
+      'searchInConversation',
+      'noBio',
+      'mediaAndFiles',
+      'photosAndVideos',
+      'documentsAndFiles',
+      'noMediaYet',
+      'noFilesYet',
+      'downloadFile',
+      'viewAll',
+      'collapse',
+      'fullscreenVideo',
+      'playVideo',
+      'privacyAndSupport',
+      'muteConversationOption',
+      'removeFriend',
+      'unfriendConfirmTitle',
+      'unfriendConfirmDesc',
+      'unfriendAction',
+      'blockUser',
+      'blockConfirmTitle',
+      'blockConfirmDesc',
+      'blockAction',
+    ]
+
+    for (const key of requiredKeys) {
+      expect(enChat[key]).toBeDefined()
+      expect(typeof enChat[key]).toBe('string')
+      expect(viChat[key]).toBeDefined()
+      expect(typeof viChat[key]).toBe('string')
+    }
+  })
 })

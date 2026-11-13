@@ -19,6 +19,8 @@ interface ConversationHeaderProps {
   showBack: boolean
   onBack?: () => void
   isTyping?: boolean
+  onToggleInfo?: () => void
+  isInfoOpen?: boolean
 }
 
 /** Pill "..." gọn thay cho chữ “Typing…” — vẫn có nhãn cho screen reader. */
@@ -49,13 +51,10 @@ export function ConversationHeader({
   showBack,
   onBack,
   isTyping,
+  onToggleInfo,
+  isInfoOpen,
 }: ConversationHeaderProps) {
   const { t } = useTranslation()
-  const headerActions = [
-    { label: t('chat.voiceCall'), icon: Phone },
-    { label: t('chat.videoCall'), icon: Video },
-    { label: t('chat.moreOptions'), icon: MoreVertical },
-  ]
 
   return (
     <header
@@ -105,17 +104,37 @@ export function ConversationHeader({
         )}
       </div>
       <div className="flex shrink-0 items-center gap-0.5">
-        {headerActions.map(({ label, icon: Icon }) => (
-          <button
-            key={label}
-            type="button"
-            aria-label={label}
-            title={label}
-            className="chat-icon-btn grid size-11 min-h-11 min-w-11 place-items-center rounded-xl text-brand-ink transition-all duration-150 hover:bg-muted active:scale-95"
-          >
-            <Icon className="size-5" aria-hidden="true" />
-          </button>
-        ))}
+        <button
+          type="button"
+          aria-label={t('chat.voiceCall')}
+          title={t('chat.voiceCall')}
+          className="chat-icon-btn grid size-11 min-h-11 min-w-11 place-items-center rounded-xl text-brand-ink transition-all duration-150 hover:bg-muted active:scale-95"
+        >
+          <Phone className="size-5" aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          aria-label={t('chat.videoCall')}
+          title={t('chat.videoCall')}
+          className="chat-icon-btn grid size-11 min-h-11 min-w-11 place-items-center rounded-xl text-brand-ink transition-all duration-150 hover:bg-muted active:scale-95"
+        >
+          <Video className="size-5" aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          onClick={onToggleInfo}
+          aria-label={t('chat.conversationInfo')}
+          title={t('chat.conversationInfo')}
+          aria-expanded={isInfoOpen}
+          className={cn(
+            'chat-icon-btn grid size-11 min-h-11 min-w-11 place-items-center rounded-xl transition-all duration-150 active:scale-95',
+            isInfoOpen
+              ? 'bg-muted text-foreground ring-1 ring-border shadow-xs'
+              : 'text-brand-ink hover:bg-muted',
+          )}
+        >
+          <MoreVertical className="size-5" aria-hidden="true" />
+        </button>
       </div>
     </header>
   )

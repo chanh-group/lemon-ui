@@ -47,6 +47,8 @@ export interface Conversation {
   members?: string
   lastActive?: string
   partnerId?: string
+  partnerUsername?: string
+  partnerBio?: string | null
   partnerAvatar?: string | null
   lastMessageSenderId?: string | null
 }
@@ -176,6 +178,7 @@ export interface ConversationPartnerResponse {
   username: string
   fullName: string
   avatarUrl: string | null
+  bio?: string | null
   isOnline: boolean
 }
 

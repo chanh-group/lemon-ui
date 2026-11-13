@@ -68,6 +68,8 @@ export function mapConversationResponse(raw: ConversationResponse): Conversation
     online: partner?.isOnline ?? false,
     isGroup,
     partnerId: partner?.id,
+    partnerUsername: partner?.username,
+    partnerBio: partner?.bio ?? null,
     partnerAvatar: partner?.avatarUrl,
     lastMessageSenderId: raw.lastMessageSenderId ?? null,
   }
