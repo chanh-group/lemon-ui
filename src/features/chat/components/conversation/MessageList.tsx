@@ -14,6 +14,7 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import {
   CheckCheckIcon as CheckCheckData,
   CheckIcon as CheckData,
+  Clock01Icon as ClockData,
   Film01Icon as FilmData,
   Image01Icon as ImageIconData,
   Share01Icon as ForwardData,
@@ -22,6 +23,7 @@ import {
 import { createIcon } from '@/components/icons/hugeIcon'
 const Check = createIcon(CheckData)
 const CheckCheck = createIcon(CheckCheckData)
+const Clock = createIcon(ClockData)
 const Film = createIcon(FilmData)
 const ImageIcon = createIcon(ImageIconData)
 const Sticker = createIcon(StickerData)
@@ -265,6 +267,7 @@ const MessageRowView = memo(function MessageRowView({
         className={cn(
           'flex max-w-[78%] flex-col sm:max-w-[65%]',
           isMe ? 'items-end' : 'items-start',
+          msg.status === 'sending' && 'opacity-80',
         )}
       >
         <div
@@ -344,10 +347,7 @@ const MessageRowView = memo(function MessageRowView({
         {/* Reactions floating independently outside the bubble, matching image 2 & Messenger */}
         {msg.reactions && msg.reactions.length > 0 && (
           <div
-            className={cn(
-              '-mt-2 z-10 flex flex-wrap gap-1 select-none',
-              isMe ? 'justify-end pr-1' : 'justify-start pl-1',
-            )}
+            className="-mt-2.5 z-10 flex max-w-full flex-wrap justify-end gap-1 select-none self-end mr-1.5"
             aria-label={t('chat.reactions')}
           >
             {msg.reactions.map((r, i) => {
@@ -366,10 +366,10 @@ const MessageRowView = memo(function MessageRowView({
                     onReact?.(msg.id, emoji)
                   }}
                   className={cn(
-                    'flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs shadow-xs transition-all active:scale-95 cursor-pointer',
+                    'flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs shadow-xs transition-all active:scale-95 cursor-pointer select-none',
                     myReaction
-                      ? 'border-primary/50 bg-primary/10 text-primary font-semibold ring-1 ring-primary/20'
-                      : 'border-border/80 bg-card hover:bg-muted text-foreground',
+                      ? 'border-primary/80 bg-secondary text-brand-ink font-semibold ring-1 ring-primary/30 shadow-xs'
+                      : 'border-border/80 bg-card hover:bg-muted text-foreground shadow-xs',
                   )}
                   title={myReaction ? t('chat.removeReaction', 'Bỏ cảm xúc') : emoji}
                 >
@@ -390,7 +390,12 @@ const MessageRowView = memo(function MessageRowView({
           >
             {msg.time}
             {isMe &&
-              (msg.status === 'read' ? (
+              (msg.status === 'sending' ? (
+                <Clock
+                  className="size-3.5 text-muted-foreground animate-pulse"
+                  aria-label={t('chat.sending', 'Đang gửi')}
+                />
+              ) : msg.status === 'read' ? (
                 <CheckCheck className="size-3.5 text-brand-ink" aria-label={t('chat.read')} />
               ) : (
                 <Check className="size-3.5" aria-label={t('chat.sent')} />

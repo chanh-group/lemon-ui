@@ -110,4 +110,26 @@ describe('MessageList buildMessageGroups & interaction data', () => {
     expect(msg.reactions![0].count).toBe(3)
     expect(msg.reactions![1].emoji).toBe('❤️')
   })
+
+  it('preserves status sending and clientMsgId for optimistic UI messages', () => {
+    const messages: ChatMessage[] = [
+      {
+        id: 'temp-client-123',
+        clientMsgId: 'client-123',
+        fromMe: true,
+        text: 'Optimistic message sending...',
+        kind: 'text',
+        time: '11:05',
+        status: 'sending',
+        createdAt: '2026-11-09T11:05:00Z',
+      },
+    ]
+
+    const groups = buildMessageGroups(messages)
+    expect(groups).toHaveLength(1)
+    const msg = groups[0].messages[0]
+    expect(msg.id).toBe('temp-client-123')
+    expect(msg.clientMsgId).toBe('client-123')
+    expect(msg.status).toBe('sending')
+  })
 })

@@ -9,6 +9,7 @@ export const queryKeys = {
     conversations: ['chat', 'conversations'] as const,
     conversation: (conversationId: string) => ['chat', 'conversation', conversationId] as const,
     messages: (conversationId: string) => ['chat', 'messages', conversationId] as const,
+    mediaArchive: (conversationId: string) => ['chat', 'media-archive', conversationId] as const,
     liveMessages: (conversationId: string) => ['chat', 'live-messages', conversationId] as const,
     stories: ['chat', 'stories'] as const,
     friendRequests: ['chat', 'friend-requests'] as const,

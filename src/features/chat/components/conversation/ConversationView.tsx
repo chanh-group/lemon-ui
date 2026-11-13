@@ -6,8 +6,9 @@ import { createIcon } from '@/components/icons/hugeIcon'
 const ArrowDown = createIcon(ArrowDownData)
 import type { Conversation, DayGroup, MessageAttachmentInput } from '../../types/chat.types'
 import { ConversationHeader } from './ConversationHeader'
+import { ConversationInfoPanel } from './ConversationInfoPanel'
 import { MessageList, type MessageListHandle } from './MessageList'
-import { MessageComposer } from './MessageComposer'
+import { MessageComposer, type PendingFile } from './MessageComposer'
 
 interface ConversationViewProps {
   conversation: Conversation
@@ -21,7 +22,11 @@ interface ConversationViewProps {
   hasNewerMessages: boolean
   isLoadingNewerMessages: boolean
   onLoadNewerMessages: () => Promise<unknown>
-  onSend: (text: string, attachments?: MessageAttachmentInput[]) => Promise<boolean>
+  onSend: (
+    text: string,
+    attachments?: MessageAttachmentInput[],
+    pendingFiles?: PendingFile[],
+  ) => Promise<boolean>
   isSending: boolean
   onBack?: () => void
   showBack: boolean
@@ -54,6 +59,7 @@ export function ConversationView({
 }: ConversationViewProps) {
   const { t } = useTranslation()
   const [draft, setDraft] = useState('')
+  const [isInfoOpen, setIsInfoOpen] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const messageListRef = useRef<MessageListHandle>(null)
   const [showJump, setShowJump] = useState(false)
@@ -149,9 +155,19 @@ export function ConversationView({
       loadNewerMessages()
   }
 
-  const submit = async (text: string, attachments?: MessageAttachmentInput[]) => {
-    if ((!text && (!attachments || attachments.length === 0)) || isSending) return false
-    const sent = await onSend(text, attachments)
+  const submit = async (
+    text: string,
+    attachments?: MessageAttachmentInput[],
+    pendingFiles?: PendingFile[],
+  ) => {
+    if (
+      (!text &&
+        (!attachments || attachments.length === 0) &&
+        (!pendingFiles || pendingFiles.length === 0)) ||
+      isSending
+    )
+      return false
+    const sent = await onSend(text, attachments, pendingFiles)
     if (!sent) return false
     // Giữ text người dùng gõ thêm trong lúc tin trước đang gửi.
     setDraft((current) => (current === text ? '' : current))
@@ -161,91 +177,102 @@ export function ConversationView({
   }
 
   return (
-    <section
-      aria-label={t('chat.conversationWith', { name: conversation.name })}
-      className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col bg-background"
-    >
-      <ConversationHeader
-        conversation={conversation}
-        showBack={showBack}
-        onBack={onBack}
-        isTyping={isTyping}
-        onOpenStory={onOpenStory}
-      />
-
-      {/* Nội dung hội thoại */}
-      <div
-        ref={scrollRef}
-        onScroll={handleScroll}
-        className="relative min-h-0 flex-1 overflow-y-auto px-3 py-4 sm:px-6"
+    <div className="relative flex h-full min-h-0 w-full min-w-0 flex-1 overflow-hidden">
+      <section
+        aria-label={t('chat.conversationWith', { name: conversation.name })}
+        className="flex h-full min-h-0 min-w-0 flex-1 flex-col bg-background"
       >
-        {messagesLoading ? (
-          <p className="py-6 text-center text-sm text-muted-foreground">{t('chat.pending')}</p>
-        ) : messagesError ? (
-          <div className="py-6 text-center text-sm">
-            <p className="font-semibold text-destructive">{t('chat.messagesLoadError')}</p>
-            <p className="mt-1 text-muted-foreground">{messagesError}</p>
+        <ConversationHeader
+          conversation={conversation}
+          showBack={showBack}
+          onBack={onBack}
+          isTyping={isTyping}
+          onOpenStory={onOpenStory}
+          onToggleInfo={() => setIsInfoOpen((prev) => !prev)}
+          isInfoOpen={isInfoOpen}
+        />
+
+        {/* Nội dung hội thoại */}
+        <div
+          ref={scrollRef}
+          onScroll={handleScroll}
+          className="relative min-h-0 flex-1 overflow-y-auto px-3 py-4 sm:px-6"
+        >
+          {messagesLoading ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">{t('chat.pending')}</p>
+          ) : messagesError ? (
+            <div className="py-6 text-center text-sm">
+              <p className="font-semibold text-destructive">{t('chat.messagesLoadError')}</p>
+              <p className="mt-1 text-muted-foreground">{messagesError}</p>
+              <button
+                type="button"
+                onClick={onRetryMessages}
+                className="mt-3 font-semibold text-brand-ink hover:underline"
+              >
+                {t('common.retry')}
+              </button>
+            </div>
+          ) : groups.length === 0 ? (
+            <div className="flex h-full flex-col items-center justify-center px-6 text-center">
+              <span
+                className="mb-4 grid size-14 place-items-center rounded-full bg-primary/10 text-brand-ink"
+                aria-hidden="true"
+              >
+                ✓
+              </span>
+              <h2 className="text-base font-semibold text-foreground">
+                {t('chat.newConnectionTitle', { name: conversation.name })}
+              </h2>
+              <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+                {t('chat.newConnectionPrompt')}
+              </p>
+            </div>
+          ) : (
+            <MessageList
+              ref={messageListRef}
+              groups={groups}
+              senderLabel={conversation.name}
+              senderAvatarUrl={conversation.partnerAvatar}
+              scrollRef={scrollRef}
+              conversationId={conversation.id}
+              followBottom={atBottom}
+            />
+          )}
+
+          {showJump && (
             <button
               type="button"
-              onClick={onRetryMessages}
-              className="mt-3 font-semibold text-brand-ink hover:underline"
+              onClick={() => {
+                setShowJump(false)
+                scrollToBottom()
+              }}
+              aria-label={t('chat.jumpToLatest')}
+              className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-md transition-transform duration-150 hover:scale-105"
             >
-              {t('common.retry')}
+              <ArrowDown className="size-3.5" aria-hidden="true" />
+              {t('chat.newMessages')}
             </button>
-          </div>
-        ) : groups.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center px-6 text-center">
-            <span
-              className="mb-4 grid size-14 place-items-center rounded-full bg-primary/10 text-brand-ink"
-              aria-hidden="true"
-            >
-              ✓
-            </span>
-            <h2 className="text-base font-semibold text-foreground">
-              {t('chat.newConnectionTitle', { name: conversation.name })}
-            </h2>
-            <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-              {t('chat.newConnectionPrompt')}
-            </p>
-          </div>
-        ) : (
-          <MessageList
-            ref={messageListRef}
-            groups={groups}
-            senderLabel={conversation.name}
-            senderAvatarUrl={conversation.partnerAvatar}
-            scrollRef={scrollRef}
-            conversationId={conversation.id}
-            followBottom={atBottom}
-          />
-        )}
+          )}
+        </div>
 
-        {showJump && (
-          <button
-            type="button"
-            onClick={() => {
-              setShowJump(false)
-              scrollToBottom()
-            }}
-            aria-label={t('chat.jumpToLatest')}
-            className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-md transition-transform duration-150 hover:scale-105"
-          >
-            <ArrowDown className="size-3.5" aria-hidden="true" />
-            {t('chat.newMessages')}
-          </button>
-        )}
-      </div>
+        <MessageComposer
+          draft={draft}
+          onDraftChange={setDraft}
+          onSubmit={submit}
+          disabled={messagesLoading || Boolean(messagesError)}
+          isSending={isSending}
+          onTypingStart={onTypingStart}
+          onTypingStop={onTypingStop}
+        />
+      </section>
 
-      <MessageComposer
-        draft={draft}
-        onDraftChange={setDraft}
-        onSubmit={submit}
-        disabled={messagesLoading || Boolean(messagesError)}
-        isSending={isSending}
-        conversationId={conversation.id}
-        onTypingStart={onTypingStart}
-        onTypingStop={onTypingStop}
-      />
-    </section>
+      {isInfoOpen && (
+        <ConversationInfoPanel
+          conversation={conversation}
+          groups={groups}
+          onClose={() => setIsInfoOpen(false)}
+        />
+      )}
+    </div>
   )
 }

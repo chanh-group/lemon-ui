@@ -222,6 +222,41 @@ describe('chat.mapper', () => {
     expect(mapped.reactions![0].count).toBe(2)
   })
 
+  it('maps temp optimistic message to status sending and preserved clientMsgId', () => {
+    const raw: MessageResponse = {
+      id: 'temp-c123',
+      clientMsgId: 'c123',
+      conversationId: 'conv-1',
+      senderId: 'user-me',
+      body: 'Optimistic text',
+      kind: 'TEXT',
+      replyToId: null,
+      editedAt: null,
+      deletedAt: null,
+      createdAt: '2026-11-09T10:00:00Z',
+    }
+
+    const mapped = mapMessageResponse(raw, 'user-me')
+    expect(mapped.id).toBe('temp-c123')
+    expect(mapped.status).toBe('sending')
+    expect(mapped.fromMe).toBe(true)
+
+    const sentMessage: MessageResponse = {
+      ...raw,
+      id: 'real-msg-id-123',
+    }
+    const mappedSent = mapMessageResponse(sentMessage, 'user-me')
+    expect(mappedSent.status).toBe('sent')
+
+    const partnerMessage: MessageResponse = {
+      ...raw,
+      id: 'partner-msg-id',
+      senderId: 'user-partner',
+    }
+    const mappedPartner = mapMessageResponse(partnerMessage, 'user-me')
+    expect(mappedPartner.status).toBeUndefined()
+  })
+
   describe('getShortName', () => {
     it('extracts given name in Vietnamese (last word)', () => {
       expect(getShortName('Nguyễn Hiệu', 'vi')).toBe('Hiệu')

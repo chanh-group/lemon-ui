@@ -68,6 +68,8 @@ export function mapConversationResponse(raw: ConversationResponse): Conversation
     online: partner?.isOnline ?? false,
     isGroup,
     partnerId: partner?.id,
+    partnerUsername: partner?.username,
+    partnerBio: partner?.bio ?? null,
     partnerAvatar: partner?.avatarUrl,
     lastMessageSenderId: raw.lastMessageSenderId ?? null,
   }
@@ -246,7 +248,7 @@ export function mapMessageResponse(raw: MessageResponse, currentUserId?: string)
     attachments: raw.attachments,
     photoLabel: raw.attachments?.[0]?.fileName,
     time: formatTimeHHmm(raw.createdAt),
-    status: isMe ? 'sent' : undefined,
+    status: raw.id.startsWith('temp-') ? 'sending' : isMe ? 'sent' : undefined,
     reactions: raw.reactions,
     isForwarded: raw.isForwarded,
     createdAt:
