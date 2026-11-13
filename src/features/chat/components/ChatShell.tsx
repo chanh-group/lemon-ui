@@ -109,6 +109,10 @@ export function ChatShell() {
     Boolean(selectedId) && !selectedFromList && !conversationsQuery.isPending
   const conversationDetailQuery = useConversationQuery(selectedId, needsConversationDetail)
   const selected = selectedFromList ?? conversationDetailQuery.data ?? null
+  const partnerStories = selected && !selected.isGroup && selected.partnerId
+    ? allStories.filter((story) => story.authorId === selected.partnerId)
+    : []
+  const partnerStory = partnerStories.find((story) => !story.viewed) ?? partnerStories[0]
 
   const restoringConversation =
     Boolean(selectedId) &&
@@ -330,6 +334,10 @@ export function ChatShell() {
             isTyping={isPartnerTyping}
             onTypingStart={handleTypingStart}
             onTypingStop={handleTypingStop}
+            onOpenStory={partnerStory ? () => {
+              setViewingStory(partnerStory)
+              setTab('stories')
+            } : undefined}
           />
         ) : selectedId ? (
           <section

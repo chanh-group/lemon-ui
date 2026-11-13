@@ -28,6 +28,7 @@ interface ConversationViewProps {
   isTyping?: boolean
   onTypingStart?: () => void
   onTypingStop?: () => void
+  onOpenStory?: () => void
 }
 
 export function ConversationView({
@@ -49,6 +50,7 @@ export function ConversationView({
   isTyping,
   onTypingStart,
   onTypingStop,
+  onOpenStory,
 }: ConversationViewProps) {
   const { t } = useTranslation()
   const [draft, setDraft] = useState('')
@@ -168,6 +170,7 @@ export function ConversationView({
         showBack={showBack}
         onBack={onBack}
         isTyping={isTyping}
+        onOpenStory={onOpenStory}
       />
 
       {/* Nội dung hội thoại */}

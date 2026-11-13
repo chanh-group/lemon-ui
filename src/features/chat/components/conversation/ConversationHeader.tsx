@@ -19,6 +19,7 @@ interface ConversationHeaderProps {
   showBack: boolean
   onBack?: () => void
   isTyping?: boolean
+  onOpenStory?: () => void
 }
 
 /** Pill "..." gọn thay cho chữ “Typing…” — vẫn có nhãn cho screen reader. */
@@ -49,6 +50,7 @@ export function ConversationHeader({
   showBack,
   onBack,
   isTyping,
+  onOpenStory,
 }: ConversationHeaderProps) {
   const { t } = useTranslation()
   const headerActions = [
@@ -74,12 +76,18 @@ export function ConversationHeader({
         </button>
       )}
       <span className="relative shrink-0">
+        {onOpenStory ? (
+          <button type="button" onClick={onOpenStory} aria-label={t('chat.storyOf', { name: conversation.name })} className="rounded-full chat-story-ring">
+            <UserAvatar name={conversation.name} src={conversation.partnerAvatar} className="size-10" />
+          </button>
+        ) : (
         <UserAvatar
           name={conversation.name}
           src={conversation.partnerAvatar}
           square={conversation.isGroup}
           className="size-10"
         />
+        )}
         {conversation.online && (
           <span
             className="absolute right-0 bottom-0 size-2.5 rounded-full bg-success ring-2 ring-card"
