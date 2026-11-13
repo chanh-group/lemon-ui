@@ -118,7 +118,7 @@ export interface ChatMessage {
   photoLabel?: string
   attachments?: MessageAttachmentItem[]
   time: string
-  status?: 'sent' | 'read' | 'sending' | 'failed'
+  status?: 'sent' | 'read' | 'sending' | 'failed' | 'uncertain'
   reactions?: MessageReactionItem[]
   isForwarded?: boolean
   storyId?: string | null
@@ -193,6 +193,8 @@ export interface ConversationResponse {
   lastMessageAt: string | null
   unreadCount: number
   createdAt: string
+  /** Client-side metadata, populated only when the corresponding message is known. */
+  lastMessageDetail?: MessageResponse
 }
 
 export interface MessageResponse {
@@ -206,6 +208,8 @@ export interface MessageResponse {
   storyId?: string | null
   storyPreview?: StoryPreview | null
   clientMsgId?: string | null
+  sendState?: 'uncertain'
+  retryPayload?: SendMessageDto
   attachments?: MessageAttachmentItem[]
   reactions?: MessageReactionItem[]
   isForwarded?: boolean

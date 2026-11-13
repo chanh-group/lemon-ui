@@ -2,6 +2,7 @@ import {
   forwardRef,
   memo,
   useCallback,
+  useEffect,
   useImperativeHandle,
   useLayoutEffect,
   useMemo,
@@ -50,6 +51,22 @@ export interface MessageGroup {
   fromMe: boolean
   sender?: string
   messages: ChatMessage[]
+}
+
+export function newestVisibleIncoming(
+  messages: Array<{ id: string; fromMe: boolean; bottom: number }>,
+  top: number,
+  bottom: number,
+): string | undefined {
+  return messages
+    .filter(
+      (message) =>
+        !message.fromMe &&
+        !message.id.startsWith('temp-') &&
+        message.bottom > top &&
+        message.bottom <= bottom,
+    )
+    .at(-1)?.id
 }
 
 function toMinutes(time: string): number {
@@ -148,6 +165,7 @@ const MessageRowView = memo(function MessageRowView({
   onReact,
   onForward,
   onReply,
+  onRetryMessage,
 }: {
   group: MessageGroup
   messageIndex: number
@@ -160,6 +178,7 @@ const MessageRowView = memo(function MessageRowView({
   onReact?: (messageId: string, emoji: string) => void
   onForward?: (message: ChatMessage) => void
   onReply?: (message: ChatMessage) => void
+  onRetryMessage?: (messageId: string) => void
 }) {
   const { t } = useTranslation()
   const isMe = group.fromMe
@@ -216,7 +235,7 @@ const MessageRowView = memo(function MessageRowView({
         onRevoke={onRevoke}
         onReact={onReact}
         onForward={onForward}
-        onReply={msg.status === 'sending' ? undefined : onReply}
+        onReply={msg.status === 'sending' || msg.status === 'uncertain' ? undefined : onReply}
         align={isMe ? 'end' : 'start'}
         onOpenChange={setIsMenuOpen}
       />
@@ -393,7 +412,7 @@ const MessageRowView = memo(function MessageRowView({
           </div>
         )}
 
-        {isLast && (
+        {(isLast || msg.status === 'uncertain') && (
           <span
             className={cn(
               'mt-1 flex items-center gap-1 px-1 text-[11px] text-muted-foreground',
@@ -407,6 +426,15 @@ const MessageRowView = memo(function MessageRowView({
                   className="size-3.5 text-muted-foreground animate-pulse"
                   aria-label={t('chat.sending', 'Đang gửi')}
                 />
+              ) : msg.status === 'uncertain' ? (
+                <button
+                  type="button"
+                  onClick={() => onRetryMessage?.(msg.id)}
+                  title={t('chat.sendUncertain')}
+                  className="text-destructive underline"
+                >
+                  {t('chat.retrySend')}
+                </button>
               ) : msg.status === 'read' ? (
                 <CheckCheck className="size-3.5 text-brand-ink" aria-label={t('chat.read')} />
               ) : (
@@ -431,10 +459,14 @@ interface MessageListProps {
   /** Còn đang ở cuối danh sách thì tự bám tin mới nhất; cuộn lên thì thôi. */
   followBottom?: boolean
   onReply?: (message: ChatMessage) => void
+  onVisibleMessage?: (messageId: string) => void
+  onRetryMessage?: (messageId: string) => void
+  restoreMessageId?: string
 }
 
 export interface MessageListHandle {
   scrollToEnd: (behavior?: ScrollBehavior) => void
+  firstVisibleMessage: () => string | undefined
 }
 
 type MessageListRow =
@@ -460,7 +492,18 @@ function estimateRowHeight(row: MessageListRow | undefined): number {
 }
 
 export const MessageList = forwardRef<MessageListHandle, MessageListProps>(function MessageList(
-  { groups, senderLabel, senderAvatarUrl, scrollRef, conversationId, followBottom = true, onReply },
+  {
+    groups,
+    senderLabel,
+    senderAvatarUrl,
+    scrollRef,
+    conversationId,
+    followBottom = true,
+    onVisibleMessage,
+    onRetryMessage,
+    restoreMessageId,
+    onReply,
+  },
   ref,
 ) {
   'use no memo'
@@ -540,20 +583,78 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
     ref,
     () => ({
       scrollToEnd: (behavior = 'auto') => virtualizer.scrollToEnd({ behavior }),
+      firstVisibleMessage: () => {
+        const root = scrollRef.current
+        if (!root) return undefined
+        const bounds = root.getBoundingClientRect()
+        for (const element of root.querySelectorAll<HTMLElement>('[data-index]')) {
+          const row = rows[Number(element.dataset.index)]
+          const rect = element.getBoundingClientRect()
+          if (row?.kind === 'message' && rect.bottom > bounds.top && rect.top < bounds.bottom)
+            return row.key
+        }
+        return undefined
+      },
     }),
-    [virtualizer],
+    [virtualizer, rows, scrollRef],
   )
+
+  const restoredMessage = useRef(false)
+  useLayoutEffect(() => {
+    if (restoredMessage.current || !restoreMessageId || rows.length === 0) return
+    const index = rows.findIndex((row) => row.kind === 'message' && row.key === restoreMessageId)
+    if (index >= 0) virtualizer.scrollToIndex(index, { align: 'start', behavior: 'auto' })
+    restoredMessage.current = true
+  }, [restoreMessageId, rows, virtualizer])
 
   // Mở chat hoặc có tin/trang mới trong lúc còn ở cuối: bám xuống tin mới nhất.
   // Khi người dùng đã cuộn lên, bỏ qua để virtualizer neo đúng tin đang đọc.
   useLayoutEffect(() => {
     if (rows.length === 0 || !followBottom) return
     const el = scrollRef.current
-    if (el) el.scrollTop = el.scrollHeight
     virtualizer.scrollToEnd({ behavior: 'auto' })
+    if (el) el.scrollTop = el.scrollHeight
   }, [rows.length, followBottom, virtualizer, scrollRef])
 
   const virtualRows = virtualizer.getVirtualItems()
+  const onVisibleMessageRef = useRef(onVisibleMessage)
+  onVisibleMessageRef.current = onVisibleMessage
+  const visibleRowKeys = virtualRows.map((row) => row.key).join('|')
+  useEffect(() => {
+    const root = scrollRef.current
+    if (!root || !onVisibleMessageRef.current) return
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const check = () => {
+      clearTimeout(timer)
+      timer = setTimeout(() => {
+        if (document.visibilityState !== 'visible' || !document.hasFocus()) return
+        const bounds = root.getBoundingClientRect()
+        const visible: Array<{ id: string; fromMe: boolean; bottom: number }> = []
+        for (const element of root.querySelectorAll<HTMLElement>('[data-index]')) {
+          const row = rows[Number(element.dataset.index)]
+          const rect = element.getBoundingClientRect()
+          if (row?.kind !== 'message') continue
+          const message = row.group.messages[row.messageIndex]
+          if (message) visible.push({ id: message.id, fromMe: message.fromMe, bottom: rect.bottom })
+        }
+        const lastId = newestVisibleIncoming(visible, bounds.top, bounds.bottom)
+        if (lastId) onVisibleMessageRef.current?.(lastId)
+      }, 300)
+    }
+    const observer = new IntersectionObserver(check, { root, threshold: [0, 1] })
+    root.querySelectorAll('[data-index]').forEach((element) => observer.observe(element))
+    root.addEventListener('scroll', check, { passive: true })
+    window.addEventListener('focus', check)
+    document.addEventListener('visibilitychange', check)
+    check()
+    return () => {
+      clearTimeout(timer)
+      observer.disconnect()
+      root.removeEventListener('scroll', check)
+      window.removeEventListener('focus', check)
+      document.removeEventListener('visibilitychange', check)
+    }
+  }, [rows, scrollRef, visibleRowKeys])
   const renderRow = (row: MessageListRow) =>
     row.kind === 'date' ? (
       <div className="flex items-center gap-3 pt-2 pb-3" role="separator" aria-label={row.date}>
@@ -576,6 +677,7 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
         onReact={handleReactMessage}
         onForward={handleForwardMessage}
         onReply={onReply}
+        onRetryMessage={onRetryMessage}
       />
     )
 
@@ -586,9 +688,10 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
         style={virtualRows.length ? { height: virtualizer.getTotalSize() } : undefined}
       >
         {virtualRows.length === 0 && rows.length > 0
-          ? rows.map((row) => (
+          ? rows.map((row, index) => (
               <div
                 key={row.key}
+                data-index={index}
                 className={
                   row.kind === 'message' && row.messageIndex === row.group.messages.length - 1
                     ? 'pb-2'

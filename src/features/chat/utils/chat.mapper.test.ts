@@ -5,6 +5,7 @@ import {
   getShortName,
   mapConversationResponse,
   mapMessageResponse,
+  updateConversationLastMessage,
 } from './chat.mapper'
 import type { Conversation, ConversationResponse, MessageResponse } from '../types/chat.types'
 import vi from '@/locales/vi.json'
@@ -24,6 +25,65 @@ function makeMockT(lang: 'vi' | 'en') {
     return val
   }
 }
+
+describe('conversation cache updates', () => {
+  const conversation: ConversationResponse = {
+    id: 'c',
+    kind: 'DIRECT',
+    partner: { id: 'other', fullName: 'Alex', username: 'alex', avatarUrl: null, isOnline: false },
+    lastMessagePreview: 'server preview',
+    lastMessageAt: '2026-01-01T00:00:00Z',
+    unreadCount: 0,
+    createdAt: '2026-01-01T00:00:00Z',
+  }
+  const message: MessageResponse = {
+    id: 'm',
+    conversationId: 'c',
+    senderId: 'me',
+    kind: 'IMAGE',
+    body: null,
+    replyToId: null,
+    createdAt: '2026-01-02T00:00:00Z',
+    editedAt: null,
+    deletedAt: null,
+  }
+
+  it('preserves sender and attachment metadata for previews', () => {
+    expect(updateConversationLastMessage(conversation, message)).toMatchObject({
+      lastMessagePreview: '[attachment]',
+      lastMessageSenderId: 'me',
+      lastMessageDetail: message,
+    })
+  })
+
+  it('does not let older or unrelated messages overwrite the inbox', () => {
+    expect(
+      updateConversationLastMessage(conversation, {
+        ...message,
+        createdAt: '2025-01-01T00:00:00Z',
+      }),
+    ).toBe(conversation)
+    expect(
+      updateConversationLastMessage(conversation, { ...message, conversationId: 'other' }),
+    ).toBe(conversation)
+  })
+
+  it('keeps story reaction previews and attachment captions consistent with the server', () => {
+    expect(
+      updateConversationLastMessage(conversation, {
+        ...message,
+        kind: 'STORY_REACTION',
+        body: '🔥',
+      }).lastMessagePreview,
+    ).toBe('[story-reaction]')
+    expect(
+      updateConversationLastMessage(conversation, {
+        ...message,
+        body: 'caption',
+      }).lastMessagePreview,
+    ).toBe('caption')
+  })
+})
 
 describe('chat.mapper', () => {
   it('preserves story replies and the referenced message in the timeline', () => {
@@ -54,6 +114,22 @@ describe('chat.mapper', () => {
       replyTarget: target,
       storyPreview: story,
     })
+  })
+
+  it('shows an uncertain send without presenting it as confirmed', () => {
+    const message: MessageResponse = {
+      id: 'temp-1',
+      conversationId: 'conv',
+      senderId: 'me',
+      kind: 'TEXT',
+      body: 'hello',
+      replyToId: null,
+      createdAt: '2026-01-01T00:00:00Z',
+      editedAt: null,
+      deletedAt: null,
+      sendState: 'uncertain',
+    }
+    expect(mapMessageResponse(message, 'me').status).toBe('uncertain')
   })
   it('maps an image attachment message correctly', () => {
     const raw: MessageResponse = {

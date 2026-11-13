@@ -140,8 +140,15 @@ export function MiddlePanel({
     }
   }, [requestsQuery.isError, requestsQuery.error, t])
   const incomingRequests = requests?.incoming?.length ?? 0
-  // Story theo tên người gửi — 1-1 mới bọc ring/bubble (Messenger không cho group)
-  const storyByName = useMemo(() => new Map(stories.map((s) => [s.name, s])), [stories])
+  const storyByAuthor = useMemo(() => {
+    const result = new Map<string, StoryEntry>()
+    for (const story of stories) {
+      if (story.mine || !story.authorId) continue
+      const current = result.get(story.authorId)
+      if (!current || (current.viewed && !story.viewed)) result.set(story.authorId, story)
+    }
+    return result
+  }, [stories])
 
   return (
     <section
@@ -259,8 +266,8 @@ export function MiddlePanel({
               <ul className="flex flex-col gap-0.5">
                 {conversations.map((c) => {
                   const isActive = c.id === selectedId
-                  // Story còn hiệu lực 24h của contact 1-1 — bấm avatar là xem tin, bấm row là chat
-                  const contactStory = !c.isGroup ? storyByName.get(c.name) : undefined
+                  const contactStory =
+                    !c.isGroup && c.partnerId ? storyByAuthor.get(c.partnerId) : undefined
                   const {
                     text: previewText,
                     isBold,
@@ -323,7 +330,6 @@ export function MiddlePanel({
                           </span>
                         </span>
                       </button>
-                      {/* Nút trên avatar — layer trên row, tránh button lồng nhau */}
                       {contactStory && (
                         <button
                           type="button"
@@ -422,9 +428,16 @@ function StoriesTab({ stories, activeStoryId, onOpenStory, onOpenCreate }: Stori
   const { t } = useTranslation()
   const { user } = useAuth()
   const userName = user?.fullName ?? user?.username ?? 'Lemon User'
-  // Tin của mình riêng — buộc nút +, hàng bấm là xem tin mới nhất của mình
   const myStory = stories.find((s) => s.mine)
-  const friendStories = stories.filter((s) => !s.mine)
+  const friendGroups = new Map<string, StoryEntry[]>()
+  for (const story of stories) {
+    if (story.mine) continue
+    const key = story.authorId ? `author:${story.authorId}` : `story:${story.id}`
+    const group = friendGroups.get(key) ?? []
+    group.push(story)
+    friendGroups.set(key, group)
+  }
+  const friendStories = [...friendGroups.values()]
 
   return (
     <ul className="flex flex-col gap-0.5">
@@ -432,7 +445,7 @@ function StoriesTab({ stories, activeStoryId, onOpenStory, onOpenCreate }: Stori
       <li className="relative">
         <button
           type="button"
-          onClick={myStory ? () => onOpenStory(myStory) : onOpenCreate}
+          onClick={onOpenCreate}
           aria-label={myStory ? t('chat.yourStory') : t('chat.createStoryTitle')}
           className={cn(
             'chat-item group flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-all duration-150',
@@ -461,6 +474,14 @@ function StoriesTab({ stories, activeStoryId, onOpenStory, onOpenCreate }: Stori
             </span>
           )}
         </button>
+        {myStory && (
+          <button
+            type="button"
+            aria-label={t('chat.yourStory')}
+            onClick={() => onOpenStory(myStory)}
+            className="absolute left-3 top-2.5 size-11 rounded-full"
+          />
+        )}
         {/* Nút + đè góc avatar — nút riêng, tránh button lồng nhau */}
         <button
           type="button"
@@ -479,8 +500,9 @@ function StoriesTab({ stories, activeStoryId, onOpenStory, onOpenCreate }: Stori
           <EmptyState title={t('chat.noStories')} message={t('chat.storiesEmpty')} />
         </li>
       ) : (
-        friendStories.map((s) => {
-          const isSelected = s.id === activeStoryId
+        friendStories.map((group) => {
+          const s = group.find((story) => !story.viewed) ?? group[0]
+          const isSelected = group.some((story) => story.id === activeStoryId)
           return (
             <li key={s.id}>
               <button
