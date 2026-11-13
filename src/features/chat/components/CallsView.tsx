@@ -5,6 +5,7 @@ import {
   CallIncoming01Icon as PhoneIncomingData,
   CallOutgoing01Icon as PhoneOutgoingData,
   CallMissed01Icon as PhoneXData,
+  Video01Icon as VideoData,
 } from '@hugeicons/core-free-icons'
 import { createIcon } from '@/components/icons/hugeIcon'
 const ArrowLeft = createIcon(ArrowLeftData)
@@ -13,6 +14,7 @@ const Search = createIcon(SearchData)
 const PhoneIncoming = createIcon(PhoneIncomingData)
 const PhoneOutgoing = createIcon(PhoneOutgoingData)
 const PhoneX = createIcon(PhoneXData)
+const Video = createIcon(VideoData)
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
@@ -33,13 +35,15 @@ const DIRECTION_KEYS = {
 
 const DIRECTION_ICON = { incoming: PhoneIncoming, outgoing: PhoneOutgoing, missed: PhoneX } as const
 
-function CallRow({ call }: { call: CallEntry }) {
+function CallRow({ call, onCall }: { call: CallEntry; onCall: (call: CallEntry) => void }) {
   const { t } = useTranslation()
   const DirectionIcon = DIRECTION_ICON[call.direction]
+  const MediaIcon = call.kind === 'video' ? Video : Phone
   const isMissed = call.direction === 'missed'
   return (
     <button
       type="button"
+      onClick={() => onCall(call)}
       title={t('chat.callBack', { name: call.name })}
       className="chat-item group flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-all duration-150 hover:translate-x-0.5 hover:bg-muted"
     >
@@ -57,7 +61,7 @@ function CallRow({ call }: { call: CallEntry }) {
         </span>
       </span>
       <span className="grid size-11 shrink-0 place-items-center rounded-xl text-brand-ink transition-colors duration-150 hover:bg-secondary">
-        <Phone className="size-5" aria-hidden="true" />
+        <MediaIcon className="size-5" aria-hidden="true" />
       </span>
     </button>
   )
@@ -143,7 +147,12 @@ export function CallsView() {
             <ul className="flex flex-col gap-0.5">
               {calls.map((call) => (
                 <li key={call.id} role="listitem">
-                  <CallRow call={call} />
+                  <CallRow
+                    call={call}
+                    onCall={(selectedCall) =>
+                      navigate(ROUTES.newCall, { state: { query: selectedCall.name } })
+                    }
+                  />
                 </li>
               ))}
             </ul>

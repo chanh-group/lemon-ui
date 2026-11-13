@@ -19,8 +19,8 @@ import { useAuth } from '@/features/auth/api'
 import type { StoryEntry } from '../../types/chat.types'
 import type { CreateMediaStoryPayload, CreateTextStoryPayload } from '../../api/stories.api'
 import { useCreateMediaStory, useCreateTextStory, useStoriesList } from '../../hooks/useStories'
-import { StoryViewer } from '../StoryViewer'
 import { SideNav } from '../SideNav'
+import { StoryViewer } from '../StoryViewer'
 import { ChooseStoryType } from './ChooseStoryType'
 import { TextStoryEditor } from './TextStoryEditor'
 import { MediaStoryEditor } from './MediaStoryEditor'
@@ -112,12 +112,20 @@ export function StoriesCreateView() {
 
         {/* Tài khoản đích */}
         <div className="flex items-center gap-3 border-b border-border px-4 py-3">
-          <UserAvatar
-            name={userName}
-            src={user?.avatarUrl}
-            className="size-14"
-            fallbackClassName="text-base font-bold text-foreground"
-          />
+          <button
+            type="button"
+            disabled={myStories.length === 0}
+            onClick={() => setViewingOwn(myStories[0])}
+            aria-label={t('chat.yourStory')}
+            className="rounded-full disabled:cursor-default"
+          >
+            <UserAvatar
+              name={userName}
+              src={user?.avatarUrl}
+              className="size-14"
+              fallbackClassName="text-base font-bold text-[#172b20]"
+            />
+          </button>
           <div className="min-w-0">
             <p className="truncate text-sm font-bold text-foreground">{userName}</p>
             <p className="truncate text-xs text-muted-foreground">{t('chat.addToStoryHint')}</p>
@@ -179,7 +187,11 @@ export function StoriesCreateView() {
         aria-label={step === 'choose' ? t('chat.createStoryTitle') : t('chat.storyEditor')}
         className="hidden h-full min-h-0 min-w-0 flex-1 overflow-y-auto md:block"
       >
-        <div className="mx-auto h-full w-full max-w-2xl">
+        <div
+          className={
+            showingEditor ? 'mx-auto h-full w-full max-w-5xl' : 'mx-auto h-full w-full max-w-2xl'
+          }
+        >
           {step === 'choose' && (
             <ChooseStoryType
               onPickMedia={() => setStep('media')}
@@ -222,7 +234,6 @@ export function StoriesCreateView() {
         </div>
       )}
 
-      {/* Xem lại tin của mình từ panel trái */}
       {viewingOwn && (
         <StoryViewer
           key={viewingOwn.id}

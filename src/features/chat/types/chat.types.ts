@@ -47,6 +47,8 @@ export interface Conversation {
   members?: string
   lastActive?: string
   partnerId?: string
+  partnerUsername?: string
+  partnerBio?: string | null
   partnerAvatar?: string | null
   lastMessageSenderId?: string | null
 }
@@ -116,7 +118,7 @@ export interface ChatMessage {
   photoLabel?: string
   attachments?: MessageAttachmentItem[]
   time: string
-  status?: 'sent' | 'read'
+  status?: 'sent' | 'read' | 'sending' | 'failed' | 'uncertain'
   reactions?: MessageReactionItem[]
   isForwarded?: boolean
   storyId?: string | null
@@ -177,6 +179,7 @@ export interface ConversationPartnerResponse {
   username: string
   fullName: string
   avatarUrl: string | null
+  bio?: string | null
   isOnline: boolean
 }
 
@@ -189,16 +192,20 @@ export interface ConversationResponse {
   lastMessageAt: string | null
   unreadCount: number
   createdAt: string
+  /** Client-side metadata, populated only when the corresponding message is known. */
+  lastMessageDetail?: MessageResponse
 }
 
 export interface MessageResponse {
   id: string
   conversationId: string
   senderId: string
-  kind: 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE' | 'SYSTEM'
+  kind: 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE' | 'SYSTEM' | 'STORY_REPLY' | 'STORY_REACTION'
   body: string | null
   replyToId: string | null
   clientMsgId?: string | null
+  sendState?: 'uncertain'
+  retryPayload?: SendMessageDto
   attachments?: MessageAttachmentItem[]
   reactions?: MessageReactionItem[]
   isForwarded?: boolean

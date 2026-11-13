@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { mergeMessagesByTime } from './useChatRealtime'
+import { correlateSentMessage, mergeMessagesByTime } from './useChatRealtime'
 import type { MessageResponse } from '../types/chat.types'
 
 function message(id: string, createdAt: string, body = id): MessageResponse {
@@ -25,5 +25,22 @@ describe('mergeMessagesByTime', () => {
 
     expect(result.map(({ id }) => id)).toEqual(['1', '2', '3'])
     expect(result[1].body).toBe('updated')
+  })
+})
+
+describe('correlateSentMessage', () => {
+  it('binds an optimistic message to the server ID before the broadcast', () => {
+    const optimistic = { ...message('temp-1', '2026-11-01T00:00:00Z'), clientMsgId: 'client-1' }
+    expect(correlateSentMessage([optimistic], 'server-1', 'client-1')).toEqual([
+      { ...optimistic, id: 'server-1' },
+    ])
+  })
+
+  it('removes the optimistic copy if the broadcast arrived first', () => {
+    const optimistic = { ...message('temp-1', '2026-11-01T00:00:00Z'), clientMsgId: 'client-1' }
+    const server = message('server-1', '2026-11-01T00:00:00Z')
+    expect(correlateSentMessage([optimistic, server], 'server-1', 'client-1')).toEqual([
+      { ...server, clientMsgId: 'client-1' },
+    ])
   })
 })
