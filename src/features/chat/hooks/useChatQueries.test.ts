@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { rollbackOptimisticConversationPreview } from './useChatQueries'
+import { rollbackOptimisticConversationPreview, windowHasLatest } from './useChatQueries'
 import type { ConversationResponse } from '../types/chat.types'
 
 const previousConversation: ConversationResponse = {
@@ -57,5 +57,16 @@ describe('rollbackOptimisticConversationPreview', () => {
         optimistic.lastMessageAt,
       ),
     ).toEqual([previousConversation])
+  })
+})
+
+describe('windowHasLatest', () => {
+  it('distinguishes the initial or completed newer page from an older window', () => {
+    const page = { items: [], hasMore: false }
+    expect(windowHasLatest(undefined)).toBe(false)
+    expect(windowHasLatest({ pages: [page], pageParams: [{}] })).toBe(true)
+    expect(windowHasLatest({ pages: [page], pageParams: [{ cursor: 'old' }] })).toBe(false)
+    expect(windowHasLatest({ pages: [page], pageParams: [{ after: 'old' }] })).toBe(true)
+    expect(windowHasLatest({ pages: [{ ...page, hasMore: true }], pageParams: [{ after: 'old' }] })).toBe(false)
   })
 })

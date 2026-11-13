@@ -10,7 +10,7 @@ import {
   type SocketConnectionStatus,
 } from '@/lib/socket'
 import { CHAT_QUERY_KEYS, type MessagePageParam } from './useChatQueries'
-import { getConversationMessages, markConversationRead } from '../api/chat.api'
+import { getConversationMessages } from '../api/chat.api'
 import { fetchMissedMessages } from '../utils/messageSync'
 import type {
   ConversationResponse,
@@ -31,6 +31,20 @@ export function mergeMessagesByTime(
     (left, right) =>
       Date.parse(left.createdAt) - Date.parse(right.createdAt) || left.id.localeCompare(right.id),
   )
+}
+
+export function correlateSentMessage(
+  messages: MessageResponse[],
+  id: string,
+  clientMsgId: string,
+): MessageResponse[] {
+  const existing = messages.find((message) => message.id === id)
+  return messages.flatMap((message) => {
+    if (message === existing) return [{ ...message, clientMsgId }]
+    if (message.clientMsgId !== clientMsgId) return [message]
+    if (existing && existing !== message) return []
+    return [{ ...message, id }]
+  })
 }
 
 export function useChatRealtime(activeConversationId: string | null) {
@@ -128,6 +142,21 @@ export function useChatRealtime(activeConversationId: string | null) {
       refreshInbox()
     }
 
+    const handleMessageCorrelated = ({
+      conversationId,
+      id,
+      clientMsgId,
+    }: {
+      conversationId: string
+      id: string
+      clientMsgId: string
+    }) => {
+      queryClient.setQueryData<MessageResponse[]>(
+        CHAT_QUERY_KEYS.liveMessages(conversationId),
+        (old) => (old ? correlateSentMessage(old, id, clientMsgId) : old),
+      )
+    }
+
     // A. Nhận tin nhắn mới
     const handleNewMessage = (msg: MessageResponse) => {
       const convId = msg.conversationId
@@ -159,7 +188,7 @@ export function useChatRealtime(activeConversationId: string | null) {
           const updated = old.map((m) => {
             if ((m.clientMsgId && m.clientMsgId === msg.clientMsgId) || m.id === msg.id) {
               replaced = true
-              return msg
+              return m.clientMsgId ? { ...msg, clientMsgId: m.clientMsgId } : msg
             }
             return m
           })
@@ -175,7 +204,6 @@ export function useChatRealtime(activeConversationId: string | null) {
         queryClient.setQueryData<ConversationResponse[]>(CHAT_QUERY_KEYS.conversations, (old) =>
           old?.map((conversation) => {
             if (conversation.id !== convId) return conversation
-            const isCurrentActive = convId === activeConversationId
             const preview = msg.deletedAt
               ? '[message-revoked]'
               : (msg.body ?? (msg.attachments && msg.attachments.length > 0 ? '[attachment]' : ''))
@@ -185,7 +213,7 @@ export function useChatRealtime(activeConversationId: string | null) {
               lastMessageSenderId: msg.senderId,
               lastMessageAt: msg.createdAt,
               unreadCount:
-                isCurrentActive || msg.senderId === userId
+                  msg.senderId === userId
                   ? conversation.unreadCount
                   : (conversation.unreadCount || 0) + 1,
             }
@@ -195,20 +223,7 @@ export function useChatRealtime(activeConversationId: string | null) {
         void queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.conversations })
       }
 
-      // Nếu đang mở đúng conversation này và tin nhắn do đối phương gửi -> Đánh dấu đã đọc
-      if (convId === activeConversationId && userId && msg.senderId !== userId) {
-        void markConversationRead(convId, msg.id)
-          .then(() => {
-            queryClient.setQueryData<ConversationResponse[]>(CHAT_QUERY_KEYS.conversations, (old) =>
-              old?.map((conversation) =>
-                conversation.id === convId ? { ...conversation, unreadCount: 0 } : conversation,
-              ),
-            )
-          })
-          .catch((error: unknown) => {
-            toast.error(error instanceof Error ? error.message : t('chat.markReadError'))
-          })
-      }
+      void queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.conversations })
     }
 
     // B. Tin nhắn được chỉnh sửa
@@ -283,8 +298,11 @@ export function useChatRealtime(activeConversationId: string | null) {
       }))
     }
 
-    // E. read:updated: không refetch timeline. UI chưa hiển thị read receipt, còn
-    // invalidate infinite query sẽ tải lại toàn bộ trang (cursor) + presign lại media.
+    const handleReadUpdated = (event: { userId: string }) => {
+      if (event.userId === userId) {
+        void queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.conversations })
+      }
+    }
 
     // F. Cập nhật cảm xúc tin nhắn (Điểm A)
     const handleMessageReaction = (payload: MessageReactionPayload) => {
@@ -310,6 +328,8 @@ export function useChatRealtime(activeConversationId: string | null) {
     }
 
     socket.on('message:new', handleNewMessage)
+    socket.on('message:correlated', handleMessageCorrelated)
+    socket.on('read:updated', handleReadUpdated)
     socket.on('message:updated', handleMessageUpdated)
     socket.on('message:revoked', handleMessageRevoked)
     socket.on('typing', handleTyping)
@@ -321,6 +341,8 @@ export function useChatRealtime(activeConversationId: string | null) {
       socket.off('connect_error', handleConnectError)
       socket.io.off('reconnect_attempt', handleReconnectAttempt)
       socket.off('message:new', handleNewMessage)
+      socket.off('message:correlated', handleMessageCorrelated)
+      socket.off('read:updated', handleReadUpdated)
       socket.off('message:updated', handleMessageUpdated)
       socket.off('message:revoked', handleMessageRevoked)
       socket.off('typing', handleTyping)
