@@ -32,6 +32,7 @@ import { ROUTES } from '@/config/constants'
 import { useAuth } from '@/features/auth/api'
 import { useFriendRequests } from '../hooks/useFriends'
 import { getConversationPreview } from '../utils/chat.mapper'
+import { groupStoriesByAuthor } from '../utils/storyGroups'
 import { storyDisplayName, storyTime } from '../data/storiesData'
 import type { CallEntry, ChatTab, Conversation, StoryEntry } from '../types/chat.types'
 import { CallsHeaderActions } from './CallsHeaderActions'
@@ -424,7 +425,7 @@ function StoriesTab({ stories, activeStoryId, onOpenStory, onOpenCreate }: Stori
   const userName = user?.fullName ?? user?.username ?? 'Lemon User'
   // Tin của mình riêng — buộc nút +, hàng bấm là xem tin mới nhất của mình
   const myStory = stories.find((s) => s.mine)
-  const friendStories = stories.filter((s) => !s.mine)
+  const friendStories = groupStoriesByAuthor(stories.filter((s) => !s.mine))
 
   return (
     <ul className="flex flex-col gap-0.5">
@@ -479,8 +480,9 @@ function StoriesTab({ stories, activeStoryId, onOpenStory, onOpenCreate }: Stori
           <EmptyState title={t('chat.noStories')} message={t('chat.storiesEmpty')} />
         </li>
       ) : (
-        friendStories.map((s) => {
-          const isSelected = s.id === activeStoryId
+        friendStories.map((group) => {
+          const s = group.find((item) => !item.viewed) ?? group[0]
+          const isSelected = group.some((item) => item.id === activeStoryId)
           return (
             <li key={s.id}>
               <button
@@ -499,7 +501,7 @@ function StoriesTab({ stories, activeStoryId, onOpenStory, onOpenCreate }: Stori
                   src={s.authorAvatar}
                   className={cn(
                     'size-11',
-                    s.viewed
+                    group.every((item) => item.viewed)
                       ? 'ring-2 ring-border ring-offset-2 ring-offset-card'
                       : 'chat-story-ring',
                   )}
