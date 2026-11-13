@@ -26,7 +26,11 @@ export function StorySettingsModal({ open, onOpenChange }: StorySettingsModalPro
   const { t } = useTranslation()
   const { data: settings, isLoading } = useStorySettings()
   const updateSettings = useUpdateStorySettings()
-  const { data: mutedAuthors = [], isLoading: mutesLoading, isError: mutesError } = useMutedAuthors()
+  const {
+    data: mutedAuthors = [],
+    isLoading: mutesLoading,
+    isError: mutesError,
+  } = useMutedAuthors()
   const { data: friends = [] } = useFriends()
   const unmuteMutation = useUnmuteAuthor()
 
