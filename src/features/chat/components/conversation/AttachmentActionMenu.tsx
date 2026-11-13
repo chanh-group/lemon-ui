@@ -7,11 +7,11 @@ import {
   Download01Icon as DownloadData,
   EyeIcon as ViewPreviewData,
   Flag01Icon as FlagData,
-  MoreVerticalIcon as DotsData,
   PinIcon as PinData,
   SmileIcon as SmileData,
 } from '@hugeicons/core-free-icons'
 import { createIcon } from '@/components/icons/hugeIcon'
+import { EllipsisVertical } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   DropdownMenu,
@@ -25,7 +25,6 @@ import { isPreviewable } from '../../utils/fileTypes'
 
 const SmileIcon = createIcon(SmileData)
 const ReplyIcon = createIcon(ReplyData)
-const DotsIcon = createIcon(DotsData)
 const DownloadIcon = createIcon(DownloadData)
 const DeleteIcon = createIcon(DeleteData)
 const CopyIcon = createIcon(CopyData)
@@ -203,7 +202,7 @@ export function MessageActionPill({
             title="Tùy chọn khác"
             aria-label="Tùy chọn khác"
           >
-            <DotsIcon className="size-4" aria-hidden="true" />
+            <EllipsisVertical className="size-4 shrink-0" aria-hidden="true" />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent

@@ -42,7 +42,7 @@ export function ChooseStoryType({ onPickMedia, onPickText }: ChooseStoryTypeProp
             onClick={onClick}
             className={`flex aspect-[3/4] w-full max-w-52 shrink-0 flex-col items-center justify-center gap-3 rounded-2xl bg-linear-to-br ${gradient} p-6 text-center shadow-lg transition-transform duration-150 hover:scale-[1.03] active:scale-95 portrait:aspect-auto portrait:min-h-52 portrait:max-w-none`}
           >
-            <span className="grid size-20 place-items-center rounded-full bg-white/90 text-foreground shadow-md lg:size-24">
+            <span className="grid size-20 place-items-center rounded-full bg-white/90 text-black shadow-md lg:size-24">
               <Icon className="size-8 lg:size-9" aria-hidden="true" />
             </span>
             <span className="text-[13px] font-bold text-white drop-shadow-sm lg:text-base">
