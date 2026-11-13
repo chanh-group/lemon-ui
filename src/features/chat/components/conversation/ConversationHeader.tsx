@@ -1,5 +1,4 @@
 import { useTranslation } from 'react-i18next'
-import { toast } from 'sonner'
 import {
   ChevronLeftIcon as ChevronLeftData,
   MoreVerticalIcon as MoreVerticalData,
@@ -22,6 +21,9 @@ interface ConversationHeaderProps {
   isTyping?: boolean
   onToggleInfo?: () => void
   isInfoOpen?: boolean
+  onVoiceCall?: () => void
+  onVideoCall?: () => void
+  onOpenStory?: () => void
 }
 
 /** Pill "..." gọn thay cho chữ “Typing…” — vẫn có nhãn cho screen reader. */
@@ -54,6 +56,9 @@ export function ConversationHeader({
   isTyping,
   onToggleInfo,
   isInfoOpen,
+  onVoiceCall,
+  onVideoCall,
+  onOpenStory,
 }: ConversationHeaderProps) {
   const { t } = useTranslation()
 
@@ -74,12 +79,27 @@ export function ConversationHeader({
         </button>
       )}
       <span className="relative shrink-0">
-        <UserAvatar
-          name={conversation.name}
-          src={conversation.partnerAvatar}
-          square={conversation.isGroup}
-          className="size-10"
-        />
+        {onOpenStory ? (
+          <button
+            type="button"
+            onClick={onOpenStory}
+            aria-label={t('chat.storyOf', { name: conversation.name })}
+            className="rounded-full"
+          >
+            <UserAvatar
+              name={conversation.name}
+              src={conversation.partnerAvatar}
+              className="size-10 ring-2 ring-primary ring-offset-2 ring-offset-card"
+            />
+          </button>
+        ) : (
+          <UserAvatar
+            name={conversation.name}
+            src={conversation.partnerAvatar}
+            square={conversation.isGroup}
+            className="size-10"
+          />
+        )}
         {conversation.online && (
           <span
             className="absolute right-0 bottom-0 size-2.5 rounded-full bg-success ring-2 ring-card"
@@ -109,7 +129,7 @@ export function ConversationHeader({
           type="button"
           aria-label={t('chat.voiceCall')}
           title={t('chat.voiceCall')}
-          onClick={() => toast.info(t('chat.featureComingSoon'))}
+          onClick={onVoiceCall}
           className="chat-icon-btn grid size-11 min-h-11 min-w-11 place-items-center rounded-xl text-brand-ink transition-all duration-150 hover:bg-muted active:scale-95"
         >
           <Phone className="size-5" aria-hidden="true" />
@@ -118,7 +138,7 @@ export function ConversationHeader({
           type="button"
           aria-label={t('chat.videoCall')}
           title={t('chat.videoCall')}
-          onClick={() => toast.info(t('chat.featureComingSoon'))}
+          onClick={onVideoCall}
           className="chat-icon-btn grid size-11 min-h-11 min-w-11 place-items-center rounded-xl text-brand-ink transition-all duration-150 hover:bg-muted active:scale-95"
         >
           <Video className="size-5" aria-hidden="true" />

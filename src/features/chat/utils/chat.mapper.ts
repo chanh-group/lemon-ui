@@ -48,6 +48,35 @@ export function formatDateLabel(
   return `${day}/${month}/${year}`
 }
 
+export function updateConversationLastMessage(
+  conversation: ConversationResponse,
+  message: MessageResponse,
+): ConversationResponse {
+  if (conversation.id !== message.conversationId) return conversation
+  const currentTime = conversation.lastMessageAt && Date.parse(conversation.lastMessageAt)
+  const messageTime = Date.parse(message.createdAt)
+  if (!Number.isFinite(messageTime) || (currentTime && messageTime < currentTime))
+    return conversation
+  const hasAttachment =
+    Boolean(message.attachments?.length) ||
+    ['IMAGE', 'VIDEO', 'AUDIO', 'FILE'].includes(message.kind)
+  return {
+    ...conversation,
+    lastMessageAt: message.createdAt,
+    lastMessageSenderId: message.senderId,
+    lastMessageDetail: message,
+    lastMessagePreview: message.deletedAt
+      ? '[message-revoked]'
+      : message.kind === 'STORY_REACTION'
+        ? '[story-reaction]'
+        : message.body
+          ? message.body.slice(0, 80)
+          : hasAttachment
+            ? '[attachment]'
+            : message.body,
+  }
+}
+
 /** Chuyển đổi từ ConversationResponse của Backend sang Conversation của UI */
 export function mapConversationResponse(raw: ConversationResponse): Conversation {
   const isGroup = raw.kind === 'GROUP'

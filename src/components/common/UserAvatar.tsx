@@ -42,7 +42,7 @@ export function UserAvatar({
       ) : null}
       <AvatarFallback
         delayMs={fallbackDelayMs ?? (src ? 300 : undefined)}
-        className={cn('text-3.25 font-bold text-foreground', radius, fallbackClassName)}
+        className={cn('text-3.25 font-bold text-[#172b20]', radius, fallbackClassName)}
         style={{ backgroundColor: avatarColor(safeName), ...fallbackStyle }}
       >
         {initials(safeName)}

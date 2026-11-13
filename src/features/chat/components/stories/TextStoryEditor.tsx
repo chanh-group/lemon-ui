@@ -17,11 +17,11 @@ export function TextStoryEditor({ onDiscard, onShare, isSharing }: TextStoryEdit
   const canShare = text.trim().length > 0
 
   return (
-    <div className="flex h-full min-h-0 flex-col items-center justify-center gap-4 p-4">
+    <div className="flex min-h-full flex-col items-center justify-center gap-4 p-4">
       {/* Canvas tin — gõ thẳng lên như Facebook */}
       <div
         className={cn(
-          'flex aspect-[9/16] w-full max-w-60 flex-col rounded-2xl bg-linear-to-br p-4 shadow-xl',
+          'flex aspect-[9/16] w-[min(100%,460px,calc(56.25dvh-90px))] shrink-0 flex-col rounded-2xl bg-linear-to-br p-4 shadow-xl',
           TEXT_STORY_BG,
         )}
       >
@@ -38,7 +38,7 @@ export function TextStoryEditor({ onDiscard, onShare, isSharing }: TextStoryEdit
       </div>
 
       {/* Footer: Bỏ / Chia sẻ */}
-      <div className="flex w-full max-w-60 items-center justify-between pb-2">
+      <div className="flex w-[min(100%,460px,calc(56.25dvh-90px))] items-center justify-between pb-2">
         <button
           type="button"
           onClick={onDiscard}

@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'bun:test'
 import {
+  applyOptimisticConversationPreview,
   rollbackOptimisticConversationPreview,
   upsertOptimisticMessage,
   windowHasLatest,
 } from './useChatQueries'
+import { updateConversationLastMessage } from '../utils/chat.mapper'
 import type { ConversationResponse, MessageResponse } from '../types/chat.types'
 
 const previousConversation: ConversationResponse = {
@@ -96,5 +98,37 @@ describe('upsertOptimisticMessage', () => {
     expect(upsertOptimisticMessage([message], message)).toEqual([
       { ...message, sendState: undefined },
     ])
+  })
+})
+
+describe('optimistic inbox timestamps', () => {
+  it('uses server time even if the sender clock is ahead', () => {
+    const optimistic: MessageResponse = {
+      id: 'temp-1',
+      conversationId: 'conversation-1',
+      senderId: 'me',
+      kind: 'TEXT',
+      body: 'hello',
+      clientMsgId: '1',
+      replyToId: null,
+      createdAt: '2026-01-01T10:10:00Z',
+      editedAt: null,
+      deletedAt: null,
+    }
+    const preview = applyOptimisticConversationPreview(previousConversation, optimistic)
+    expect(preview.lastMessageAt).toBe(previousConversation.lastMessageAt)
+    const confirmed = { ...optimistic, id: 'server-1', createdAt: '2026-01-01T10:01:00Z' }
+    expect(updateConversationLastMessage(preview, confirmed)).toMatchObject({
+      lastMessageAt: confirmed.createdAt,
+      lastMessageDetail: confirmed,
+    })
+    expect(
+      rollbackOptimisticConversationPreview(
+        [preview],
+        [previousConversation],
+        'conversation-1',
+        optimistic.createdAt,
+      ),
+    ).toEqual([previousConversation])
   })
 })

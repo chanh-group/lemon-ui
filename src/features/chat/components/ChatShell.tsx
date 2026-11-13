@@ -5,7 +5,8 @@ import { toast } from 'sonner'
 import { BrandMark } from '@/components/common/BrandMark'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { cn } from '@/lib/utils'
-import { conversationPath, ROUTES } from '@/config/constants'
+import { callPath, conversationPath, ROUTES, type CallMedia } from '@/config/constants'
+import { isCallPreviewEnabled } from '@/config/env'
 import { emitTypingStart, emitTypingStop } from '@/lib/socket'
 import { MOCK_CALLS } from '../data/mockData'
 import type {
@@ -61,6 +62,7 @@ export function ChatShell() {
   const [tab, setTab] = useState<ChatTab>(initialTab)
   const [query, setQuery] = useState('')
   const [viewingStory, setViewingStory] = useState<StoryEntry | null>(null)
+  const [conversationStory, setConversationStory] = useState<StoryEntry | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const todayLabel = t('chat.today')
 
@@ -129,6 +131,11 @@ export function ChatShell() {
     Boolean(selectedId) && !selectedFromList && !conversationsQuery.isPending
   const conversationDetailQuery = useConversationQuery(selectedId, needsConversationDetail)
   const selected = selectedFromList ?? conversationDetailQuery.data ?? null
+  const partnerStories =
+    selected && !selected.isGroup && selected.partnerId
+      ? allStories.filter((story) => story.authorId === selected.partnerId && !story.mine)
+      : []
+  const partnerStory = partnerStories.find((story) => !story.viewed) ?? partnerStories[0]
 
   const restoringConversation =
     Boolean(selectedId) &&
@@ -172,6 +179,21 @@ export function ChatShell() {
     setTab('messages')
     setQuery('')
     navigate(conversationPath(id))
+  }
+
+  const startCall = (media: CallMedia) => {
+    if (!selected) return
+    if (!isCallPreviewEnabled()) {
+      toast.info(t('chat.callsNotAvailable'))
+      return
+    }
+    navigate(callPath(selected.id, { media, state: 'ringing' }), {
+      state: {
+        peerName: selected.name,
+        peerAvatar: selected.partnerAvatar,
+        from: conversationPath(selected.id),
+      },
+    })
   }
 
   const markVisibleMessageRead = (messageId: string) => {
@@ -253,9 +275,6 @@ export function ChatShell() {
         onChange={(nextTab) => {
           setTab(nextTab)
           setQuery('')
-          if (nextTab === 'stories' && !viewingStory && stories.length > 0) {
-            setViewingStory(stories[0])
-          }
           // Desktop giữ hội thoại đang mở trên URL; mobile quay về danh sách.
           const targetPath =
             !isMdDown && selectedId ? conversationPath(selectedId) : ROUTES.messages
@@ -272,7 +291,7 @@ export function ChatShell() {
       {/* Panel B — danh sách (tin nhắn / cuộc gọi / story) */}
       <div
         className={cn(
-          selectedId || (tab === 'stories' && currentStory)
+          (tab === 'messages' && selectedId) || (tab === 'stories' && currentStory)
             ? 'hidden h-full min-h-0 md:flex md:h-full md:min-w-0'
             : 'flex h-full min-h-0 min-w-0 flex-1 md:flex-none',
           !sidebarOpen && 'hidden md:hidden',
@@ -287,14 +306,21 @@ export function ChatShell() {
             void conversationsQuery.refetch()
           }}
           calls={calls}
-          stories={stories}
+          stories={tab === 'stories' ? stories : (storiesQuery.data ?? [])}
           selectedId={selectedId}
           activeStoryId={tab === 'stories' ? currentStory?.id : null}
           query={query}
           onQuery={setQuery}
           onSelectConversation={handleSelect}
-          onOpenStory={(s) => setViewingStory(s)}
-          onCall={() => navigate(ROUTES.calls)}
+          onOpenStory={(s) => {
+            setQuery('')
+            setViewingStory(s)
+            setTab('stories')
+          }}
+          onCall={() => {
+            if (isCallPreviewEnabled()) navigate(ROUTES.calls)
+            else toast.info(t('chat.callsNotAvailable'))
+          }}
           onNewCall={() => navigate(ROUTES.newCall)}
           onNewChat={() => navigate(ROUTES.newChat)}
         />
@@ -303,7 +329,7 @@ export function ChatShell() {
       {/* Panel C — Hội thoại hoặc Story Viewer trực tiếp trên màn hình chính */}
       <div
         className={
-          selectedId || (tab === 'stories' && currentStory)
+          (tab === 'messages' && selectedId) || (tab === 'stories' && currentStory)
             ? 'flex h-full min-h-0 w-full min-w-0 flex-1'
             : 'hidden h-full min-h-0 w-full min-w-0 flex-1 md:flex'
         }
@@ -338,6 +364,7 @@ export function ChatShell() {
           <ConversationView
             key={selected.id}
             conversation={selected}
+            onOpenStory={partnerStory ? () => setConversationStory(partnerStory) : undefined}
             groups={groups}
             messagesLoading={messagesQuery.isPending}
             messagesError={
@@ -382,6 +409,8 @@ export function ChatShell() {
             isTyping={isPartnerTyping}
             onTypingStart={handleTypingStart}
             onTypingStop={handleTypingStop}
+            onVoiceCall={() => startCall('voice')}
+            onVideoCall={() => startCall('video')}
           />
         ) : selectedId ? (
           <section
@@ -448,6 +477,15 @@ export function ChatShell() {
           </section>
         )}
       </div>
+      {conversationStory && (
+        <StoryViewer
+          key={conversationStory.id}
+          story={allStories.find((story) => story.id === conversationStory.id) ?? conversationStory}
+          stories={partnerStories}
+          onSelectStory={setConversationStory}
+          onClose={() => setConversationStory(null)}
+        />
+      )}
     </main>
   )
 }

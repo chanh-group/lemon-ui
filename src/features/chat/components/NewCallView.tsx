@@ -5,13 +5,15 @@ import {
 } from '@hugeicons/core-free-icons'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { createIcon } from '@/components/icons/hugeIcon'
-import { ROUTES } from '@/config/constants'
+import { callPath, ROUTES, type CallMedia } from '@/config/constants'
+import { isCallPreviewEnabled } from '@/config/env'
 import { SideNav } from './SideNav'
-import { useConversationsQuery } from '../hooks/useChatQueries'
+import { useConversationsQuery, useCreateDirectChatMutation } from '../hooks/useChatQueries'
 import { useFriends } from '../hooks/useFriends'
+import type { ChatUser, Conversation } from '../types/chat.types'
 import { Avatar, SearchBox } from './new-chat/kit'
 
 const ArrowLeft = createIcon(ArrowLeftData)
@@ -21,9 +23,12 @@ const Video = createIcon(VideoData)
 export function NewCallView() {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const [query, setQuery] = useState('')
+  const location = useLocation()
+  const initialQuery = (location.state as { query?: string } | null)?.query ?? ''
+  const [query, setQuery] = useState(initialQuery)
   const friendsQuery = useFriends()
   const conversationsQuery = useConversationsQuery()
+  const createDirectChat = useCreateDirectChatMutation()
   const totalUnread = (conversationsQuery.data ?? []).reduce(
     (count, conversation) => count + conversation.unread,
     0,
@@ -48,7 +53,38 @@ export function NewCallView() {
       ),
     [conversationsQuery.data, normalizedQuery],
   )
-  const callUnavailable = () => toast.info(t('chat.callsNotAvailable'))
+  const startDirectCall = async (friend: ChatUser, media: CallMedia) => {
+    if (!isCallPreviewEnabled()) {
+      toast.info(t('chat.callsNotAvailable'))
+      return
+    }
+    try {
+      const conversation = await createDirectChat.mutateAsync(friend.id)
+      navigate(callPath(conversation.id, { media, state: 'ringing' }), {
+        state: {
+          peerName: friend.name,
+          peerAvatar: friend.avatarUrl,
+          from: ROUTES.calls,
+        },
+      })
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : t('chat.callsNotAvailable'))
+    }
+  }
+
+  const startGroupCall = (group: Conversation, media: CallMedia) => {
+    if (!isCallPreviewEnabled()) {
+      toast.info(t('chat.callsNotAvailable'))
+      return
+    }
+    navigate(callPath(group.id, { media, state: 'ringing' }), {
+      state: {
+        peerName: group.name,
+        peerAvatar: group.partnerAvatar,
+        from: ROUTES.calls,
+      },
+    })
+  }
 
   return (
     <main className="flex h-dvh w-full overflow-hidden bg-background text-foreground">
@@ -95,25 +131,27 @@ export function NewCallView() {
             <ul className="flex flex-col gap-1">
               {friends.map((friend) => (
                 <li key={friend.id} className="flex min-h-16 items-center gap-3 rounded-xl px-2">
-                  <Avatar name={friend.name} />
+                  <Avatar name={friend.name} src={friend.avatarUrl} />
                   <span className="min-w-0 flex-1 truncate text-[15px] text-foreground">
                     {friend.name}
                   </span>
                   <button
                     type="button"
-                    onClick={callUnavailable}
+                    onClick={() => void startDirectCall(friend, 'voice')}
+                    disabled={createDirectChat.isPending}
                     aria-label={t('chat.startVoiceCallWith', { name: friend.name })}
                     title={t('chat.voiceCall')}
-                    className="grid size-10 shrink-0 place-items-center rounded-xl text-foreground transition-colors hover:bg-muted"
+                    className="grid size-10 shrink-0 place-items-center rounded-xl text-foreground transition-colors hover:bg-muted disabled:cursor-wait disabled:opacity-50"
                   >
                     <Phone className="size-5" aria-hidden="true" />
                   </button>
                   <button
                     type="button"
-                    onClick={callUnavailable}
+                    onClick={() => void startDirectCall(friend, 'video')}
+                    disabled={createDirectChat.isPending}
                     aria-label={t('chat.startVideoCallWith', { name: friend.name })}
                     title={t('chat.videoCall')}
-                    className="grid size-10 shrink-0 place-items-center rounded-xl text-foreground transition-colors hover:bg-muted"
+                    className="grid size-10 shrink-0 place-items-center rounded-xl text-foreground transition-colors hover:bg-muted disabled:cursor-wait disabled:opacity-50"
                   >
                     <Video className="size-5" aria-hidden="true" />
                   </button>
@@ -135,13 +173,22 @@ export function NewCallView() {
             <ul className="flex flex-col gap-1">
               {groups.map((group) => (
                 <li key={group.id} className="flex min-h-16 items-center gap-3 rounded-xl px-2">
-                  <Avatar name={group.name} square />
+                  <Avatar name={group.name} src={group.partnerAvatar} square />
                   <span className="min-w-0 flex-1 truncate text-[15px] text-foreground">
                     {group.name}
                   </span>
                   <button
                     type="button"
-                    onClick={callUnavailable}
+                    onClick={() => startGroupCall(group, 'voice')}
+                    aria-label={t('chat.startVoiceCallWith', { name: group.name })}
+                    title={t('chat.voiceCall')}
+                    className="grid size-10 shrink-0 place-items-center rounded-xl text-foreground transition-colors hover:bg-muted"
+                  >
+                    <Phone className="size-5" aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => startGroupCall(group, 'video')}
                     aria-label={t('chat.startVideoCallWith', { name: group.name })}
                     title={t('chat.videoCall')}
                     className="grid size-10 shrink-0 place-items-center rounded-xl text-foreground transition-colors hover:bg-muted"
