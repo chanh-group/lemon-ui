@@ -163,6 +163,7 @@ const MessageRowView = memo(function MessageRowView({
   onRevoke,
   onReact,
   onForward,
+  onRetryMessage,
 }: {
   group: MessageGroup
   messageIndex: number
@@ -174,6 +175,7 @@ const MessageRowView = memo(function MessageRowView({
   onRevoke?: (messageId: string) => void
   onReact?: (messageId: string, emoji: string) => void
   onForward?: (message: ChatMessage) => void
+  onRetryMessage?: (messageId: string) => void
 }) {
   const { t } = useTranslation()
   const isMe = group.fromMe
@@ -392,7 +394,7 @@ const MessageRowView = memo(function MessageRowView({
           </div>
         )}
 
-        {isLast && (
+        {(isLast || msg.status === 'uncertain') && (
           <span
             className={cn(
               'mt-1 flex items-center gap-1 px-1 text-[11px] text-muted-foreground',
@@ -407,7 +409,9 @@ const MessageRowView = memo(function MessageRowView({
                   aria-label={t('chat.sending', 'Đang gửi')}
                 />
               ) : msg.status === 'uncertain' ? (
-                <span role="img" aria-label={t('chat.sendUncertain')} title={t('chat.sendUncertain')}>⚠</span>
+                <button type="button" onClick={() => onRetryMessage?.(msg.id)} title={t('chat.sendUncertain')} className="text-destructive underline">
+                  {t('chat.retrySend')}
+                </button>
               ) : msg.status === 'read' ? (
                 <CheckCheck className="size-3.5 text-brand-ink" aria-label={t('chat.read')} />
               ) : (
@@ -432,6 +436,7 @@ interface MessageListProps {
   /** Còn đang ở cuối danh sách thì tự bám tin mới nhất; cuộn lên thì thôi. */
   followBottom?: boolean
   onVisibleMessage?: (messageId: string) => void
+  onRetryMessage?: (messageId: string) => void
   restoreMessageId?: string
 }
 
@@ -463,7 +468,7 @@ function estimateRowHeight(row: MessageListRow | undefined): number {
 }
 
 export const MessageList = forwardRef<MessageListHandle, MessageListProps>(function MessageList(
-  { groups, senderLabel, senderAvatarUrl, scrollRef, conversationId, followBottom = true, onVisibleMessage, restoreMessageId },
+  { groups, senderLabel, senderAvatarUrl, scrollRef, conversationId, followBottom = true, onVisibleMessage, onRetryMessage, restoreMessageId },
   ref,
 ) {
   'use no memo'
@@ -635,6 +640,7 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
         onRevoke={handleRevokeMessage}
         onReact={handleReactMessage}
         onForward={handleForwardMessage}
+        onRetryMessage={onRetryMessage}
       />
     )
 

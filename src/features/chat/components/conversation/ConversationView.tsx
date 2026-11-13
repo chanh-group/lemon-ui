@@ -25,6 +25,7 @@ interface ConversationViewProps {
   hasLatest: boolean
   onLoadLatest: () => Promise<void>
   onVisibleMessage: (messageId: string) => void
+  onRetryMessage: (messageId: string) => void
   restoreMessageId?: string
   onPositionChange: (messageId: string | undefined) => void
   onSend: (
@@ -55,6 +56,7 @@ export function ConversationView({
   hasLatest,
   onLoadLatest,
   onVisibleMessage,
+  onRetryMessage,
   restoreMessageId,
   onPositionChange,
   onSend,
@@ -266,6 +268,7 @@ export function ConversationView({
               conversationId={conversation.id}
               followBottom={atBottom && hasLatest}
               onVisibleMessage={onVisibleMessage}
+              onRetryMessage={onRetryMessage}
               restoreMessageId={initialRestoreMessageId}
             />
           )}

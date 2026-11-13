@@ -168,6 +168,7 @@
     "sendMessage": "Send message",
     "sendMessageError": "Message could not be sent",
     "sendUncertain": "Message delivery is uncertain. Check your connection before sending again.",
+    "retrySend": "Retry sending",
     "markReadError": "Messages could not be marked as read",
     "realtimeConnecting": "Connecting to realtime chat…",
     "realtimeOffline": "Realtime chat is offline. Reconnecting…",

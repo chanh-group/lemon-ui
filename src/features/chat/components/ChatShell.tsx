@@ -207,6 +207,12 @@ export function ChatShell() {
     }
   }
 
+  const handleRetrySend = (messageId: string) => {
+    const message = messagesQuery.liveMessages?.find((item) => item.id === messageId)
+    if (!message?.retryPayload || sendMessageMutation.isPending) return
+    void sendMessageMutation.mutateAsync(message.retryPayload).catch(() => undefined)
+  }
+
   const handleTypingStart = () => {
     if (!selectedId) return
     const now = Date.now()
@@ -349,6 +355,7 @@ export function ChatShell() {
             hasLatest={messagesQuery.hasLatest}
             onLoadLatest={messagesQuery.loadLatest}
             onVisibleMessage={markVisibleMessageRead}
+            onRetryMessage={handleRetrySend}
             restoreMessageId={
               !selected.unread && messageItems.some((message) => message.id === scrollPositions[selected.id])
                 ? scrollPositions[selected.id]

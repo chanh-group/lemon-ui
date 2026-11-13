@@ -14,7 +14,7 @@
 - [x] Đọc luồng timeline LemonUI, Threema Web, Signal Desktop và hợp đồng liên quan trong LemonCore.
 - [x] Ghi kế hoạch và các phụ thuộc giữa frontend/backend.
 - [ ] P0 — Viết test tái hiện, xác minh API bằng e2e và đo baseline browser.
-- [ ] P1 — Sửa đối soát tin gửi optimistic/socket (đã thêm correlation sender-only và retry một lần với cùng payload; giữ trạng thái chưa xác định khi cả hai lần đều timeout, chưa có nút retry cùng key).
+- [ ] P1 — Sửa đối soát tin gửi optimistic/socket (đã thêm correlation sender-only, retry tự động một lần và nút retry cùng key trong phiên; chưa kiểm thử đầy đủ reconnect/race).
 - [ ] P2 — Timeline liên tục và trạng thái latest rõ ràng (đã có `hasLatest` và ẩn live ngoài cửa sổ; chưa kiểm thử race end-to-end).
 - [ ] P3 — Jump-to-latest và gửi khi đang đọc lịch sử (đã có tải lại latest và nút jump; chưa kiểm thử browser/race).
 - [ ] P4 — Giữ anchor, resize, media và paging.
@@ -50,7 +50,7 @@ Các acceptance criteria liên quan layout/scroll vẫn chưa được xác minh
 - Backend nhận `clientMsgId` để idempotency; retry cùng key có thể trả lại cùng message ID.
 - **Hợp đồng đang triển khai:** HTTP response gửi tin và timeline trả `clientMsgId` chỉ cho sender; `message:new` vẫn không chứa trường này. Event `message:correlated` gửi riêng tới user room của sender trước broadcast. Socket có thể tới trước HTTP; event có thể bị bỏ lỡ.
 - Vì vậy không thể bảo đảm ghép optimistic với socket chỉ bằng `clientMsgId` như frontend hiện giả định. Không ghép theo body/thời gian vì có thể nhầm hai tin giống nhau. HTTP response có thể ánh xạ message ID với mutation tương ứng khi về, nhưng chưa đủ để luôn tránh duplicate tạm thời trước response hoặc khi HTTP thất bại sau khi server đã commit.
-- Thay đổi này là additive và không lộ correlation trong conversation room. Chưa xử lý đầy đủ trường hợp HTTP timeout sau commit khi cả correlation lẫn broadcast bị bỏ lỡ; cần retry idempotent và kiểm thử end-to-end trước khi hoàn tất P1.
+- Thay đổi này là additive và không lộ correlation trong conversation room. Khi hai lần gửi đều lỗi mạng, UI giữ tin chưa xác định và cho retry cùng payload/key trong phiên; khi reload, payload tạm không được lưu bền. Cần kiểm thử các trường hợp mất event/reconnect trước khi hoàn tất P1.
 - Backend phát `message:new`, `message:updated`, `message:revoked`, `message:reaction`, `read:updated` tới conversation room; socket tự join các conversation active khi kết nối. Phát realtime là best-effort; không coi socket là nguồn đầy đủ sau reconnect.
 - Nguồn: `LemonCore/src/domain/message/service.ts:179`, `dto/mapper.ts:100`, `test/e2e/chat-1-1.e2e-spec.ts:210`, `src/domain/realtime/realtime.service.ts:25`, `chat.gateway.ts:128`.
 
@@ -82,3 +82,4 @@ Các acceptance criteria liên quan layout/scroll vẫn chưa được xác minh
 - 2026-11-13: Bắt đầu P2/P3: phân biệt latest theo page param, tránh render live ngoài cửa sổ liên tục, nút jump tải lại latest khi cần. Unit: LemonUI 96/96, LemonCore 801/801; build UI và lint hai repo đạt (UI có một cảnh báo effect). PostgreSQL local không phản hồi `pg_isready`; chưa chạy e2e DB hay kiểm thử browser. P0 và P1–P6 vẫn chưa hoàn tất.
 - 2026-11-13: Hai nhánh local đổi thành `fix/chat-timeline` (Core còn upstream `origin/perf`). Chạy PostgreSQL/Valkey test cô lập, migrate rồi chạy e2e chat 28/28 và socket 8/8, gồm test correlation chỉ đến sender; đã dừng tài nguyên test. Thêm retry mạng một lần cùng payload, restore message còn cache và mark read theo viewport/focus; chưa kiểm thử browser, chưa có unread divider/anchor ngoài cache.
 - 2026-11-13: Giữ tin optimistic và hiển thị trạng thái chưa xác định sau hai lỗi mạng, thay vì khẳng định đã gửi thất bại. LemonUI 100/100 unit test, build đạt; vẫn cần UI retry cùng `clientMsgId`, kiểm thử browser và hoàn thiện P0–P6. Các commit và thay đổi user không liên quan được giữ riêng.
+- 2026-11-13: Bổ sung nút retry tin chưa xác định với cùng `clientMsgId` và payload đã upload trong bộ nhớ phiên; không thêm tin optimistic trùng. Nếu retry bị từ chối vẫn giữ trạng thái chưa xác định. Lỗi mạng và HTTP 5xx đều được coi là kết quả chưa chắc chắn. LemonUI 102/102 unit test, build và lint đạt (còn một cảnh báo effect); chưa kiểm thử browser.

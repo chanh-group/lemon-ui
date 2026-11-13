@@ -21,7 +21,7 @@ Giữ cấu trúc hiện tại, TanStack Query và Virtual. Chỉ thêm abstract
 
 ## P1 — Correlation optimistic, socket và HTTP
 
-**Đang triển khai:** LemonCore đã bổ sung `clientMsgId` chỉ cho sender trong response/timeline và event `message:correlated` riêng cho sender; broadcast `message:new` vẫn không lộ trường này. LemonUI retry một lần cùng payload và giữ trạng thái chưa xác định nếu tiếp tục lỗi mạng. Chưa có UI retry cùng key sau hai lần lỗi, chưa hoàn tất P1.
+**Đang triển khai:** LemonCore đã bổ sung `clientMsgId` chỉ cho sender trong response/timeline và event `message:correlated` riêng cho sender; broadcast `message:new` vẫn không lộ trường này. LemonUI retry một lần cùng payload, giữ trạng thái chưa xác định nếu tiếp tục lỗi mạng và cho retry cùng key trong phiên. Chưa kiểm thử đầy đủ reconnect/race, chưa hoàn tất P1.
 
 - [x] Chọn hợp đồng correlation chỉ dành cho sender qua HTTP, timeline và event socket riêng; broadcast chung giữ nguyên.
 - [ ] Hoàn tất thay đổi LemonCore kèm test mapper/service/socket/e2e, đặc biệt quyền riêng tư và retry; cập nhật và kiểm tra LemonUI tương ứng.

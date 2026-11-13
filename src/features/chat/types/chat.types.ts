@@ -202,6 +202,7 @@ export interface MessageResponse {
   replyToId: string | null
   clientMsgId?: string | null
   sendState?: 'uncertain'
+  retryPayload?: SendMessageDto
   attachments?: MessageAttachmentItem[]
   reactions?: MessageReactionItem[]
   isForwarded?: boolean

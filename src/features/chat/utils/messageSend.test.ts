@@ -53,4 +53,12 @@ describe('retryUncertainSend', () => {
     })).rejects.toThrow('rejected')
     expect(attempts).toBe(1)
   })
+
+  it('also retries an ambiguous server error', async () => {
+    let attempts = 0
+    await retryUncertainSend(async () => {
+      if (++attempts === 1) throw new ApiError('UNAVAILABLE', 503, 'unavailable')
+    })
+    expect(attempts).toBe(2)
+  })
 })

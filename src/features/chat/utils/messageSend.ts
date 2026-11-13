@@ -12,11 +12,15 @@ export function resolveSendMessageKind(
   if (body?.trim() || attachmentKinds.size > 1) return 'TEXT'
   return requestedKind ?? attachmentKinds.values().next().value ?? 'TEXT'
 }
+export function isUncertainSendError(error: unknown): boolean {
+  return error instanceof ApiError && (error.status === 0 || error.status >= 500)
+}
+
 export async function retryUncertainSend<T>(send: () => Promise<T>): Promise<T> {
   try {
     return await send()
   } catch (error) {
-    if (!(error instanceof ApiError) || error.status !== 0) throw error
+    if (!isUncertainSendError(error)) throw error
     return send()
   }
 }

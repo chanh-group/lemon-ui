@@ -9,8 +9,7 @@ import {
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { generateUUID } from '@/lib/utils'
-import { ApiError } from '@/infrastructure/api/errors'
-import { resolveSendMessageKind, retryUncertainSend } from '../utils/messageSend'
+import { isUncertainSendError, resolveSendMessageKind, retryUncertainSend } from '../utils/messageSend'
 import { queryKeys } from '@/infrastructure/query/keys'
 import {
   getConversationById,
@@ -59,6 +58,18 @@ export function rollbackOptimisticConversationPreview(
       ? previousConversation
       : conversation,
   )
+}
+
+export function upsertOptimisticMessage(
+  messages: MessageResponse[],
+  optimistic: MessageResponse,
+): MessageResponse[] {
+  const exists = messages.some((message) => message.clientMsgId === optimistic.clientMsgId)
+  if (!exists) return [...messages, optimistic]
+  return messages.map((message) => {
+    if (message.clientMsgId !== optimistic.clientMsgId || !message.id.startsWith('temp-')) return message
+    return { ...message, sendState: undefined }
+  })
 }
 
 export interface MessagePageParam {
@@ -321,6 +332,9 @@ export function useSendMessageMutation(conversationId: string | null) {
       if (typeof arg !== 'string') {
         arg.clientMsgId = clientMsgId
       }
+      const wasUncertain = queryClient.getQueryData<MessageResponse[]>(
+        CHAT_QUERY_KEYS.liveMessages(targetConversationId),
+      )?.some((message) => message.clientMsgId === clientMsgId && message.sendState === 'uncertain') ?? false
 
       // Chuẩn bị attachments tạm thời cho UI lạc quan (dùng local blob URL cho media)
       let optimisticAttachments: MessageAttachmentItem[] | undefined
@@ -382,7 +396,7 @@ export function useSendMessageMutation(conversationId: string | null) {
       // 1. Thêm tin nhắn tạm vào liveMessages ngay tức thì
       queryClient.setQueryData<MessageResponse[]>(
         CHAT_QUERY_KEYS.liveMessages(targetConversationId),
-        (old) => [...(old ?? []), optimisticMessage],
+        (old) => upsertOptimisticMessage(old ?? [], optimisticMessage),
       )
 
       // 2. Cập nhật preview của danh sách hội thoại ở thanh bên trái
@@ -407,6 +421,7 @@ export function useSendMessageMutation(conversationId: string | null) {
         clientMsgId,
         targetConversationId,
         optimisticCreatedAt: optimisticMessage.createdAt,
+        wasUncertain,
       }
     },
 
@@ -473,6 +488,12 @@ export function useSendMessageMutation(conversationId: string | null) {
         isForwarded: typeof arg !== 'string' ? arg.isForwarded : undefined,
         sourceMessageId: typeof arg !== 'string' ? arg.sourceMessageId : undefined,
       }
+      queryClient.setQueryData<MessageResponse[]>(
+        CHAT_QUERY_KEYS.liveMessages(targetConversationId),
+        (old) => old?.map((message) =>
+          message.clientMsgId === clientMsgId ? { ...message, retryPayload: payload } : message,
+        ),
+      )
       return retryUncertainSend(() => sendMessage(targetConversationId, payload))
     },
 
@@ -489,7 +510,7 @@ export function useSendMessageMutation(conversationId: string | null) {
           ].some((message) => message.clientMsgId === context.clientMsgId && !message.id.startsWith('temp-'))
         : false
       if (confirmed) return
-      if (error instanceof ApiError && error.status === 0 && context?.targetConversationId) {
+      if ((context?.wasUncertain || isUncertainSendError(error)) && context?.targetConversationId) {
         queryClient.setQueryData<MessageResponse[]>(
           CHAT_QUERY_KEYS.liveMessages(context.targetConversationId),
           (old) => old?.map((message) =>
