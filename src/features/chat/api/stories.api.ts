@@ -175,11 +175,13 @@ export interface ReplyStoryPayload {
 /* API functions                                                      */
 /* ------------------------------------------------------------------ */
 
+const mutedMockAuthors = new Set<string>()
+
 /** Danh sách story hiển thị ở tab Stories (feed bạn bè + story của mình). */
 export async function listStories(currentUserId?: string): Promise<StoryEntry[]> {
   if (isAuthBypass()) {
     await delay(150)
-    return storyStore.map((s) => ({ ...s }))
+    return storyStore.filter((s) => !mutedMockAuthors.has(s.authorId ?? '')).map((s) => ({ ...s }))
   }
   const res = await api.get<any[]>('/stories/feed')
   const raw = res.data ?? []
@@ -525,7 +527,7 @@ export async function updateStorySettings(
 /** Ẩn (mute) story của tác giả khác. */
 export async function muteAuthor(authorId: string): Promise<{ success: boolean }> {
   if (isAuthBypass()) {
-    storyStore = storyStore.filter((s) => s.authorId !== authorId)
+    mutedMockAuthors.add(authorId)
     return { success: true }
   }
   await api.post(`/stories/mutes/${authorId}`)
@@ -535,6 +537,7 @@ export async function muteAuthor(authorId: string): Promise<{ success: boolean }
 /** Bỏ ẩn (unmute) story của tác giả khác. */
 export async function unmuteAuthor(authorId: string): Promise<{ success: boolean }> {
   if (isAuthBypass()) {
+    mutedMockAuthors.delete(authorId)
     return { success: true }
   }
   await api.delete(`/stories/mutes/${authorId}`)
@@ -544,7 +547,7 @@ export async function unmuteAuthor(authorId: string): Promise<{ success: boolean
 /** Lấy danh sách ID các tác giả bị ẩn story. */
 export async function getMutedAuthors(): Promise<string[]> {
   if (isAuthBypass()) {
-    return []
+    return [...mutedMockAuthors]
   }
   const res = await api.get<string[]>('/stories/mutes')
   return res.data ?? []
