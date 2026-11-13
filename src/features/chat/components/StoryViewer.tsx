@@ -377,16 +377,18 @@ export function StoryViewer({
                 {muted ? <VolumeX size={18} /> : <Volume2 size={18} />}
               </button>
             )}
-            {story.mine && !story.archived && (
+            {story.mine && (
               <>
-                <button
-                  type="button"
-                  onClick={openEdit}
-                  className={actionClass}
-                  aria-label={t('chat.editStory', { defaultValue: 'Chỉnh sửa tin' })}
-                >
-                  <Pencil size={18} />
-                </button>
+                {!story.archived && (
+                  <button
+                    type="button"
+                    onClick={openEdit}
+                    className={actionClass}
+                    aria-label={t('chat.editStory', { defaultValue: 'Chỉnh sửa tin' })}
+                  >
+                    <Pencil size={18} />
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setConfirmDelete(true)}
@@ -537,7 +539,7 @@ export function StoryViewer({
             </DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
-            {t('chat.deleteStoryHint', { defaultValue: 'Tin sẽ không còn hiển thị với bạn bè.' })}
+            {story.archived ? t('chat.archiveDeleteHint') : t('chat.deleteStoryHint')}
           </p>
           <button
             type="button"
