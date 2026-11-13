@@ -413,8 +413,7 @@ export function useSendMessageMutation(conversationId: string | null) {
           (old) =>
             old?.filter(
               (m) =>
-                m.clientMsgId !== context.clientMsgId &&
-                m.id !== `temp-${context.clientMsgId}`,
+                m.clientMsgId !== context.clientMsgId && m.id !== `temp-${context.clientMsgId}`,
             ),
         )
       }

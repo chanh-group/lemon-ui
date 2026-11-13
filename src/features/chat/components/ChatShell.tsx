@@ -8,7 +8,12 @@ import { cn } from '@/lib/utils'
 import { conversationPath, ROUTES } from '@/config/constants'
 import { emitTypingStart, emitTypingStop } from '@/lib/socket'
 import { MOCK_CALLS } from '../data/mockData'
-import type { ChatTab, MessageAttachmentInput, MessageResponse, StoryEntry } from '../types/chat.types'
+import type {
+  ChatTab,
+  MessageAttachmentInput,
+  MessageResponse,
+  StoryEntry,
+} from '../types/chat.types'
 import {
   useConversationsQuery,
   useConversationMessagesQuery,

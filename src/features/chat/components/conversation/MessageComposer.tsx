@@ -304,8 +304,7 @@ export function MessageComposer({
     await onSubmit(textToSend, undefined, filesToSend.length > 0 ? filesToSend : undefined)
   }
 
-  const canSubmit =
-    (draft.trim().length > 0 || pendingFiles.length > 0) && !disabled && !isSending
+  const canSubmit = (draft.trim().length > 0 || pendingFiles.length > 0) && !disabled && !isSending
 
   return (
     <footer

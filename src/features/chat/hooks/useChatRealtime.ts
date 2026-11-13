@@ -150,19 +150,14 @@ export function useChatRealtime(activeConversationId: string | null) {
           )
           if (alreadyLoaded) {
             return old?.filter(
-              (m) =>
-                m.id !== msg.id &&
-                (!msg.clientMsgId || m.clientMsgId !== msg.clientMsgId),
+              (m) => m.id !== msg.id && (!msg.clientMsgId || m.clientMsgId !== msg.clientMsgId),
             )
           }
 
           if (!old) return [msg]
           let replaced = false
           const updated = old.map((m) => {
-            if (
-              (m.clientMsgId && m.clientMsgId === msg.clientMsgId) ||
-              m.id === msg.id
-            ) {
+            if ((m.clientMsgId && m.clientMsgId === msg.clientMsgId) || m.id === msg.id) {
               replaced = true
               return msg
             }
