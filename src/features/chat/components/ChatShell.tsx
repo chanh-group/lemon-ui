@@ -33,6 +33,19 @@ import { useAuth } from '@/features/auth/api'
 
 const TYPING_HEARTBEAT_MS = 1_500
 
+export function visibleLiveMessages(
+  timeline: MessageResponse[],
+  live: MessageResponse[],
+  hasLatest: boolean,
+): MessageResponse[] {
+  if (!hasLatest) return []
+  if (timeline.length === 0) return live
+  const compare = (a: MessageResponse, b: MessageResponse) =>
+    Date.parse(a.createdAt) - Date.parse(b.createdAt) || a.id.localeCompare(b.id)
+  const oldest = timeline.reduce((a, b) => (compare(a, b) <= 0 ? a : b))
+  return live.filter((message) => message.id.startsWith('temp-') || compare(message, oldest) >= 0)
+}
+
 export function ChatShell() {
   const { t } = useTranslation()
   const { user } = useAuth()
@@ -68,6 +81,7 @@ export function ChatShell() {
   const markReadMutation = useMarkReadMutation()
   const lastTypingSentAt = useRef(0)
   const lastReadAttempt = useRef<string | null>(null)
+  const [scrollPositions, setScrollPositions] = useState<Record<string, string | undefined>>({})
 
   const rawConversations = useMemo(() => conversationsQuery.data ?? [], [conversationsQuery.data])
 
@@ -128,9 +142,10 @@ export function ChatShell() {
   const restoreListError = conversationsQuery.isError && !conversationDetailQuery.isSuccess
 
   const messageItems = useMemo(() => {
+    const timeline = messagesQuery.data?.pages.flatMap((page) => page.items) ?? []
     const messages = [
-      ...(messagesQuery.data?.pages.flatMap((page) => page.items) ?? []),
-      ...(messagesQuery.liveMessages ?? []),
+      ...timeline,
+      ...visibleLiveMessages(timeline, messagesQuery.liveMessages ?? [], messagesQuery.hasLatest),
     ]
     const uniqueMap = new Map<string, MessageResponse>()
     for (const msg of messages) {
@@ -141,9 +156,10 @@ export function ChatShell() {
       }
     }
     return [...uniqueMap.values()].sort(
-      (left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt),
+      (left, right) =>
+        Date.parse(left.createdAt) - Date.parse(right.createdAt) || left.id.localeCompare(right.id),
     )
-  }, [messagesQuery.data, messagesQuery.liveMessages])
+  }, [messagesQuery.data, messagesQuery.liveMessages, messagesQuery.hasLatest])
 
   // API trả từng trang mới nhất trước; UI cần timeline cũ đến mới.
   const groups = useMemo(() => {
@@ -158,21 +174,20 @@ export function ChatShell() {
     navigate(conversationPath(id))
   }
 
-  const lastMessage = messageItems.at(-1)
-  const selectedUnread = selected?.unread
-  const lastMessageId = lastMessage?.id
-  const lastMessageConversationId = lastMessage?.conversationId
-  const markReadMutate = markReadMutation.mutate
-
-  // Tự động mark as read khi mở hội thoại và có tin nhắn chưa đọc
-  useEffect(() => {
-    if (!selectedId || !lastMessageId || !selectedUnread || selectedUnread <= 0) return
-    if (lastMessageConversationId !== selectedId) return
-    if (lastReadAttempt.current === lastMessageId) return
-
-    lastReadAttempt.current = lastMessageId
-    markReadMutate({ conversationId: selectedId, lastReadMessageId: lastMessageId })
-  }, [selectedId, lastMessageId, lastMessageConversationId, selectedUnread, markReadMutate])
+  const markVisibleMessageRead = (messageId: string) => {
+    if (!selectedId) return
+    const attempt = `${selectedId}:${messageId}`
+    if (lastReadAttempt.current === attempt) return
+    lastReadAttempt.current = attempt
+    markReadMutation.mutate(
+      { conversationId: selectedId, lastReadMessageId: messageId },
+      {
+        onError: () => {
+          if (lastReadAttempt.current === attempt) lastReadAttempt.current = null
+        },
+      },
+    )
+  }
 
   const handleSend = async (
     text: string,
@@ -191,6 +206,12 @@ export function ChatShell() {
     } catch {
       return false
     }
+  }
+
+  const handleRetrySend = (messageId: string) => {
+    const message = messagesQuery.liveMessages?.find((item) => item.id === messageId)
+    if (!message?.retryPayload || sendMessageMutation.isPending) return
+    void sendMessageMutation.mutateAsync(message.retryPayload).catch(() => undefined)
   }
 
   const handleTypingStart = () => {
@@ -332,6 +353,23 @@ export function ChatShell() {
               if (result.isError) throw result.error
             }}
             hasNewerMessages={Boolean(messagesQuery.hasPreviousPage)}
+            hasLatest={messagesQuery.hasLatest}
+            onLoadLatest={messagesQuery.loadLatest}
+            onVisibleMessage={markVisibleMessageRead}
+            onRetryMessage={handleRetrySend}
+            restoreMessageId={
+              !selected.unread &&
+              messageItems.some((message) => message.id === scrollPositions[selected.id])
+                ? scrollPositions[selected.id]
+                : undefined
+            }
+            onPositionChange={(messageId) => {
+              setScrollPositions((positions) =>
+                positions[selected.id] === messageId
+                  ? positions
+                  : { ...positions, [selected.id]: messageId },
+              )
+            }}
             isLoadingNewerMessages={messagesQuery.isFetchingPreviousPage}
             onLoadNewerMessages={async () => {
               const result = await messagesQuery.fetchPreviousPage()

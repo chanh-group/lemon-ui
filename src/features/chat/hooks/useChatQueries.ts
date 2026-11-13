@@ -9,7 +9,11 @@ import {
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { generateUUID } from '@/lib/utils'
-import { resolveSendMessageKind } from '../utils/messageSend'
+import {
+  isUncertainSendError,
+  resolveSendMessageKind,
+  retryUncertainSend,
+} from '../utils/messageSend'
 import { queryKeys } from '@/infrastructure/query/keys'
 import {
   getConversationById,
@@ -60,9 +64,31 @@ export function rollbackOptimisticConversationPreview(
   )
 }
 
+export function upsertOptimisticMessage(
+  messages: MessageResponse[],
+  optimistic: MessageResponse,
+): MessageResponse[] {
+  const exists = messages.some((message) => message.clientMsgId === optimistic.clientMsgId)
+  if (!exists) return [...messages, optimistic]
+  return messages.map((message) => {
+    if (message.clientMsgId !== optimistic.clientMsgId || !message.id.startsWith('temp-'))
+      return message
+    return { ...message, sendState: undefined }
+  })
+}
+
 export interface MessagePageParam {
   cursor?: string
   after?: string
+}
+
+export function windowHasLatest(
+  data: InfiniteData<MessageTimelineResponse, unknown> | undefined,
+): boolean {
+  const page = data?.pages[0]
+  const param = data?.pageParams[0] as MessagePageParam | undefined
+  if (!page || !param) return false
+  return (!param.cursor && !param.after) || (Boolean(param.after) && !page.hasMore)
 }
 
 /** Hook lấy danh sách hội thoại Inbox */
@@ -135,6 +161,7 @@ export function useConversationMessagesQuery(conversationId: string | null) {
     staleTime: Infinity,
   })
   const { data, fetchNextPage, isFetchingNextPage } = query
+  const latestRequests = useRef(new Map<string, Promise<void>>())
   const latestPage = data?.pages.at(-1)
   const pageCount = data?.pages.length ?? 0
 
@@ -203,23 +230,43 @@ export function useConversationMessagesQuery(conversationId: string | null) {
     )
   }, [conversationId, data, queryClient])
 
-  // maxPages cắt trang mới nhất khi cuộn lên. Rời hội thoại lúc cửa sổ không
-  // còn neo ở trang mới nhất thì reset để lần mở sau vào đúng tin mới nhất.
+  // Keep the loaded window when switching conversations; allow an interrupted
+  // initial prefetch to continue if the conversation is reopened.
   useEffect(() => {
     const prefetched = initialPrefetches.current
     return () => {
-      if (!conversationId) return
-      const key = CHAT_QUERY_KEYS.messages(conversationId)
-      const cached =
-        queryClient.getQueryData<InfiniteData<MessageTimelineResponse, MessagePageParam>>(key)
-      const firstParam = cached?.pageParams[0]
-      if (!firstParam?.cursor && !firstParam?.after) return
-      prefetched.delete(conversationId)
-      void queryClient.resetQueries({ queryKey: key, exact: true })
+      if (conversationId) prefetched.delete(conversationId)
     }
-  }, [conversationId, queryClient])
+  }, [conversationId])
 
-  return { ...query, liveMessages: liveMessagesQuery.data }
+  const loadLatest = async () => {
+    if (!conversationId) return
+    const existing = latestRequests.current.get(conversationId)
+    if (existing) return existing
+    const key = CHAT_QUERY_KEYS.messages(conversationId)
+    const request = (async () => {
+      const page = await getConversationMessages(conversationId, undefined, MESSAGE_PAGE_SIZE)
+      await queryClient.cancelQueries({ queryKey: key, exact: true })
+      queryClient.setQueryData<InfiniteData<MessageTimelineResponse, MessagePageParam>>(key, {
+        pages: [page],
+        pageParams: [{}],
+      })
+    })()
+    latestRequests.current.set(conversationId, request)
+    try {
+      await request
+    } finally {
+      if (latestRequests.current.get(conversationId) === request)
+        latestRequests.current.delete(conversationId)
+    }
+  }
+
+  return {
+    ...query,
+    liveMessages: liveMessagesQuery.data,
+    hasLatest: windowHasLatest(data),
+    loadLatest,
+  }
 }
 
 /** Paginate the full message history for the media archive without expanding the chat window. */
@@ -296,6 +343,12 @@ export function useSendMessageMutation(conversationId: string | null) {
       if (typeof arg !== 'string') {
         arg.clientMsgId = clientMsgId
       }
+      const wasUncertain =
+        queryClient
+          .getQueryData<MessageResponse[]>(CHAT_QUERY_KEYS.liveMessages(targetConversationId))
+          ?.some(
+            (message) => message.clientMsgId === clientMsgId && message.sendState === 'uncertain',
+          ) ?? false
 
       // Chuẩn bị attachments tạm thời cho UI lạc quan (dùng local blob URL cho media)
       let optimisticAttachments: MessageAttachmentItem[] | undefined
@@ -357,7 +410,7 @@ export function useSendMessageMutation(conversationId: string | null) {
       // 1. Thêm tin nhắn tạm vào liveMessages ngay tức thì
       queryClient.setQueryData<MessageResponse[]>(
         CHAT_QUERY_KEYS.liveMessages(targetConversationId),
-        (old) => [...(old ?? []), optimisticMessage],
+        (old) => upsertOptimisticMessage(old ?? [], optimisticMessage),
       )
 
       // 2. Cập nhật preview của danh sách hội thoại ở thanh bên trái
@@ -382,6 +435,7 @@ export function useSendMessageMutation(conversationId: string | null) {
         clientMsgId,
         targetConversationId,
         optimisticCreatedAt: optimisticMessage.createdAt,
+        wasUncertain,
       }
     },
 
@@ -448,11 +502,48 @@ export function useSendMessageMutation(conversationId: string | null) {
         isForwarded: typeof arg !== 'string' ? arg.isForwarded : undefined,
         sourceMessageId: typeof arg !== 'string' ? arg.sourceMessageId : undefined,
       }
-      return sendMessage(targetConversationId, payload)
+      queryClient.setQueryData<MessageResponse[]>(
+        CHAT_QUERY_KEYS.liveMessages(targetConversationId),
+        (old) =>
+          old?.map((message) =>
+            message.clientMsgId === clientMsgId ? { ...message, retryPayload: payload } : message,
+          ),
+      )
+      return retryUncertainSend(() => sendMessage(targetConversationId, payload))
     },
 
     onError: (error: unknown, _arg: SendMessageArg, context) => {
       // Nếu gửi thất bại thì hiển thị thông báo lỗi và xoá tin nhắn đó đi
+      const confirmed =
+        context?.targetConversationId && context.clientMsgId
+          ? [
+              ...(queryClient.getQueryData<MessageResponse[]>(
+                CHAT_QUERY_KEYS.liveMessages(context.targetConversationId),
+              ) ?? []),
+              ...(queryClient
+                .getQueryData<InfiniteData<MessageTimelineResponse>>(
+                  CHAT_QUERY_KEYS.messages(context.targetConversationId),
+                )
+                ?.pages.flatMap((page) => page.items) ?? []),
+            ].some(
+              (message) =>
+                message.clientMsgId === context.clientMsgId && !message.id.startsWith('temp-'),
+            )
+          : false
+      if (confirmed) return
+      if ((context?.wasUncertain || isUncertainSendError(error)) && context?.targetConversationId) {
+        queryClient.setQueryData<MessageResponse[]>(
+          CHAT_QUERY_KEYS.liveMessages(context.targetConversationId),
+          (old) =>
+            old?.map((message) =>
+              message.clientMsgId === context.clientMsgId
+                ? { ...message, sendState: 'uncertain' }
+                : message,
+            ),
+        )
+        toast.error(t('chat.sendUncertain'))
+        return
+      }
       if (context?.targetConversationId) {
         queryClient.setQueryData<MessageResponse[]>(
           CHAT_QUERY_KEYS.liveMessages(context.targetConversationId),
@@ -579,11 +670,8 @@ export function useMarkReadMutation() {
       lastReadMessageId: string
     }) => markConversationRead(conversationId, lastReadMessageId),
     onSuccess: (_, { conversationId }) => {
-      // Reset unreadCount trong conversations cache
-      queryClient.setQueryData<ConversationResponse[]>(CHAT_QUERY_KEYS.conversations, (old) => {
-        if (!old) return old
-        return old.map((conv) => (conv.id === conversationId ? { ...conv, unreadCount: 0 } : conv))
-      })
+      void queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.conversations })
+      void queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.conversation(conversationId) })
     },
     onError: (error) => {
       toast.error(error instanceof Error ? error.message : t('chat.markReadError'))

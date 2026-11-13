@@ -84,7 +84,7 @@ export function AudioPlayerBubble({
   return (
     <div
       onClick={(e) => e.stopPropagation()}
-      className="flex items-center gap-3 py-1.5 px-0.5 min-w-[210px] sm:min-w-[250px] max-w-xs sm:max-w-sm select-none"
+      className="flex items-center gap-3 py-1.5 px-0.5 min-w-52.5 sm:min-w-62.5 max-w-xs sm:max-w-sm select-none"
     >
       <audio
         ref={audioRef}
@@ -134,7 +134,7 @@ export function AudioPlayerBubble({
             onChange={handleSeek}
             className="w-full h-1.5 bg-foreground/15 rounded-full appearance-none cursor-pointer accent-primary"
           />
-          <span className="tabular-nums font-mono text-[11px] text-foreground/80 shrink-0 min-w-[28px] text-right">
+          <span className="tabular-nums font-mono text-[11px] text-foreground/80 shrink-0 min-w-7 text-right">
             {formatSec(isPlaying ? currentTime : duration || currentTime)}
           </span>
         </div>
@@ -286,7 +286,7 @@ export function AttachmentBubble({
       onClick={handleCardClick}
       title={canPreview ? t('chat.preview', 'Xem trước') : t('chat.download', 'Tải xuống')}
       className={cn(
-        'flex items-center gap-3 py-1 px-0.5 transition-opacity cursor-pointer hover:opacity-90 select-none min-w-[200px] max-w-xs sm:max-w-sm',
+        'flex items-center gap-3 py-1 px-0.5 transition-opacity cursor-pointer hover:opacity-90 select-none min-w-50 max-w-xs sm:max-w-sm',
         hasCaption && 'pb-2 border-b border-foreground/15 mb-1.5',
       )}
     >

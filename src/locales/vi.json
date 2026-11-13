@@ -166,6 +166,8 @@
     "sendPhoto": "Gửi ảnh",
     "sendMessage": "Gửi tin nhắn",
     "sendMessageError": "Không thể gửi tin nhắn",
+    "sendUncertain": "Chưa xác định được tin nhắn đã gửi hay chưa. Kiểm tra kết nối trước khi gửi lại.",
+    "retrySend": "Thử gửi lại",
     "markReadError": "Không thể đánh dấu tin nhắn đã đọc",
     "realtimeConnecting": "Đang kết nối trò chuyện thời gian thực…",
     "realtimeOffline": "Trò chuyện thời gian thực đang ngoại tuyến. Đang kết nối lại…",
