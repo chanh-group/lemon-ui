@@ -35,6 +35,7 @@ interface ConversationViewProps {
   onTypingStop?: () => void
   onVoiceCall?: () => void
   onVideoCall?: () => void
+  onOpenStory?: () => void
 }
 
 export function ConversationView({
@@ -58,6 +59,7 @@ export function ConversationView({
   onTypingStop,
   onVoiceCall,
   onVideoCall,
+  onOpenStory,
 }: ConversationViewProps) {
   const { t } = useTranslation()
   const [draft, setDraft] = useState('')
@@ -186,6 +188,7 @@ export function ConversationView({
       >
         <ConversationHeader
           conversation={conversation}
+          onOpenStory={onOpenStory}
           showBack={showBack}
           onBack={onBack}
           isTyping={isTyping}

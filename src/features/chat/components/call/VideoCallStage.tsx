@@ -37,8 +37,14 @@ export function VideoCallStage({
         }}
         aria-hidden="true"
       />
-      <div aria-hidden="true" className="absolute -left-24 top-1/4 size-96 rounded-full bg-emerald-500/15 blur-3xl animate-float-slow" />
-      <div aria-hidden="true" className="absolute -right-30 bottom-1/4 size-80 rounded-full bg-lime-300/10 blur-3xl animate-float-y" />
+      <div
+        aria-hidden="true"
+        className="absolute -left-24 top-1/4 size-96 rounded-full bg-emerald-500/15 blur-3xl animate-float-slow"
+      />
+      <div
+        aria-hidden="true"
+        className="absolute -right-30 bottom-1/4 size-80 rounded-full bg-lime-300/10 blur-3xl animate-float-y"
+      />
       <div
         aria-hidden="true"
         className="absolute inset-0 opacity-[0.05]"

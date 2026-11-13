@@ -48,6 +48,7 @@ export function ChatShell() {
   const [tab, setTab] = useState<ChatTab>(initialTab)
   const [query, setQuery] = useState('')
   const [viewingStory, setViewingStory] = useState<StoryEntry | null>(null)
+  const [conversationStory, setConversationStory] = useState<StoryEntry | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const todayLabel = t('chat.today')
 
@@ -115,6 +116,11 @@ export function ChatShell() {
     Boolean(selectedId) && !selectedFromList && !conversationsQuery.isPending
   const conversationDetailQuery = useConversationQuery(selectedId, needsConversationDetail)
   const selected = selectedFromList ?? conversationDetailQuery.data ?? null
+  const partnerStories =
+    selected && !selected.isGroup && selected.partnerId
+      ? allStories.filter((story) => story.authorId === selected.partnerId && !story.mine)
+      : []
+  const partnerStory = partnerStories.find((story) => !story.viewed) ?? partnerStories[0]
 
   const restoringConversation =
     Boolean(selectedId) &&
@@ -329,6 +335,7 @@ export function ChatShell() {
           <ConversationView
             key={selected.id}
             conversation={selected}
+            onOpenStory={partnerStory ? () => setConversationStory(partnerStory) : undefined}
             groups={groups}
             messagesLoading={messagesQuery.isPending}
             messagesError={
@@ -424,6 +431,15 @@ export function ChatShell() {
           </section>
         )}
       </div>
+      {conversationStory && (
+        <StoryViewer
+          key={conversationStory.id}
+          story={allStories.find((story) => story.id === conversationStory.id) ?? conversationStory}
+          stories={partnerStories}
+          onSelectStory={setConversationStory}
+          onClose={() => setConversationStory(null)}
+        />
+      )}
     </main>
   )
 }

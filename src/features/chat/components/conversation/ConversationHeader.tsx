@@ -23,6 +23,7 @@ interface ConversationHeaderProps {
   isInfoOpen?: boolean
   onVoiceCall?: () => void
   onVideoCall?: () => void
+  onOpenStory?: () => void
 }
 
 /** Pill "..." gọn thay cho chữ “Typing…” — vẫn có nhãn cho screen reader. */
@@ -57,6 +58,7 @@ export function ConversationHeader({
   isInfoOpen,
   onVoiceCall,
   onVideoCall,
+  onOpenStory,
 }: ConversationHeaderProps) {
   const { t } = useTranslation()
 
@@ -77,12 +79,27 @@ export function ConversationHeader({
         </button>
       )}
       <span className="relative shrink-0">
-        <UserAvatar
-          name={conversation.name}
-          src={conversation.partnerAvatar}
-          square={conversation.isGroup}
-          className="size-10"
-        />
+        {onOpenStory ? (
+          <button
+            type="button"
+            onClick={onOpenStory}
+            aria-label={t('chat.storyOf', { name: conversation.name })}
+            className="rounded-full"
+          >
+            <UserAvatar
+              name={conversation.name}
+              src={conversation.partnerAvatar}
+              className="size-10 ring-2 ring-primary ring-offset-2 ring-offset-card"
+            />
+          </button>
+        ) : (
+          <UserAvatar
+            name={conversation.name}
+            src={conversation.partnerAvatar}
+            square={conversation.isGroup}
+            className="size-10"
+          />
+        )}
         {conversation.online && (
           <span
             className="absolute right-0 bottom-0 size-2.5 rounded-full bg-success ring-2 ring-card"

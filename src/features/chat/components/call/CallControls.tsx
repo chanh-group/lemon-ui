@@ -54,13 +54,23 @@ interface ControlButtonProps {
   pulse?: boolean
 }
 
-function ControlButton({ icon: Icon, label, onClick, tone = 'glass', size = 'md', pulse = false }: ControlButtonProps) {
+function ControlButton({
+  icon: Icon,
+  label,
+  onClick,
+  tone = 'glass',
+  size = 'md',
+  pulse = false,
+}: ControlButtonProps) {
   return (
     <div className="flex w-18 flex-col items-center gap-2">
       <span className="relative grid place-items-center">
         {pulse && (
           <>
-            <span aria-hidden="true" className="absolute inset-0 rounded-full bg-emerald-400/40 animate-pulse-ring" />
+            <span
+              aria-hidden="true"
+              className="absolute inset-0 rounded-full bg-emerald-400/40 animate-pulse-ring"
+            />
             <span
               aria-hidden="true"
               className="absolute inset-0 rounded-full bg-emerald-400/30 animate-pulse-ring"
@@ -218,12 +228,7 @@ export function CallControls({
           label={t('chat.callSwitchToVoice')}
           onClick={() => onChangeMedia('voice')}
         />
-        <ControlButton
-          icon={CallEnd}
-          label={t('chat.callEnd')}
-          onClick={onEnd}
-          tone="danger"
-        />
+        <ControlButton icon={CallEnd} label={t('chat.callEnd')} onClick={onEnd} tone="danger" />
       </div>
     )
   }
@@ -242,12 +247,7 @@ export function CallControls({
         label={media === 'video' ? t('chat.callSwitchToVoice') : t('chat.callSwitchToVideo')}
         onClick={() => onChangeMedia(media === 'video' ? 'voice' : 'video')}
       />
-      <ControlButton
-        icon={CallEnd}
-        label={t('chat.callEnd')}
-        onClick={onEnd}
-        tone="danger"
-      />
+      <ControlButton icon={CallEnd} label={t('chat.callEnd')} onClick={onEnd} tone="danger" />
     </div>
   )
 }

@@ -4,7 +4,13 @@ import { useLocation, useNavigate, useParams, useSearchParams } from 'react-rout
 import { ArrowLeft01Icon as ArrowLeftData } from '@hugeicons/core-free-icons'
 import { toast } from 'sonner'
 import { createIcon } from '@/components/icons/hugeIcon'
-import { ROUTES, conversationPath, type CallEndReason, type CallMedia, type CallPhase } from '@/config/constants'
+import {
+  ROUTES,
+  conversationPath,
+  type CallEndReason,
+  type CallMedia,
+  type CallPhase,
+} from '@/config/constants'
 import { useAuth } from '@/features/auth/api'
 import { useConversationQuery } from '../../hooks/useChatQueries'
 import { cn } from '@/lib/utils'
@@ -70,14 +76,17 @@ export function CallScreen() {
 
   const updateCall = useCallback(
     (patch: CallPatch) => {
-      setSearchParams((prev) => {
-        const next = new URLSearchParams(prev)
-        if (patch.media) next.set('media', patch.media)
-        if (patch.state) next.set('state', patch.state)
-        if (patch.reason) next.set('reason', patch.reason)
-        else if (patch.reason === null) next.delete('reason')
-        return next
-      }, { replace: true, state: location.state })
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev)
+          if (patch.media) next.set('media', patch.media)
+          if (patch.state) next.set('state', patch.state)
+          if (patch.reason) next.set('reason', patch.reason)
+          else if (patch.reason === null) next.delete('reason')
+          return next
+        },
+        { replace: true, state: location.state },
+      )
     },
     [location.state, setSearchParams],
   )
@@ -166,7 +175,10 @@ export function CallScreen() {
       <main className="relative flex h-dvh w-full flex-col overflow-hidden bg-[#07120c] text-white">
         <CallBackdrop />
         <div className="relative z-10 flex h-full flex-col items-center justify-center gap-4 px-6 text-center">
-          <span className="size-9 animate-spin rounded-full border-2 border-white/20 border-t-primary" aria-hidden="true" />
+          <span
+            className="size-9 animate-spin rounded-full border-2 border-white/20 border-t-primary"
+            aria-hidden="true"
+          />
           <p className="text-sm text-white/60">{t('chat.callStarting')}</p>
         </div>
       </main>
@@ -211,8 +223,14 @@ export function CallScreen() {
       )}
 
       {/* Lớp tối để chữ và nút luôn đọc được trên video/voice stage. */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-40 bg-gradient-to-b from-black/65 via-black/25 to-transparent" aria-hidden="true" />
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-72 bg-gradient-to-t from-black/80 via-black/40 to-transparent" aria-hidden="true" />
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 z-20 h-40 bg-gradient-to-b from-black/65 via-black/25 to-transparent"
+        aria-hidden="true"
+      />
+      <div
+        className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-72 bg-gradient-to-t from-black/80 via-black/40 to-transparent"
+        aria-hidden="true"
+      />
 
       <header className="relative z-30 flex items-start justify-between gap-3 px-4 pt-[max(1rem,env(safe-area-inset-top))] sm:px-6">
         <button
@@ -296,8 +314,14 @@ function CallBackdrop({ children }: { children?: ReactNode }) {
         }}
         aria-hidden="true"
       />
-      <div aria-hidden="true" className="absolute -left-28 top-24 size-96 rounded-full bg-emerald-500/12 blur-3xl animate-float-slow" />
-      <div aria-hidden="true" className="absolute -right-24 bottom-20 size-80 rounded-full bg-lime-300/8 blur-3xl animate-float-y" />
+      <div
+        aria-hidden="true"
+        className="absolute -left-28 top-24 size-96 rounded-full bg-emerald-500/12 blur-3xl animate-float-slow"
+      />
+      <div
+        aria-hidden="true"
+        className="absolute -right-24 bottom-20 size-80 rounded-full bg-lime-300/8 blur-3xl animate-float-y"
+      />
       {children}
     </div>
   )

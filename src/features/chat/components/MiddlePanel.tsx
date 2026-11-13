@@ -266,7 +266,6 @@ export function MiddlePanel({
               <ul className="flex flex-col gap-0.5">
                 {conversations.map((c) => {
                   const isActive = c.id === selectedId
-                  // Story còn hiệu lực 24h của contact 1-1 — bấm avatar là xem tin, bấm row là chat
                   const contactStory =
                     !c.isGroup && c.partnerId ? storyByAuthor.get(c.partnerId) : undefined
                   const {
@@ -331,16 +330,6 @@ export function MiddlePanel({
                           </span>
                         </span>
                       </button>
-                      {/* Nút trên avatar — layer trên row, tránh button lồng nhau */}
-                      {contactStory && (
-                        <button
-                          type="button"
-                          aria-label={t('chat.viewStoryOf', { name: c.name })}
-                          title={t('chat.viewStoryOf', { name: c.name })}
-                          onClick={() => onOpenStory(contactStory)}
-                          className="absolute top-1/2 left-3 z-10 size-11 -translate-y-1/2 rounded-full transition-transform duration-150 hover:scale-105 active:scale-95 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                        />
-                      )}
                     </li>
                   )
                 })}
@@ -476,6 +465,14 @@ function StoriesTab({ stories, activeStoryId, onOpenStory, onOpenCreate }: Stori
             </span>
           )}
         </button>
+        {myStory && (
+          <button
+            type="button"
+            aria-label={t('chat.yourStory')}
+            onClick={() => onOpenStory(myStory)}
+            className="absolute left-3 top-2.5 size-11 rounded-full"
+          />
+        )}
         {/* Nút + đè góc avatar — nút riêng, tránh button lồng nhau */}
         <button
           type="button"

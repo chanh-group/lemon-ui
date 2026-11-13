@@ -61,13 +61,14 @@ export function VoiceCallStage({
   })()
 
   return (
-    <section
-      className="absolute inset-0 flex flex-col items-center justify-center px-6 pt-20 pb-46 text-center sm:pb-52"
-    >
+    <section className="absolute inset-0 flex flex-col items-center justify-center px-6 pt-20 pb-46 text-center sm:pb-52">
       <div className="relative mb-8 sm:mb-10">
         {showPulse && (
           <>
-            <span aria-hidden="true" className="absolute inset-0 rounded-full bg-primary/15 animate-pulse-ring" />
+            <span
+              aria-hidden="true"
+              className="absolute inset-0 rounded-full bg-primary/15 animate-pulse-ring"
+            />
             <span
               aria-hidden="true"
               className="absolute inset-0 rounded-full bg-primary/10 animate-pulse-ring"
