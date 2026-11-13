@@ -7,7 +7,7 @@ const ArrowDown = createIcon(ArrowDownData)
 import type { Conversation, DayGroup, MessageAttachmentInput } from '../../types/chat.types'
 import { ConversationHeader } from './ConversationHeader'
 import { MessageList, type MessageListHandle } from './MessageList'
-import { MessageComposer } from './MessageComposer'
+import { MessageComposer, type PendingFile } from './MessageComposer'
 
 interface ConversationViewProps {
   conversation: Conversation
@@ -21,7 +21,11 @@ interface ConversationViewProps {
   hasNewerMessages: boolean
   isLoadingNewerMessages: boolean
   onLoadNewerMessages: () => Promise<unknown>
-  onSend: (text: string, attachments?: MessageAttachmentInput[]) => Promise<boolean>
+  onSend: (
+    text: string,
+    attachments?: MessageAttachmentInput[],
+    pendingFiles?: PendingFile[],
+  ) => Promise<boolean>
   isSending: boolean
   onBack?: () => void
   showBack: boolean
@@ -147,9 +151,19 @@ export function ConversationView({
       loadNewerMessages()
   }
 
-  const submit = async (text: string, attachments?: MessageAttachmentInput[]) => {
-    if ((!text && (!attachments || attachments.length === 0)) || isSending) return false
-    const sent = await onSend(text, attachments)
+  const submit = async (
+    text: string,
+    attachments?: MessageAttachmentInput[],
+    pendingFiles?: PendingFile[],
+  ) => {
+    if (
+      (!text &&
+        (!attachments || attachments.length === 0) &&
+        (!pendingFiles || pendingFiles.length === 0)) ||
+      isSending
+    )
+      return false
+    const sent = await onSend(text, attachments, pendingFiles)
     if (!sent) return false
     // Giữ text người dùng gõ thêm trong lúc tin trước đang gửi.
     setDraft((current) => (current === text ? '' : current))

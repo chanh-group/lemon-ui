@@ -246,7 +246,7 @@ export function mapMessageResponse(raw: MessageResponse, currentUserId?: string)
     attachments: raw.attachments,
     photoLabel: raw.attachments?.[0]?.fileName,
     time: formatTimeHHmm(raw.createdAt),
-    status: isMe ? 'sent' : undefined,
+    status: raw.id.startsWith('temp-') ? 'sending' : isMe ? 'sent' : undefined,
     reactions: raw.reactions,
     isForwarded: raw.isForwarded,
     createdAt:

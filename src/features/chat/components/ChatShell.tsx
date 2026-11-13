@@ -8,13 +8,14 @@ import { cn } from '@/lib/utils'
 import { conversationPath, ROUTES } from '@/config/constants'
 import { emitTypingStart, emitTypingStop } from '@/lib/socket'
 import { MOCK_CALLS } from '../data/mockData'
-import type { ChatTab, MessageAttachmentInput, StoryEntry } from '../types/chat.types'
+import type { ChatTab, MessageAttachmentInput, MessageResponse, StoryEntry } from '../types/chat.types'
 import {
   useConversationsQuery,
   useConversationMessagesQuery,
   useConversationQuery,
   useMarkReadMutation,
   useSendMessageMutation,
+  type SendMessagePendingFile,
 } from '../hooks/useChatQueries'
 import { useChatRealtime } from '../hooks/useChatRealtime'
 import { useStoriesList } from '../hooks/useStories'
@@ -126,8 +127,15 @@ export function ChatShell() {
       ...(messagesQuery.data?.pages.flatMap((page) => page.items) ?? []),
       ...(messagesQuery.liveMessages ?? []),
     ]
-    const uniqueMessages = new Map(messages.map((message) => [message.id, message]))
-    return [...uniqueMessages.values()].sort(
+    const uniqueMap = new Map<string, MessageResponse>()
+    for (const msg of messages) {
+      const key = msg.clientMsgId ? `client-${msg.clientMsgId}` : msg.id
+      const existing = uniqueMap.get(key)
+      if (!existing || (existing.id.startsWith('temp-') && !msg.id.startsWith('temp-'))) {
+        uniqueMap.set(key, msg)
+      }
+    }
+    return [...uniqueMap.values()].sort(
       (left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt),
     )
   }, [messagesQuery.data, messagesQuery.liveMessages])
@@ -164,6 +172,7 @@ export function ChatShell() {
   const handleSend = async (
     text: string,
     attachments?: MessageAttachmentInput[],
+    pendingFiles?: SendMessagePendingFile[],
   ): Promise<boolean> => {
     if (!selectedId) return false
     try {
@@ -171,10 +180,10 @@ export function ChatShell() {
       await sendMessageMutation.mutateAsync({
         body: text,
         attachments,
+        pendingFiles,
       })
       return true
-    } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : t('chat.sendMessageError'))
+    } catch {
       return false
     }
   }

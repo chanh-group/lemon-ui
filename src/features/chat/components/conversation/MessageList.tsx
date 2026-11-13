@@ -14,6 +14,7 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import {
   CheckCheckIcon as CheckCheckData,
   CheckIcon as CheckData,
+  Clock01Icon as ClockData,
   Film01Icon as FilmData,
   Image01Icon as ImageIconData,
   Share01Icon as ForwardData,
@@ -22,6 +23,7 @@ import {
 import { createIcon } from '@/components/icons/hugeIcon'
 const Check = createIcon(CheckData)
 const CheckCheck = createIcon(CheckCheckData)
+const Clock = createIcon(ClockData)
 const Film = createIcon(FilmData)
 const ImageIcon = createIcon(ImageIconData)
 const Sticker = createIcon(StickerData)
@@ -265,6 +267,7 @@ const MessageRowView = memo(function MessageRowView({
         className={cn(
           'flex max-w-[78%] flex-col sm:max-w-[65%]',
           isMe ? 'items-end' : 'items-start',
+          msg.status === 'sending' && 'opacity-80',
         )}
       >
         <div
@@ -390,7 +393,12 @@ const MessageRowView = memo(function MessageRowView({
           >
             {msg.time}
             {isMe &&
-              (msg.status === 'read' ? (
+              (msg.status === 'sending' ? (
+                <Clock
+                  className="size-3.5 text-muted-foreground animate-pulse"
+                  aria-label={t('chat.sending', 'Đang gửi')}
+                />
+              ) : msg.status === 'read' ? (
                 <CheckCheck className="size-3.5 text-brand-ink" aria-label={t('chat.read')} />
               ) : (
                 <Check className="size-3.5" aria-label={t('chat.sent')} />

@@ -116,7 +116,7 @@ export interface ChatMessage {
   photoLabel?: string
   attachments?: MessageAttachmentItem[]
   time: string
-  status?: 'sent' | 'read'
+  status?: 'sent' | 'read' | 'sending' | 'failed'
   reactions?: MessageReactionItem[]
   isForwarded?: boolean
   storyId?: string | null

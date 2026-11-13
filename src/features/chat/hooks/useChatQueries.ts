@@ -17,14 +17,21 @@ import {
   getConversationMessages,
   getOrCreateDirectConversation,
   markConversationRead,
+  presignFile,
   reactToMessage,
   revokeMessage,
   sendMessage,
+  uploadBinaryToUrl,
+  uploadFileViaBackend,
 } from '../api/chat.api'
+import { getKindFromMime, isImage } from '../utils/fileTypes'
+import { useAuth } from '@/features/auth/api'
 import { mapConversationResponse } from '../utils/chat.mapper'
 import type {
   Conversation,
   ConversationResponse,
+  MessageAttachmentInput,
+  MessageAttachmentItem,
   MessageResponse,
   MessageTimelineResponse,
   SendMessageDto,
@@ -199,52 +206,237 @@ export function useConversationMessagesQuery(conversationId: string | null) {
   return { ...query, liveMessages: liveMessagesQuery.data }
 }
 
+export interface SendMessagePendingFile {
+  id: string
+  file: File
+  previewUrl?: string
+  uploadedAttachment?: MessageAttachmentInput
+}
+
 export type SendMessageArg =
   | string
   | {
       body?: string
       kind?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE' | 'SYSTEM'
-      attachments?: import('../types/chat.types').MessageAttachmentInput[]
+      attachments?: MessageAttachmentInput[]
+      pendingFiles?: SendMessagePendingFile[]
       isForwarded?: boolean
       sourceMessageId?: string
       targetConversationId?: string
+      clientMsgId?: string
     }
 
-/** Hook gửi tin nhắn mới */
+/** Hook gửi tin nhắn mới với Optimistic UI */
 export function useSendMessageMutation(conversationId: string | null) {
   const queryClient = useQueryClient()
+  const { user } = useAuth()
+  const currentUserId = user?.id || 'me'
+  const { t } = useTranslation()
 
   return useMutation({
-    mutationFn: async (arg: SendMessageArg) => {
-      const targetConversationId =
-        typeof arg === 'string' ? conversationId : (arg.targetConversationId ?? conversationId)
-      if (!targetConversationId) throw new Error('No conversation selected')
-      const clientMsgId = generateUUID()
-      const payload: SendMessageDto =
-        typeof arg === 'string'
-          ? { body: arg, clientMsgId, kind: 'TEXT' }
-          : {
-              body: arg.body,
-              clientMsgId,
-              kind: resolveSendMessageKind(arg.body, arg.kind, arg.attachments),
-              attachments: arg.attachments,
-              isForwarded: arg.isForwarded,
-              sourceMessageId: arg.sourceMessageId,
-            }
-      return sendMessage(targetConversationId, payload)
-    },
-    onSuccess: (newMessage: MessageResponse, arg: SendMessageArg) => {
+    onMutate: async (arg: SendMessageArg) => {
       const targetConversationId =
         typeof arg === 'string' ? conversationId : (arg.targetConversationId ?? conversationId)
       if (!targetConversationId) return
 
-      // Cập nhật messages cache
-      const timeline = queryClient.getQueryData<
-        InfiniteData<MessageTimelineResponse, MessagePageParam>
-      >(CHAT_QUERY_KEYS.messages(targetConversationId))
+      await queryClient.cancelQueries({
+        queryKey: CHAT_QUERY_KEYS.liveMessages(targetConversationId),
+      })
+      await queryClient.cancelQueries({ queryKey: CHAT_QUERY_KEYS.conversations })
+
+      const previousLive = queryClient.getQueryData<MessageResponse[]>(
+        CHAT_QUERY_KEYS.liveMessages(targetConversationId),
+      )
+      const previousConversations = queryClient.getQueryData<ConversationResponse[]>(
+        CHAT_QUERY_KEYS.conversations,
+      )
+
+      const clientMsgId = (typeof arg !== 'string' && arg.clientMsgId) || generateUUID()
+      if (typeof arg !== 'string') {
+        arg.clientMsgId = clientMsgId
+      }
+
+      // Chuẩn bị attachments tạm thời cho UI lạc quan (dùng local blob URL cho media)
+      let optimisticAttachments: MessageAttachmentItem[] | undefined
+      if (typeof arg !== 'string' && arg.pendingFiles && arg.pendingFiles.length > 0) {
+        optimisticAttachments = arg.pendingFiles.map((pf) => {
+          const mimeType = pf.file.type || 'application/octet-stream'
+          const kindRaw = getKindFromMime(mimeType, pf.file.name)
+          const kind = kindRaw.replace('CHAT_', '') as 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE'
+          const previewUrl =
+            pf.previewUrl || (isImage(mimeType, pf.file.name) ? URL.createObjectURL(pf.file) : '')
+          return {
+            id: pf.id || generateUUID(),
+            kind,
+            fileName: pf.file.name,
+            mimeType,
+            sizeBytes: pf.file.size,
+            previewUrl,
+            downloadUrl: previewUrl,
+          }
+        })
+      } else if (typeof arg !== 'string' && arg.attachments && arg.attachments.length > 0) {
+        optimisticAttachments = arg.attachments.map((att) => ({
+          id: generateUUID(),
+          kind: att.kind || 'FILE',
+          fileName: att.fileName,
+          mimeType: att.mimeType,
+          sizeBytes: att.sizeBytes,
+          previewUrl: '',
+          downloadUrl: '',
+        }))
+      }
+
+      const bodyText = typeof arg === 'string' ? arg : arg.body
+      const kind = resolveSendMessageKind(
+        bodyText,
+        typeof arg === 'string' ? undefined : arg.kind,
+        optimisticAttachments || (typeof arg !== 'string' ? arg.attachments : undefined),
+      )
+
+      const optimisticMessage: MessageResponse = {
+        id: `temp-${clientMsgId}`,
+        conversationId: targetConversationId,
+        senderId: currentUserId,
+        kind,
+        body: bodyText || null,
+        replyToId: null,
+        clientMsgId,
+        attachments:
+          optimisticAttachments && optimisticAttachments.length > 0
+            ? optimisticAttachments
+            : undefined,
+        reactions: [],
+        isForwarded: typeof arg !== 'string' ? arg.isForwarded : false,
+        createdAt: new Date().toISOString(),
+        editedAt: null,
+        deletedAt: null,
+      }
+
+      // 1. Thêm tin nhắn tạm vào liveMessages ngay tức thì
+      queryClient.setQueryData<MessageResponse[]>(
+        CHAT_QUERY_KEYS.liveMessages(targetConversationId),
+        (old) => [...(old ?? []), optimisticMessage],
+      )
+
+      // 2. Cập nhật preview của danh sách hội thoại ở thanh bên trái
+      queryClient.setQueryData<ConversationResponse[]>(CHAT_QUERY_KEYS.conversations, (old) => {
+        if (!old) return old
+        const preview = bodyText || (optimisticAttachments?.length ? '[attachment]' : '')
+        return old.map((conv) => {
+          if (conv.id === targetConversationId) {
+            return {
+              ...conv,
+              lastMessagePreview: preview,
+              lastMessageSenderId: currentUserId,
+              lastMessageAt: optimisticMessage.createdAt,
+            }
+          }
+          return conv
+        })
+      })
+
+      return { previousLive, previousConversations, clientMsgId, targetConversationId }
+    },
+
+    mutationFn: async (arg: SendMessageArg) => {
+      const targetConversationId =
+        typeof arg === 'string' ? conversationId : (arg.targetConversationId ?? conversationId)
+      if (!targetConversationId) throw new Error('No conversation selected')
+      const clientMsgId = (typeof arg !== 'string' && arg.clientMsgId) || generateUUID()
+
+      let finalAttachments: MessageAttachmentInput[] | undefined
+      if (typeof arg !== 'string' && arg.pendingFiles && arg.pendingFiles.length > 0) {
+        finalAttachments = []
+        for (const item of arg.pendingFiles) {
+          if (item.uploadedAttachment) {
+            finalAttachments.push(item.uploadedAttachment)
+            continue
+          }
+          const file = item.file
+          const mimeType = file.type || 'application/octet-stream'
+          const kind = getKindFromMime(mimeType, file.name)
+          let objectKey: string
+          try {
+            const presignRes = await presignFile({
+              kind,
+              sizeBytes: file.size,
+              mimeType,
+              fileName: file.name,
+              conversationId: targetConversationId,
+            })
+            await uploadBinaryToUrl(presignRes.uploadUrl, file, mimeType)
+            objectKey = presignRes.objectKey
+          } catch (r2Err) {
+            console.warn('R2 upload failed, using backend fallback:', r2Err)
+            const fallbackRes = await uploadFileViaBackend(
+              file,
+              kind,
+              targetConversationId,
+              file.name,
+            )
+            objectKey = fallbackRes.objectKey
+          }
+          finalAttachments.push({
+            objectKey,
+            fileName: file.name,
+            mimeType,
+            sizeBytes: file.size,
+            kind: kind.replace('CHAT_', '') as 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE',
+          })
+        }
+      } else if (typeof arg !== 'string') {
+        finalAttachments = arg.attachments
+      }
+
+      const bodyText = typeof arg === 'string' ? arg : arg.body
+      const payload: SendMessageDto = {
+        body: bodyText,
+        clientMsgId,
+        kind: resolveSendMessageKind(
+          bodyText,
+          typeof arg === 'string' ? undefined : arg.kind,
+          finalAttachments,
+        ),
+        attachments: finalAttachments,
+        isForwarded: typeof arg !== 'string' ? arg.isForwarded : undefined,
+        sourceMessageId: typeof arg !== 'string' ? arg.sourceMessageId : undefined,
+      }
+      return sendMessage(targetConversationId, payload)
+    },
+
+    onError: (error: unknown, _arg: SendMessageArg, context) => {
+      // Nếu gửi thất bại thì hiển thị thông báo lỗi và xoá tin nhắn đó đi
+      if (context?.targetConversationId) {
+        queryClient.setQueryData<MessageResponse[]>(
+          CHAT_QUERY_KEYS.liveMessages(context.targetConversationId),
+          (old) =>
+            old?.filter(
+              (m) =>
+                m.clientMsgId !== context.clientMsgId &&
+                m.id !== `temp-${context.clientMsgId}`,
+            ),
+        )
+      }
+      if (context?.previousConversations) {
+        queryClient.setQueryData(CHAT_QUERY_KEYS.conversations, context.previousConversations)
+      }
+      toast.error(error instanceof Error ? error.message : t('chat.sendMessageError'))
+    },
+
+    onSuccess: (newMessage: MessageResponse, arg: SendMessageArg, context) => {
+      const targetConversationId =
+        context?.targetConversationId ||
+        (typeof arg === 'string' ? conversationId : (arg.targetConversationId ?? conversationId))
+      if (!targetConversationId) return
+
+      // Cập nhật messages cache: Thay thế tin nhắn tạm bằng tin nhắn chính thức từ backend
       queryClient.setQueryData<MessageResponse[]>(
         CHAT_QUERY_KEYS.liveMessages(targetConversationId),
         (old) => {
+          const timeline = queryClient.getQueryData<
+            InfiniteData<MessageTimelineResponse, MessagePageParam>
+          >(CHAT_QUERY_KEYS.messages(targetConversationId))
           const alreadyLoaded = timeline?.pages.some((page) =>
             page.items.some(
               (message) =>
@@ -252,12 +444,29 @@ export function useSendMessageMutation(conversationId: string | null) {
                 (message.clientMsgId && message.clientMsgId === newMessage.clientMsgId),
             ),
           )
-          const alreadyLive = old?.some(
-            (message) =>
-              message.id === newMessage.id ||
-              (message.clientMsgId && message.clientMsgId === newMessage.clientMsgId),
-          )
-          return alreadyLoaded || alreadyLive ? old : [...(old ?? []), newMessage]
+          if (alreadyLoaded) {
+            return old?.filter(
+              (m) =>
+                m.clientMsgId !== newMessage.clientMsgId &&
+                m.id !== newMessage.id &&
+                m.id !== `temp-${context?.clientMsgId}`,
+            )
+          }
+
+          if (!old) return [newMessage]
+          let replaced = false
+          const updated = old.map((m) => {
+            if (
+              (m.clientMsgId && m.clientMsgId === newMessage.clientMsgId) ||
+              m.id === `temp-${context?.clientMsgId}` ||
+              m.id === newMessage.id
+            ) {
+              replaced = true
+              return newMessage
+            }
+            return m
+          })
+          return replaced ? updated : [...updated, newMessage]
         },
       )
 
