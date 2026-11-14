@@ -566,7 +566,7 @@ export async function getArchivedStories(
   const res = await api.get<{ items: BackendStoryResponse[]; nextCursor: string | null }>(
     `/stories/archive?${params.toString()}`,
   )
-  const raw = res.data.items
+  const raw = res.data?.items ?? []
   return {
     items: raw.map((item: BackendStoryResponse) => ({
       ...mapBackendStoryToEntry(item),

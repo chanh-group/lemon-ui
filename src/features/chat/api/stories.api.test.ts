@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it, mock } from 'bun:test'
 import { api } from '@/infrastructure/api/client'
-import { createMediaStory, getStoryViews, listStories, replyStory } from './stories.api'
+import {
+  createMediaStory,
+  getArchivedStories,
+  getStoryViews,
+  listStories,
+  replyStory,
+} from './stories.api'
 
 const originalGet = api.get
 const originalPost = api.post
@@ -97,6 +103,25 @@ describe('story API contract', () => {
     })
     expect(calls.map((call) => call.path)).toEqual(['/files/presign', '/files/upload', '/stories'])
     expect(calls.at(-1)).toMatchObject({ path: '/stories', body: { objectKey: 'fallback' } })
+  })
+
+  it('maps archived stories and tolerates a response without items', async () => {
+    const item = {
+      id: 's',
+      userId: 'u',
+      kind: 'TEXT',
+      caption: 'archived',
+      createdAt: '2026-01-01T00:00:00Z',
+    }
+    api.get = mock(() =>
+      Promise.resolve({ data: { items: [item], nextCursor: null } }),
+    ) as unknown as typeof api.get
+    expect(await getArchivedStories()).toMatchObject({
+      items: [{ id: 's', mine: true, archived: true, createdAt: '2026-01-01T00:00:00Z' }],
+      nextCursor: null,
+    })
+    api.get = mock(() => Promise.resolve({ data: {} })) as unknown as typeof api.get
+    expect((await getArchivedStories()).items).toEqual([])
   })
 
   it('uses backend view pagination and reply body', async () => {
