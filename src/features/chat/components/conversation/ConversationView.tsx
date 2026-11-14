@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { ArrowDown01Icon as ArrowDownData } from '@hugeicons/core-free-icons'
@@ -9,15 +9,18 @@ import { ConversationHeader } from './ConversationHeader'
 import { ConversationInfoPanel } from './ConversationInfoPanel'
 import { MessageList, type MessageListHandle } from './MessageList'
 import { MessageComposer, type PendingFile } from './MessageComposer'
+import type { MessageScrollPosition } from '../../utils/messageScrollPosition'
 
 interface ConversationViewProps {
   conversation: Conversation
+  isVisible: boolean
   groups: DayGroup[]
   messagesLoading: boolean
   messagesError?: string
   onRetryMessages: () => void
   hasOlderMessages: boolean
   isLoadingOlderMessages: boolean
+  isFetchingMessages: boolean
   onLoadOlderMessages: () => Promise<unknown>
   hasNewerMessages: boolean
   isLoadingNewerMessages: boolean
@@ -26,8 +29,8 @@ interface ConversationViewProps {
   onLoadLatest: () => Promise<void>
   onVisibleMessage: (messageId: string) => void
   onRetryMessage: (messageId: string) => void
-  restoreMessageId?: string
-  onPositionChange: (messageId: string | undefined) => void
+  restorePosition?: MessageScrollPosition
+  onPositionChange: (position: MessageScrollPosition) => void
   onSend: (
     text: string,
     attachments?: MessageAttachmentInput[],
@@ -46,12 +49,14 @@ interface ConversationViewProps {
 
 export function ConversationView({
   conversation,
+  isVisible,
   groups,
   messagesLoading,
   messagesError,
   onRetryMessages,
   hasOlderMessages,
   isLoadingOlderMessages,
+  isFetchingMessages,
   onLoadOlderMessages,
   hasNewerMessages,
   isLoadingNewerMessages,
@@ -60,7 +65,7 @@ export function ConversationView({
   onLoadLatest,
   onVisibleMessage,
   onRetryMessage,
-  restoreMessageId,
+  restorePosition,
   onPositionChange,
   onSend,
   isSending,
@@ -74,18 +79,24 @@ export function ConversationView({
   onOpenStory,
 }: ConversationViewProps) {
   const { t } = useTranslation()
-  const [initialRestoreMessageId] = useState(restoreMessageId)
+  const [initialRestorePosition] = useState(restorePosition)
   const [draft, setDraft] = useState('')
   const [isInfoOpen, setIsInfoOpen] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(null)
+  const setScrollContainerRef = useCallback((element: HTMLDivElement | null) => {
+    scrollRef.current = element
+    if (element) setScrollElement(element)
+  }, [])
   const messageListRef = useRef<MessageListHandle>(null)
   const [showJump, setShowJump] = useState(false)
-  const [atBottom, setAtBottom] = useState(!initialRestoreMessageId)
+  const [atBottom, setAtBottom] = useState(initialRestorePosition?.kind !== 'message')
   const [jumpPending, setJumpPending] = useState(false)
   const [jumpReady, setJumpReady] = useState(false)
-  const atBottomRef = useRef(!initialRestoreMessageId)
+  const atBottomRef = useRef(initialRestorePosition?.kind !== 'message')
   const olderRequestPending = useRef(false)
   const newerRequestPending = useRef(false)
+  const lastUserScrollInput = useRef(0)
   const latestMessage = groups.at(-1)?.messages.at(-1)
   const previousLatestMessageId = useRef<string | undefined>(undefined)
 
@@ -115,6 +126,10 @@ export function ConversationView({
     setAtBottom(true)
   }, [jumpReady, hasLatest, groups])
 
+  useLayoutEffect(() => {
+    if (isVisible && atBottom && hasLatest) onPositionChange({ kind: 'bottom' })
+  }, [isVisible, atBottom, hasLatest, onPositionChange])
+
   const goToLatest = async () => {
     if (jumpPending) return
     setJumpPending(true)
@@ -130,7 +145,14 @@ export function ConversationView({
 
   const loadOlderMessages = () => {
     const el = scrollRef.current
-    if (!el || !hasOlderMessages || isLoadingOlderMessages || olderRequestPending.current) return
+    if (
+      !el ||
+      !hasOlderMessages ||
+      isFetchingMessages ||
+      olderRequestPending.current ||
+      newerRequestPending.current
+    )
+      return
 
     olderRequestPending.current = true
     void onLoadOlderMessages()
@@ -143,6 +165,7 @@ export function ConversationView({
   const loadNewerMessages = () => {
     if (
       !hasNewerMessages ||
+      isFetchingMessages ||
       isLoadingNewerMessages ||
       newerRequestPending.current ||
       olderRequestPending.current
@@ -157,16 +180,21 @@ export function ConversationView({
   }
 
   const lastScrollTop = useRef(0)
+  const noteUserScrollInput = () => {
+    lastUserScrollInput.current = Date.now()
+  }
 
   const handleScroll = () => {
     const el = scrollRef.current
-    if (!el) return
+    if (!el || !isVisible || el.clientHeight === 0) return
     const previousScrollTop = lastScrollTop.current
     lastScrollTop.current = el.scrollTop
     const scrollingUp = el.scrollTop < previousScrollTop
     const scrollingDown = el.scrollTop > previousScrollTop
     const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120
-    if (nearBottom && hasLatest) onPositionChange(undefined)
+    const userInitiated = Date.now() - lastUserScrollInput.current < 500
+    if (!userInitiated && !(nearBottom && hasLatest)) return
+    if (nearBottom && hasLatest) onPositionChange({ kind: 'bottom' })
     else {
       const visibleMessage = messageListRef.current?.firstVisibleMessage()
       if (visibleMessage) onPositionChange(visibleMessage)
@@ -183,9 +211,10 @@ export function ConversationView({
     // Chỉ tải lịch sử khi người dùng thực sự cuộn lên. Nếu không, scroll
     // chương trình lúc mở chat (scrollTop = 0 khi nội dung ngắn hơn khung)
     // sẽ kích hoạt tải trang cũ liên tục và giữ viewport ở đầu lịch sử.
-    if (scrollingUp && el.scrollTop < edgeThreshold) loadOlderMessages()
+    if (userInitiated && scrollingUp && el.scrollTop < edgeThreshold) loadOlderMessages()
 
     if (
+      userInitiated &&
       scrollingDown &&
       el.scrollHeight - el.scrollTop - el.clientHeight < edgeThreshold &&
       hasNewerMessages &&
@@ -234,10 +263,30 @@ export function ConversationView({
 
         {/* Nội dung hội thoại */}
         <div
-          ref={scrollRef}
+          ref={setScrollContainerRef}
           onScroll={handleScroll}
+          onWheel={noteUserScrollInput}
+          onTouchMove={noteUserScrollInput}
+          onKeyDown={(event) => {
+            if (
+              ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '].includes(event.key)
+            )
+              noteUserScrollInput()
+          }}
           className="relative min-h-0 flex-1 overflow-y-auto px-3 py-4 sm:px-6"
         >
+          {!messagesLoading && !messagesError && hasOlderMessages && (
+            <div className="py-2 text-center">
+              <button
+                type="button"
+                onClick={loadOlderMessages}
+                disabled={isFetchingMessages}
+                className="rounded-full px-4 py-2 text-xs font-semibold text-brand-ink hover:bg-muted disabled:opacity-50"
+              >
+                {isLoadingOlderMessages ? t('chat.pending') : t('chat.loadOlderMessages')}
+              </button>
+            </div>
+          )}
           {messagesLoading ? (
             <p className="py-6 text-center text-sm text-muted-foreground">{t('chat.pending')}</p>
           ) : messagesError ? (
@@ -274,11 +323,13 @@ export function ConversationView({
               senderLabel={conversation.name}
               senderAvatarUrl={conversation.partnerAvatar}
               scrollRef={scrollRef}
+              scrollElement={scrollElement}
+              isVisible={isVisible}
               conversationId={conversation.id}
               followBottom={atBottom && hasLatest}
               onVisibleMessage={onVisibleMessage}
               onRetryMessage={onRetryMessage}
-              restoreMessageId={initialRestoreMessageId}
+              restorePosition={restorePosition ?? initialRestorePosition}
             />
           )}
 

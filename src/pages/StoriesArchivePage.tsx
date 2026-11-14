@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { ArchiveIcon, ArrowLeft01Icon } from '@hugeicons/core-free-icons'
 import { createIcon } from '@/components/icons/hugeIcon'
 import { ROUTES } from '@/config/constants'
@@ -15,11 +16,21 @@ const Archive = createIcon(ArchiveIcon)
 
 export function StoriesArchivePage() {
   const navigate = useNavigate()
+  const { t, i18n } = useTranslation()
   const { data, isLoading, isError, refetch, hasNextPage, fetchNextPage, isFetchingNextPage } =
     useArchivedStories()
   const [selectedStory, setSelectedStory] = useState<StoryEntry | null>(null)
 
-  const items = data?.pages.flatMap((page) => page.items) ?? []
+  const formatDate = (value?: string) => {
+    if (!value || Number.isNaN(Date.parse(value))) return t('chat.archivedStory')
+    return new Intl.DateTimeFormat(i18n.resolvedLanguage === 'vi' ? 'vi-VN' : 'en-US', {
+      dateStyle: 'medium',
+    }).format(new Date(value))
+  }
+  const items =
+    data?.pages
+      .flatMap((page) => page.items)
+      .map((item) => ({ ...item, time: formatDate(item.createdAt) })) ?? []
 
   const backToStories = () => {
     navigate(ROUTES.messages, { state: { tab: 'stories' } })
@@ -33,21 +44,21 @@ export function StoriesArchivePage() {
         mobileBarVisible={true}
       />
 
-      <div className="flex flex-1 flex-col min-w-0 h-full overflow-hidden bg-[#18191a] text-[#e4e6eb]">
+      <div className="flex h-full min-w-0 flex-1 flex-col overflow-hidden bg-background text-foreground">
         {/* Header */}
-        <header className="flex h-14 shrink-0 items-center justify-between border-b border-[#2f3031] px-4">
+        <header className="flex h-14 shrink-0 items-center justify-between border-b border-border px-4">
           <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={backToStories}
-              aria-label="Quay lại danh sách tin"
-              className="grid size-10 place-items-center rounded-full bg-[#3a3b3c] hover:bg-[#4e4f50] text-white transition-colors cursor-pointer"
+              aria-label={t('chat.archiveBack')}
+              className="grid size-10 place-items-center rounded-full bg-muted hover:bg-accent text-foreground transition-colors cursor-pointer"
             >
               <ArrowLeft className="size-5" />
             </button>
             <div className="flex items-center gap-2">
-              <Archive className="size-5 text-[#2e89ff]" />
-              <h1 className="text-lg font-bold text-white">Kho lưu trữ tin</h1>
+              <Archive className="size-5 text-primary" />
+              <h1 className="text-lg font-bold">{t('chat.storyArchive')}</h1>
             </div>
           </div>
         </header>
@@ -56,37 +67,31 @@ export function StoriesArchivePage() {
         <div className="flex-1 overflow-y-auto p-4 md:p-6">
           <div className="max-w-5xl mx-auto">
             <div className="mb-6">
-              <p className="text-sm text-[#b0b3b8]">
-                Chỉ bạn mới có thể nhìn thấy kho lưu trữ tin của mình. Các tin hết hạn 24 giờ được
-                tự động lưu lại ở đây cùng số lượt xem và cảm xúc.
-              </p>
+              <p className="text-sm text-muted-foreground">{t('chat.archiveDescription')}</p>
             </div>
 
             {isLoading ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                 {Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} className="aspect-[9/16] rounded-xl bg-[#252728] animate-pulse" />
+                  <div key={i} className="aspect-[9/16] rounded-xl bg-muted animate-pulse" />
                 ))}
               </div>
             ) : isError && !data ? (
               <button
                 type="button"
                 onClick={() => void refetch()}
-                className="rounded-lg bg-white/10 px-4 py-2 text-sm"
+                className="rounded-lg bg-muted hover:bg-accent px-4 py-2 text-sm"
               >
-                Không thể tải kho lưu trữ. Thử lại
+                {t('chat.archiveLoadError')}
               </button>
             ) : items.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 text-center">
-                <div className="grid size-16 place-items-center rounded-full bg-[#252728] text-[#8a8d91] mb-3">
+                <div className="grid size-16 place-items-center rounded-full bg-muted text-muted-foreground mb-3">
                   <Archive className="size-8" />
                 </div>
-                <p className="text-base font-semibold text-white">
-                  Chưa có tin nào trong kho lưu trữ
-                </p>
-                <p className="text-xs text-[#b0b3b8] mt-1 max-w-sm">
-                  Khi bạn chia sẻ tin và bật tính năng tự động lưu trữ, các tin đã hết hạn sẽ xuất
-                  hiện ở đây.
+                <p className="text-base font-semibold text-foreground">{t('chat.archiveEmpty')}</p>
+                <p className="text-xs text-muted-foreground mt-1 max-w-sm">
+                  {t('chat.archiveEmptyHint')}
                 </p>
               </div>
             ) : (
@@ -109,7 +114,9 @@ export function StoriesArchivePage() {
                             item.background || TEXT_STORY_BG,
                           )}
                         >
-                          <span className="line-clamp-4">{item.caption || 'Tin văn bản'}</span>
+                          <span className="line-clamp-4">
+                            {item.caption || t('chat.archiveTextStory')}
+                          </span>
                         </div>
                       )}
                       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/40" />
@@ -118,7 +125,7 @@ export function StoriesArchivePage() {
                     {/* Top date badge */}
                     <div className="relative z-10 p-2.5">
                       <span className="text-[11px] font-semibold text-white/90 drop-shadow-md">
-                        {item.time || 'Đã lưu trữ'}
+                        {item.time}
                       </span>
                     </div>
                   </button>
@@ -130,9 +137,9 @@ export function StoriesArchivePage() {
                 type="button"
                 onClick={() => void fetchNextPage()}
                 disabled={isFetchingNextPage}
-                className="mt-4 rounded-lg bg-white/10 px-4 py-2 text-sm"
+                className="mt-4 rounded-lg bg-muted hover:bg-accent px-4 py-2 text-sm"
               >
-                Xem thêm
+                {t('chat.loadMore')}
               </button>
             )}
           </div>

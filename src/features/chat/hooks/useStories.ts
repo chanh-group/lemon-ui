@@ -75,6 +75,7 @@ export function useReactStory() {
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: STORIES_KEY })
       queryClient.invalidateQueries({ queryKey: STORY_REACTIONS_KEY(variables.storyId) })
+      queryClient.invalidateQueries({ queryKey: STORY_VIEWS_KEY(variables.storyId) })
     },
   })
 }
@@ -86,14 +87,17 @@ export function useUnreactStory() {
     onSuccess: (_data, storyId) => {
       queryClient.invalidateQueries({ queryKey: STORIES_KEY })
       queryClient.invalidateQueries({ queryKey: STORY_REACTIONS_KEY(storyId) })
+      queryClient.invalidateQueries({ queryKey: STORY_VIEWS_KEY(storyId) })
     },
   })
 }
 
 export function useStoryReactions(storyId?: string) {
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: STORY_REACTIONS_KEY(storyId ?? ''),
-    queryFn: () => (storyId ? getStoryReactions(storyId) : Promise.resolve([])),
+    initialPageParam: undefined as string | undefined,
+    queryFn: ({ pageParam }) => getStoryReactions(storyId!, pageParam),
+    getNextPageParam: (page) => (page.hasMore ? (page.nextCursor ?? undefined) : undefined),
     enabled: Boolean(storyId),
   })
 }

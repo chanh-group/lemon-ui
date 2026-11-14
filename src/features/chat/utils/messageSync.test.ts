@@ -33,4 +33,15 @@ describe('fetchMissedMessages', () => {
     expect(cursors).toEqual(['last-known', '2', '3'])
     expect(result.map(({ id }) => id)).toEqual(['1', '2', '3', '4'])
   })
+
+  it('rejects an incomplete page or a cursor cycle instead of reporting a complete sync', async () => {
+    await expect(
+      fetchMissedMessages('start', async () => ({ ...page([]), hasMore: true })),
+    ).rejects.toThrow('Invalid message cursor')
+    await expect(
+      fetchMissedMessages('start', async (cursor) =>
+        cursor === 'start' ? page(['1'], 'next') : page(['2'], 'start'),
+      ),
+    ).rejects.toThrow('Invalid message cursor')
+  })
 })

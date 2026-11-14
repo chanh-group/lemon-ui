@@ -112,6 +112,7 @@ export function mapBackendStoryToEntry(
     id: item.id,
     name: item.user?.fullName || item.caption?.slice(0, 18) || 'Story',
     time: formatRelativeTime(item.createdAt),
+    createdAt: item.createdAt,
     viewed: Boolean(item.viewerHasViewed),
     mine: isMine,
     online: true,
@@ -175,11 +176,13 @@ export interface ReplyStoryPayload {
 /* API functions                                                      */
 /* ------------------------------------------------------------------ */
 
+const mutedMockAuthors = new Set<string>()
+
 /** Danh sách story hiển thị ở tab Stories (feed bạn bè + story của mình). */
 export async function listStories(currentUserId?: string): Promise<StoryEntry[]> {
   if (isAuthBypass()) {
     await delay(150)
-    return storyStore.map((s) => ({ ...s }))
+    return storyStore.filter((s) => !mutedMockAuthors.has(s.authorId ?? '')).map((s) => ({ ...s }))
   }
   const res = await api.get<any[]>('/stories/feed')
   const raw = res.data ?? []
@@ -319,6 +322,7 @@ export async function reactStory(
       return {
         ...s,
         viewerReaction: reaction,
+        myReactionKind: 'REACTION',
         reactionsCount: (s.reactionsCount ?? 0) + countDiff,
       }
     })
@@ -343,6 +347,7 @@ export async function unreactStory(storyId: string): Promise<{ success: boolean 
       return {
         ...s,
         viewerReaction: null,
+        myReactionKind: null,
         reactionsCount: Math.max(0, (s.reactionsCount ?? 0) - (hadReaction ? 1 : 0)),
       }
     })
@@ -352,38 +357,68 @@ export async function unreactStory(storyId: string): Promise<{ success: boolean 
   return { success: true }
 }
 
-/** Danh sách cảm xúc đã thả của một Story. */
-export async function getStoryReactions(storyId: string): Promise<StoryReactionItem[]> {
+/** Danh sách cảm xúc của story, chỉ chủ story có quyền xem. */
+export async function getStoryReactions(
+  storyId: string,
+  cursor?: string,
+): Promise<{
+  items: StoryReactionItem[]
+  nextCursor: string | null
+  hasMore: boolean
+  totalCount?: number
+  summary?: Array<{ emoji: string; count: number }>
+}> {
   if (isAuthBypass()) {
     await delay(100)
     const story = storyStore.find((s) => s.id === storyId)
-    if (!story || !story.viewerReaction) return []
-    return [
-      {
-        id: `react-${storyId}`,
-        storyId,
-        userId: 'me',
-        reaction: story.viewerReaction,
-        createdAt: new Date().toISOString(),
-        user: {
-          id: 'me',
-          fullName: 'Bạn',
-          avatarUrl: null,
-        },
-      },
-    ]
+    const items: StoryReactionItem[] = story?.viewerReaction
+      ? [
+          {
+            id: `react-${storyId}`,
+            storyId,
+            userId: 'me',
+            reaction: story.viewerReaction,
+            kind: story.myReactionKind ?? 'REACTION',
+            createdAt: new Date().toISOString(),
+            user: { id: 'me', fullName: 'Bạn', avatarUrl: null },
+          },
+        ]
+      : []
+    return {
+      items,
+      nextCursor: null,
+      hasMore: false,
+      totalCount: items.length,
+      summary: items.map((item) => ({ emoji: item.reaction, count: 1 })),
+    }
   }
   const res = await api.get<{
-    items: Array<{ user: StoryReactionItem['user']; emoji: string; createdAt: string }>
-  }>(`/stories/${storyId}/reactions`)
-  return (res.data?.items ?? []).map((item) => ({
-    id: item.user.id,
-    userId: item.user.id,
-    storyId,
-    reaction: item.emoji,
-    createdAt: item.createdAt,
-    user: item.user,
-  }))
+    items: Array<{
+      user: StoryReactionItem['user']
+      emoji: string
+      kind: 'REACTION' | 'LIKE'
+      createdAt: string
+    }>
+    nextCursor: string | null
+    hasMore: boolean
+    totalCount?: number
+    summary?: Array<{ emoji: string; count: number }>
+  }>(`/stories/${storyId}/reactions`, { params: { cursor } })
+  return {
+    items: (res.data?.items ?? []).map((item) => ({
+      id: item.user.id,
+      userId: item.user.id,
+      storyId,
+      reaction: item.emoji,
+      kind: item.kind,
+      createdAt: item.createdAt,
+      user: item.user,
+    })),
+    nextCursor: res.data?.nextCursor ?? null,
+    hasMore: res.data?.hasMore ?? false,
+    totalCount: res.data?.totalCount,
+    summary: res.data?.summary,
+  }
 }
 
 /** Phản hồi (reply) story bằng tin nhắn, tự động gửi vào hội thoại 1:1 với tác giả. */
@@ -468,6 +503,7 @@ export async function likeStory(
       return {
         ...s,
         viewerReaction: '❤️',
+        myReactionKind: 'LIKE',
         reactionsCount: (s.reactionsCount ?? 0) + (hadReaction ? 0 : 1),
       }
     })
@@ -525,7 +561,7 @@ export async function updateStorySettings(
 /** Ẩn (mute) story của tác giả khác. */
 export async function muteAuthor(authorId: string): Promise<{ success: boolean }> {
   if (isAuthBypass()) {
-    storyStore = storyStore.filter((s) => s.authorId !== authorId)
+    mutedMockAuthors.add(authorId)
     return { success: true }
   }
   await api.post(`/stories/mutes/${authorId}`)
@@ -535,6 +571,7 @@ export async function muteAuthor(authorId: string): Promise<{ success: boolean }
 /** Bỏ ẩn (unmute) story của tác giả khác. */
 export async function unmuteAuthor(authorId: string): Promise<{ success: boolean }> {
   if (isAuthBypass()) {
+    mutedMockAuthors.delete(authorId)
     return { success: true }
   }
   await api.delete(`/stories/mutes/${authorId}`)
@@ -544,7 +581,7 @@ export async function unmuteAuthor(authorId: string): Promise<{ success: boolean
 /** Lấy danh sách ID các tác giả bị ẩn story. */
 export async function getMutedAuthors(): Promise<string[]> {
   if (isAuthBypass()) {
-    return []
+    return [...mutedMockAuthors]
   }
   const res = await api.get<string[]>('/stories/mutes')
   return res.data ?? []
@@ -559,8 +596,10 @@ export async function getArchivedStories(
   }
   const params = new URLSearchParams()
   if (cursor) params.append('cursor', cursor)
-  const res = await api.get<any>(`/stories/archive?${params.toString()}`)
-  const raw = res.data?.items ?? res.data ?? []
+  const res = await api.get<{ items: BackendStoryResponse[]; nextCursor: string | null }>(
+    `/stories/archive?${params.toString()}`,
+  )
+  const raw = res.data?.items ?? []
   return {
     items: raw.map((item: BackendStoryResponse) => ({
       ...mapBackendStoryToEntry(item),
