@@ -153,6 +153,7 @@
     "unreadCount": "{{count}} unread",
     "friendRequestCount": "{{count}} friend requests",
     "jumpToLatest": "Scroll to latest message",
+    "loadOlderMessages": "Load older messages",
     "newMessages": "New messages",
     "youPrefix": "You: ",
     "youSentAttachment": "You sent an attachment.",

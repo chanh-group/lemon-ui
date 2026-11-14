@@ -153,6 +153,7 @@
     "unreadCount": "{{count}} tin chưa đọc",
     "friendRequestCount": "{{count}} lời mời kết bạn",
     "jumpToLatest": "Cuộn xuống tin nhắn mới nhất",
+    "loadOlderMessages": "Tải tin nhắn cũ hơn",
     "newMessages": "Tin nhắn mới",
     "youPrefix": "Bạn: ",
     "youSentAttachment": "Bạn đã gửi một file đính kèm.",

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -25,6 +25,11 @@ import {
 import { useChatRealtime } from '../hooks/useChatRealtime'
 import { useStoriesList } from '../hooks/useStories'
 import { buildDayGroupsFromMessages, mapMessageResponse } from '../utils/chat.mapper'
+import {
+  getMessageScrollPosition,
+  saveMessageScrollPosition,
+  type MessageScrollPosition,
+} from '../utils/messageScrollPosition'
 import { SideNav } from './SideNav'
 import { MiddlePanel } from './MiddlePanel'
 import { ConversationView } from './conversation'
@@ -84,7 +89,6 @@ export function ChatShell() {
   const callWindow = useCallWindow()
   const lastTypingSentAt = useRef(0)
   const lastReadAttempt = useRef<string | null>(null)
-  const [scrollPositions, setScrollPositions] = useState<Record<string, string | undefined>>({})
 
   const rawConversations = useMemo(() => conversationsQuery.data ?? [], [conversationsQuery.data])
 
@@ -247,6 +251,13 @@ export function ChatShell() {
     void sendMessageMutation.mutateAsync(message.retryPayload).catch(() => undefined)
   }
 
+  const handlePositionChange = useCallback(
+    (position: MessageScrollPosition) => {
+      if (selectedId) saveMessageScrollPosition(selectedId, position)
+    },
+    [selectedId],
+  )
+
   const handleTypingStart = () => {
     if (!selectedId) return
     const now = Date.now()
@@ -262,6 +273,14 @@ export function ChatShell() {
   }
 
   const userName = user?.fullName ?? user?.username ?? 'Lemon User'
+  const savedScrollPosition =
+    selected && !selected.unread ? getMessageScrollPosition(selected.id) : undefined
+  const restorePosition =
+    savedScrollPosition?.kind === 'bottom' ||
+    (savedScrollPosition?.kind === 'message' &&
+      messageItems.some((message) => message.id === savedScrollPosition.messageId))
+      ? savedScrollPosition
+      : undefined
 
   return (
     <main
@@ -372,6 +391,7 @@ export function ChatShell() {
           <ConversationView
             key={selected.id}
             conversation={selected}
+            isVisible={!isMdDown || tab === 'messages'}
             onOpenStory={partnerStory ? () => setConversationStory(partnerStory) : undefined}
             groups={groups}
             messagesLoading={messagesQuery.isPending}
@@ -383,6 +403,7 @@ export function ChatShell() {
             }}
             hasOlderMessages={Boolean(messagesQuery.hasNextPage)}
             isLoadingOlderMessages={messagesQuery.isFetchingNextPage}
+            isFetchingMessages={messagesQuery.isFetching}
             onLoadOlderMessages={async () => {
               const result = await messagesQuery.fetchNextPage()
               if (result.isError) throw result.error
@@ -392,19 +413,8 @@ export function ChatShell() {
             onLoadLatest={messagesQuery.loadLatest}
             onVisibleMessage={markVisibleMessageRead}
             onRetryMessage={handleRetrySend}
-            restoreMessageId={
-              !selected.unread &&
-              messageItems.some((message) => message.id === scrollPositions[selected.id])
-                ? scrollPositions[selected.id]
-                : undefined
-            }
-            onPositionChange={(messageId) => {
-              setScrollPositions((positions) =>
-                positions[selected.id] === messageId
-                  ? positions
-                  : { ...positions, [selected.id]: messageId },
-              )
-            }}
+            restorePosition={restorePosition}
+            onPositionChange={handlePositionChange}
             isLoadingNewerMessages={messagesQuery.isFetchingPreviousPage}
             onLoadNewerMessages={async () => {
               const result = await messagesQuery.fetchPreviousPage()
