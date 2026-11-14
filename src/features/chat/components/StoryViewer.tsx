@@ -72,7 +72,6 @@ export function StoryViewer({
   const [confirmDelete, setConfirmDelete] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
   const currentStoryId = useRef(story.id)
-  currentStoryId.current = story.id
   const items = stories.length ? stories : [story]
   const index = items.findIndex((item) => item.id === story.id)
   const sameAuthor = items.filter((item) =>
@@ -110,6 +109,7 @@ export function StoryViewer({
   }
 
   useEffect(() => {
+    currentStoryId.current = story.id
     setProgress(0)
     setPaused(false)
     setDraft('')
@@ -389,16 +389,18 @@ export function StoryViewer({
                 {muted ? <VolumeX size={18} /> : <Volume2 size={18} />}
               </button>
             )}
-            {story.mine && !story.archived && (
+            {story.mine && (
               <>
-                <button
-                  type="button"
-                  onClick={openEdit}
-                  className={actionClass}
-                  aria-label={t('chat.editStory', { defaultValue: 'Chỉnh sửa tin' })}
-                >
-                  <Pencil size={18} />
-                </button>
+                {!story.archived && (
+                  <button
+                    type="button"
+                    onClick={openEdit}
+                    className={actionClass}
+                    aria-label={t('chat.editStory', { defaultValue: 'Chỉnh sửa tin' })}
+                  >
+                    <Pencil size={18} />
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setConfirmDelete(true)}
@@ -565,7 +567,7 @@ export function StoryViewer({
             </DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
-            {t('chat.deleteStoryHint', { defaultValue: 'Tin sẽ không còn hiển thị với bạn bè.' })}
+            {story.archived ? t('chat.archiveDeleteHint') : t('chat.deleteStoryHint')}
           </p>
           <button
             type="button"
@@ -616,7 +618,11 @@ export function StoryViewer({
           {viewerTab === 'reactions' && storyReactions.data?.pages[0].summary && (
             <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
               <span>
-                {t('chat.storyReactionCount', { count: storyReactions.data.pages[0].totalCount })}
+                {t('chat.storyReactionCount', {
+                  count:
+                    storyReactions.data.pages[0].totalCount ??
+                    storyReactions.data.pages[0].summary.reduce((sum, item) => sum + item.count, 0),
+                })}
               </span>
               {storyReactions.data.pages[0].summary.map((item) => (
                 <span key={item.emoji} className="rounded-full bg-muted px-2 py-1 text-foreground">

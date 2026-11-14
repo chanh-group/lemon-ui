@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, mock } from 'bun:test'
 import { api } from '@/infrastructure/api/client'
 import {
   createMediaStory,
+  getArchivedStories,
   getStoryReactions,
   getStoryViews,
   listStories,
@@ -134,6 +135,25 @@ describe('story API contract', () => {
       totalCount: 3,
       summary: [{ emoji: '❤️', count: 3 }],
     })
+  })
+
+  it('maps archived stories and tolerates a response without items', async () => {
+    const item = {
+      id: 's',
+      userId: 'u',
+      kind: 'TEXT',
+      caption: 'archived',
+      createdAt: '2026-01-01T00:00:00Z',
+    }
+    api.get = mock(() =>
+      Promise.resolve({ data: { items: [item], nextCursor: null } }),
+    ) as unknown as typeof api.get
+    expect(await getArchivedStories()).toMatchObject({
+      items: [{ id: 's', mine: true, archived: true, createdAt: '2026-01-01T00:00:00Z' }],
+      nextCursor: null,
+    })
+    api.get = mock(() => Promise.resolve({ data: {} })) as unknown as typeof api.get
+    expect((await getArchivedStories()).items).toEqual([])
   })
 
   it('uses backend view pagination and reply body', async () => {
