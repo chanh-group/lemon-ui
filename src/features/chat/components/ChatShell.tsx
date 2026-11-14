@@ -25,6 +25,7 @@ import {
 import { useChatRealtime } from '../hooks/useChatRealtime'
 import { useStoriesList } from '../hooks/useStories'
 import { buildDayGroupsFromMessages, mapMessageResponse } from '../utils/chat.mapper'
+import { groupStoriesByAuthor } from '../utils/storyGroups'
 import {
   getMessageScrollPosition,
   saveMessageScrollPosition,
@@ -113,7 +114,10 @@ export function ChatShell() {
       )
     }
   }, [storiesQuery.isError, storiesQuery.error, t])
-  const allStories = useMemo(() => storiesQuery.data ?? [], [storiesQuery.data])
+  const allStories = useMemo(
+    () => groupStoriesByAuthor(storiesQuery.data ?? []).flat(),
+    [storiesQuery.data],
+  )
   const stories = useMemo(
     () => allStories.filter((s) => !q || s.name.toLowerCase().includes(q)),
     [allStories, q],

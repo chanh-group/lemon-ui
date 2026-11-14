@@ -32,6 +32,7 @@ import { ROUTES } from '@/config/constants'
 import { useAuth } from '@/features/auth/api'
 import { useFriendRequests } from '../hooks/useFriends'
 import { getConversationPreview } from '../utils/chat.mapper'
+import { groupStoriesByAuthor } from '../utils/storyGroups'
 import { storyDisplayName, storyTime } from '../data/storiesData'
 import type { CallEntry, ChatTab, Conversation, StoryEntry } from '../types/chat.types'
 import { CallsHeaderActions } from './CallsHeaderActions'
@@ -429,15 +430,7 @@ function StoriesTab({ stories, activeStoryId, onOpenStory, onOpenCreate }: Stori
   const { user } = useAuth()
   const userName = user?.fullName ?? user?.username ?? 'Lemon User'
   const myStory = stories.find((s) => s.mine)
-  const friendGroups = new Map<string, StoryEntry[]>()
-  for (const story of stories) {
-    if (story.mine) continue
-    const key = story.authorId ? `author:${story.authorId}` : `story:${story.id}`
-    const group = friendGroups.get(key) ?? []
-    group.push(story)
-    friendGroups.set(key, group)
-  }
-  const friendStories = [...friendGroups.values()]
+  const friendStories = groupStoriesByAuthor(stories.filter((s) => !s.mine))
 
   return (
     <ul className="flex flex-col gap-0.5">
@@ -501,8 +494,8 @@ function StoriesTab({ stories, activeStoryId, onOpenStory, onOpenCreate }: Stori
         </li>
       ) : (
         friendStories.map((group) => {
-          const s = group.find((story) => !story.viewed) ?? group[0]
-          const isSelected = group.some((story) => story.id === activeStoryId)
+          const s = group.find((item) => !item.viewed) ?? group[0]
+          const isSelected = group.some((item) => item.id === activeStoryId)
           return (
             <li key={s.id}>
               <button
@@ -521,7 +514,7 @@ function StoriesTab({ stories, activeStoryId, onOpenStory, onOpenCreate }: Stori
                   src={s.authorAvatar}
                   className={cn(
                     'size-11',
-                    s.viewed
+                    group.every((item) => item.viewed)
                       ? 'ring-2 ring-border ring-offset-2 ring-offset-card'
                       : 'chat-story-ring',
                   )}
