@@ -34,6 +34,7 @@ import { useAuth } from '@/features/auth/api'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import type { ChatMessage, DayGroup, MessageAttachmentItem } from '../../types/chat.types'
+import type { MessageScrollPosition } from '../../utils/messageScrollPosition'
 import { isAudio, isImage, isVideo } from '../../utils/fileTypes'
 import { useReactMessageMutation, useRevokeMessageMutation } from '../../hooks/useChatQueries'
 import { MessageActionPill } from './AttachmentActionMenu'
@@ -159,6 +160,7 @@ const MessageRowView = memo(function MessageRowView({
   senderLabel,
   senderAvatarUrl,
   currentUserId,
+  isGroup,
   onOpenLightbox,
   onOpenDocument,
   onRevoke,
@@ -172,6 +174,7 @@ const MessageRowView = memo(function MessageRowView({
   senderLabel: string
   senderAvatarUrl?: string | null
   currentUserId?: string
+  isGroup?: boolean
   onOpenLightbox: (attachment: MessageAttachmentItem) => void
   onOpenDocument: (attachment: MessageAttachmentItem) => void
   onRevoke?: (messageId: string) => void
@@ -187,6 +190,8 @@ const MessageRowView = memo(function MessageRowView({
   const isFirst = messageIndex === 0
   const isLast = messageIndex === total - 1
   const authorName = group.sender ?? senderLabel
+  const replyTargetName =
+    msg.replyTarget?.senderId === currentUserId ? t('chat.you') : isGroup ? null : senderLabel
   const hasAttachments = Boolean(msg.attachments && msg.attachments.length > 0)
   const firstAttachment = hasAttachments ? msg.attachments![0] : undefined
 
@@ -323,9 +328,9 @@ const MessageRowView = memo(function MessageRowView({
           {msg.replyToId && (
             <div className="mb-2 rounded-lg border-l-2 border-primary bg-muted/70 px-2 py-1 text-xs">
               <p className="font-semibold">
-                {t('chat.replyingTo', {
-                  name: msg.replyTarget?.senderId === currentUserId ? t('chat.you') : senderLabel,
-                })}
+                {replyTargetName
+                  ? t('chat.replyingTo', { name: replyTargetName })
+                  : t('chat.replyMessage')}
               </p>
               <p className="truncate text-muted-foreground">
                 {!msg.replyTarget || msg.replyTarget.deletedAt
@@ -455,18 +460,21 @@ interface MessageListProps {
   senderLabel: string
   senderAvatarUrl?: string | null
   scrollRef: RefObject<HTMLDivElement | null>
+  scrollElement: HTMLDivElement | null
+  isVisible: boolean
   conversationId?: string
+  isGroup?: boolean
   /** Còn đang ở cuối danh sách thì tự bám tin mới nhất; cuộn lên thì thôi. */
   followBottom?: boolean
   onReply?: (message: ChatMessage) => void
   onVisibleMessage?: (messageId: string) => void
   onRetryMessage?: (messageId: string) => void
-  restoreMessageId?: string
+  restorePosition?: MessageScrollPosition
 }
 
 export interface MessageListHandle {
   scrollToEnd: (behavior?: ScrollBehavior) => void
-  firstVisibleMessage: () => string | undefined
+  firstVisibleMessage: () => Extract<MessageScrollPosition, { kind: 'message' }> | undefined
 }
 
 type MessageListRow =
@@ -497,11 +505,14 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
     senderLabel,
     senderAvatarUrl,
     scrollRef,
+    scrollElement,
+    isVisible,
     conversationId,
+    isGroup,
     followBottom = true,
     onVisibleMessage,
     onRetryMessage,
-    restoreMessageId,
+    restorePosition,
     onReply,
   },
   ref,
@@ -570,12 +581,11 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
   // eslint-disable-next-line react/incompatible-library
   const virtualizer = useVirtualizer({
     count: rows.length,
-    getScrollElement: () => scrollRef.current,
+    getScrollElement: () => scrollElement,
     getItemKey: (index) => rows[index]?.key ?? index,
     estimateSize: (index) => estimateRowHeight(rows[index]),
     overscan: 10,
     anchorTo: 'end',
-    followOnAppend: true,
     scrollEndThreshold: 120,
   })
 
@@ -591,7 +601,7 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
           const row = rows[Number(element.dataset.index)]
           const rect = element.getBoundingClientRect()
           if (row?.kind === 'message' && rect.bottom > bounds.top && rect.top < bounds.bottom)
-            return row.key
+            return { kind: 'message', messageId: row.key, offset: rect.top - bounds.top }
         }
         return undefined
       },
@@ -599,30 +609,64 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
     [virtualizer, rows, scrollRef],
   )
 
-  const restoredMessage = useRef(false)
-  useLayoutEffect(() => {
-    if (restoredMessage.current || !restoreMessageId || rows.length === 0) return
-    const index = rows.findIndex((row) => row.kind === 'message' && row.key === restoreMessageId)
-    if (index >= 0) virtualizer.scrollToIndex(index, { align: 'start', behavior: 'auto' })
-    restoredMessage.current = true
-  }, [restoreMessageId, rows, virtualizer])
-
-  // Mở chat hoặc có tin/trang mới trong lúc còn ở cuối: bám xuống tin mới nhất.
-  // Khi người dùng đã cuộn lên, bỏ qua để virtualizer neo đúng tin đang đọc.
-  useLayoutEffect(() => {
-    if (rows.length === 0 || !followBottom) return
-    const el = scrollRef.current
-    virtualizer.scrollToEnd({ behavior: 'auto' })
-    if (el) el.scrollTop = el.scrollHeight
-  }, [rows.length, followBottom, virtualizer, scrollRef])
-
   const virtualRows = virtualizer.getVirtualItems()
+  const visibleRowKeys = virtualRows.map((row) => row.key).join('|')
+  const wasVisible = useRef(false)
+  const pendingAnchor = useRef<Extract<MessageScrollPosition, { kind: 'message' }> | null>(null)
+
+  useLayoutEffect(() => {
+    if (!isVisible) {
+      wasVisible.current = false
+      pendingAnchor.current = null
+      return
+    }
+    if (!scrollElement || wasVisible.current || rows.length === 0) return
+    wasVisible.current = true
+
+    if (restorePosition?.kind === 'message') {
+      const index = rows.findIndex(
+        (row) => row.kind === 'message' && row.key === restorePosition.messageId,
+      )
+      if (index >= 0) {
+        pendingAnchor.current = restorePosition
+        virtualizer.scrollToIndex(index, { align: 'start', behavior: 'auto' })
+        return
+      }
+      virtualizer.scrollToEnd({ behavior: 'auto' })
+    }
+  }, [isVisible, rows, restorePosition, scrollElement, virtualizer])
+
+  useLayoutEffect(() => {
+    const anchor = pendingAnchor.current
+    const root = scrollRef.current
+    if (!isVisible || !anchor || !root) return
+    if (!rows.some((row) => row.kind === 'message' && row.key === anchor.messageId)) {
+      pendingAnchor.current = null
+      return
+    }
+    const element = [...root.querySelectorAll<HTMLElement>('[data-message-id]')].find(
+      (item) => item.dataset.messageId === anchor.messageId,
+    )
+    if (!element) return
+    const delta =
+      element.getBoundingClientRect().top - root.getBoundingClientRect().top - anchor.offset
+    pendingAnchor.current = null
+    if (Math.abs(delta) > 1) virtualizer.scrollBy(delta, { behavior: 'auto' })
+  }, [isVisible, rows, visibleRowKeys, virtualizer, scrollRef])
+
+  // Restore at activation and follow new rows through one scroll authority.
+  useLayoutEffect(() => {
+    if (rows.length === 0 || !followBottom || !isVisible) return
+    virtualizer.scrollToEnd({ behavior: 'auto' })
+    const frame = requestAnimationFrame(() => virtualizer.scrollToEnd({ behavior: 'auto' }))
+    return () => cancelAnimationFrame(frame)
+  }, [rows.length, followBottom, isVisible, virtualizer])
+
   const onVisibleMessageRef = useRef(onVisibleMessage)
   onVisibleMessageRef.current = onVisibleMessage
-  const visibleRowKeys = virtualRows.map((row) => row.key).join('|')
   useEffect(() => {
     const root = scrollRef.current
-    if (!root || !onVisibleMessageRef.current) return
+    if (!isVisible || !root || !onVisibleMessageRef.current) return
     let timer: ReturnType<typeof setTimeout> | undefined
     const check = () => {
       clearTimeout(timer)
@@ -654,7 +698,7 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
       window.removeEventListener('focus', check)
       document.removeEventListener('visibilitychange', check)
     }
-  }, [rows, scrollRef, visibleRowKeys])
+  }, [isVisible, rows, scrollRef, visibleRowKeys])
   const renderRow = (row: MessageListRow) =>
     row.kind === 'date' ? (
       <div className="flex items-center gap-3 pt-2 pb-3" role="separator" aria-label={row.date}>
@@ -671,6 +715,7 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
         senderLabel={senderLabel}
         senderAvatarUrl={senderAvatarUrl}
         currentUserId={currentUserId}
+        isGroup={isGroup}
         onOpenLightbox={setLightboxAttachment}
         onOpenDocument={setDocumentAttachment}
         onRevoke={handleRevokeMessage}

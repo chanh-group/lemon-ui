@@ -26,6 +26,7 @@ import {
   useReactStory,
   useReplyStory,
   useStoryMedia,
+  useStoryReactions,
   useStoryViews,
   useUnlikeStory,
   useUnreactStory,
@@ -67,8 +68,10 @@ export function StoryViewer({
   const [editAllowReplies, setEditAllowReplies] = useState(true)
   const [editAllowReactions, setEditAllowReactions] = useState(true)
   const [showViews, setShowViews] = useState(false)
+  const [viewerTab, setViewerTab] = useState<'views' | 'reactions'>('views')
   const [confirmDelete, setConfirmDelete] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
+  const currentStoryId = useRef(story.id)
   const items = stories.length ? stories : [story]
   const index = items.findIndex((item) => item.id === story.id)
   const sameAuthor = items.filter((item) =>
@@ -76,7 +79,10 @@ export function StoryViewer({
   )
   const media = useStoryMedia(story)
   const mediaUrl = story.mediaUrl || media.data
-  const views = useStoryViews(story.mine && showViews ? story.id : undefined)
+  const views = useStoryViews(
+    story.mine && showViews && viewerTab === 'views' ? story.id : undefined,
+  )
+  const storyReactions = useStoryReactions(story.mine && !story.archived ? story.id : undefined)
   const view = useViewStory()
   const react = useReactStory()
   const unreact = useUnreactStory()
@@ -92,6 +98,8 @@ export function StoryViewer({
   const isMedia = story.kind === 'MEDIA' || story.kind === 'media' || Boolean(story.mediaUrl)
   const stopped = paused || editing || showViews || confirmDelete || Boolean(draft)
 
+  const hasNext = Boolean(onSelectStory && index >= 0 && index < items.length - 1)
+  const hasPrevious = Boolean(onSelectStory && index > 0)
   const next = () => {
     if (index >= 0 && index < items.length - 1 && onSelectStory) onSelectStory(items[index + 1])
     else onClose()
@@ -101,11 +109,13 @@ export function StoryViewer({
   }
 
   useEffect(() => {
+    currentStoryId.current = story.id
     setProgress(0)
     setPaused(false)
     setDraft('')
     setEditing(false)
     setShowViews(false)
+    setViewerTab('views')
     setCaption(story.caption ?? '')
     setAllowReplies(story.allowReplies !== false)
     setAllowReactions(story.allowReactions !== false)
@@ -143,7 +153,7 @@ export function StoryViewer({
         return
       if (event.key === 'Escape') onClose()
       if (event.key === 'ArrowLeft') previous()
-      if (event.key === 'ArrowRight') next()
+      if (event.key === 'ArrowRight' && hasNext) next()
       if (event.key === ' ') {
         event.preventDefault()
         setPaused((value) => !value)
@@ -154,18 +164,22 @@ export function StoryViewer({
   })
 
   async function toggleReaction(emoji: StoryReactionType) {
+    const selectedStoryId = story.id
     try {
       if (reaction === emoji) {
         if (reactionKind === 'LIKE') await unlike.mutateAsync(story.id)
         else await unreact.mutateAsync(story.id)
+        if (currentStoryId.current !== selectedStoryId) return
         setReaction(null)
         setReactionKind(null)
       } else {
         if (emoji === '❤️') {
           await like.mutateAsync(story.id)
+          if (currentStoryId.current !== selectedStoryId) return
           setReactionKind('LIKE')
         } else {
           await react.mutateAsync({ storyId: story.id, reaction: emoji })
+          if (currentStoryId.current !== selectedStoryId) return
           setReactionKind('REACTION')
         }
         setReaction(emoji)
@@ -263,23 +277,21 @@ export function StoryViewer({
       <button
         type="button"
         onClick={onClose}
-        className={cn(actionClass, 'absolute left-3 top-3 z-20')}
+        className="absolute left-3 top-3 z-20 grid size-10 place-items-center rounded-full bg-muted text-foreground hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring"
         aria-label={t('common.close', { defaultValue: 'Đóng' })}
       >
         <X size={20} />
       </button>
-      <button
-        type="button"
-        onClick={previous}
-        disabled={index <= 0}
-        className={cn(
-          actionClass,
-          'absolute left-3 top-1/2 z-20 hidden disabled:opacity-30 md:grid',
-        )}
-        aria-label={t('chat.previousStory', { defaultValue: 'Tin trước' })}
-      >
-        <ArrowLeft size={20} />
-      </button>
+      {hasPrevious && (
+        <button
+          type="button"
+          onClick={previous}
+          className="absolute left-3 top-1/2 z-20 hidden size-10 place-items-center rounded-full bg-muted text-foreground hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring md:grid"
+          aria-label={t('chat.previousStory', { defaultValue: 'Tin trước' })}
+        >
+          <ArrowLeft size={20} />
+        </button>
+      )}
       <section
         className="relative flex aspect-[9/16] w-[min(100%,460px,56.25cqh)] shrink-0 flex-col overflow-hidden bg-card shadow-2xl sm:rounded-2xl"
         aria-label={name}
@@ -377,16 +389,18 @@ export function StoryViewer({
                 {muted ? <VolumeX size={18} /> : <Volume2 size={18} />}
               </button>
             )}
-            {story.mine && !story.archived && (
+            {story.mine && (
               <>
-                <button
-                  type="button"
-                  onClick={openEdit}
-                  className={actionClass}
-                  aria-label={t('chat.editStory', { defaultValue: 'Chỉnh sửa tin' })}
-                >
-                  <Pencil size={18} />
-                </button>
+                {!story.archived && (
+                  <button
+                    type="button"
+                    onClick={openEdit}
+                    className={actionClass}
+                    aria-label={t('chat.editStory', { defaultValue: 'Chỉnh sửa tin' })}
+                  >
+                    <Pencil size={18} />
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setConfirmDelete(true)}
@@ -419,7 +433,14 @@ export function StoryViewer({
             className="w-1/4"
           />
           <div className="flex-1" />
-          <button type="button" aria-label={t('chat.nextStory')} onClick={next} className="w-1/4" />
+          {hasNext && (
+            <button
+              type="button"
+              aria-label={t('chat.nextStory')}
+              onClick={next}
+              className="w-1/4"
+            />
+          )}
         </div>
         <footer className="relative z-10 space-y-3 p-4">
           {isMedia && caption && (
@@ -435,6 +456,13 @@ export function StoryViewer({
             >
               <Eye size={18} />
               {t('chat.storyViewers', { defaultValue: 'Người xem' })}
+              {storyReactions.data?.pages[0].totalCount !== undefined && (
+                <span>
+                  {' '}
+                  ·{' '}
+                  {t('chat.storyReactionCount', { count: storyReactions.data.pages[0].totalCount })}
+                </span>
+              )}
             </button>
           ) : (
             <>
@@ -452,7 +480,7 @@ export function StoryViewer({
                       aria-pressed={reaction === emoji}
                       className={cn(
                         'grid size-10 place-items-center rounded-full bg-muted text-2xl hover:bg-accent',
-                        reaction === emoji && 'ring-2 ring-white',
+                        reaction === emoji && 'ring-2 ring-primary',
                       )}
                     >
                       {emoji}
@@ -483,14 +511,16 @@ export function StoryViewer({
           )}
         </footer>
       </section>
-      <button
-        type="button"
-        onClick={next}
-        className={cn(actionClass, 'absolute right-3 top-1/2 z-20 hidden md:grid')}
-        aria-label={t('chat.nextStory', { defaultValue: 'Tin tiếp theo' })}
-      >
-        <ArrowRight size={20} />
-      </button>
+      {hasNext && (
+        <button
+          type="button"
+          onClick={next}
+          className="absolute right-3 top-1/2 z-20 hidden size-10 place-items-center rounded-full bg-muted text-foreground hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring md:grid"
+          aria-label={t('chat.nextStory', { defaultValue: 'Tin tiếp theo' })}
+        >
+          <ArrowRight size={20} />
+        </button>
+      )}
       <Dialog open={editing} onOpenChange={setEditing}>
         <DialogContent className="text-foreground">
           <DialogHeader>
@@ -537,7 +567,7 @@ export function StoryViewer({
             </DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
-            {t('chat.deleteStoryHint', { defaultValue: 'Tin sẽ không còn hiển thị với bạn bè.' })}
+            {story.archived ? t('chat.archiveDeleteHint') : t('chat.deleteStoryHint')}
           </p>
           <button
             type="button"
@@ -553,48 +583,144 @@ export function StoryViewer({
         <DialogContent className="text-foreground">
           <DialogHeader>
             <DialogTitle>
-              {t('chat.storyViewers', { defaultValue: 'Người xem' })}{' '}
-              {views.data ? `(${views.data.pages[0].totalViewsCount})` : ''}
+              {viewerTab === 'views' ? t('chat.storyViewers') : t('chat.storyReactions')}{' '}
+              {viewerTab === 'views' && views.data
+                ? `(${views.data.pages[0].totalViewsCount})`
+                : ''}
             </DialogTitle>
           </DialogHeader>
-          {views.isPending ? (
+          <div aria-label={t('chat.storyActivity')} className="flex gap-2 border-b">
+            <button
+              type="button"
+              aria-pressed={viewerTab === 'views'}
+              onClick={() => setViewerTab('views')}
+              className={cn(
+                'px-3 py-2 text-sm',
+                viewerTab === 'views' && 'border-b-2 border-primary font-semibold',
+              )}
+            >
+              {t('chat.storyViewers')}
+            </button>
+            {!story.archived && (
+              <button
+                type="button"
+                aria-pressed={viewerTab === 'reactions'}
+                onClick={() => setViewerTab('reactions')}
+                className={cn(
+                  'px-3 py-2 text-sm',
+                  viewerTab === 'reactions' && 'border-b-2 border-primary font-semibold',
+                )}
+              >
+                {t('chat.storyReactions')}
+              </button>
+            )}
+          </div>
+          {viewerTab === 'reactions' && storyReactions.data?.pages[0].summary && (
+            <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
+              <span>
+                {t('chat.storyReactionCount', {
+                  count:
+                    storyReactions.data.pages[0].totalCount ??
+                    storyReactions.data.pages[0].summary.reduce((sum, item) => sum + item.count, 0),
+                })}
+              </span>
+              {storyReactions.data.pages[0].summary.map((item) => (
+                <span key={item.emoji} className="rounded-full bg-muted px-2 py-1 text-foreground">
+                  {item.emoji} {item.count}
+                </span>
+              ))}
+            </div>
+          )}
+          {viewerTab === 'views' ? (
+            views.isPending ? (
+              <p>{t('chat.pending')}</p>
+            ) : views.isError && !views.data ? (
+              <div>
+                <p>{t('chat.storyActivityError')}</p>
+                <button
+                  type="button"
+                  onClick={() => void views.refetch()}
+                  className="text-sm underline"
+                >
+                  {t('chat.tryAgain')}
+                </button>
+              </div>
+            ) : views.data?.pages.some((page) => page.items.length) ? (
+              <ul className="max-h-80 space-y-3 overflow-y-auto">
+                {views.data.pages
+                  .flatMap((page) => page.items)
+                  .map((item) => (
+                    <li key={item.user.id} className="flex items-center gap-3">
+                      <UserAvatar
+                        name={item.user.fullName}
+                        src={item.user.avatarUrl}
+                        className="size-9"
+                      />
+                      <span className="flex-1 text-sm">{item.user.fullName}</span>
+                      {item.reaction && <span aria-label={item.reaction}>{item.reaction}</span>}
+                    </li>
+                  ))}
+                {views.hasNextPage && (
+                  <li>
+                    <button
+                      type="button"
+                      disabled={views.isFetchingNextPage}
+                      onClick={() => void views.fetchNextPage()}
+                      className="text-sm underline"
+                    >
+                      {views.isFetchNextPageError ? t('chat.tryAgain') : t('chat.loadMore')}
+                    </button>
+                  </li>
+                )}
+              </ul>
+            ) : (
+              <p className="text-sm text-muted-foreground">{t('chat.noStoryViews')}</p>
+            )
+          ) : storyReactions.isPending ? (
             <p>{t('chat.pending')}</p>
-          ) : views.isError ? (
-            <p>
-              {t('chat.storyActionError', { defaultValue: 'Không thể tải danh sách người xem.' })}
-            </p>
-          ) : views.data?.pages.some((page) => page.items.length) ? (
+          ) : storyReactions.isError && !storyReactions.data ? (
+            <div>
+              <p>{t('chat.storyActivityError')}</p>
+              <button
+                type="button"
+                onClick={() => void storyReactions.refetch()}
+                className="text-sm underline"
+              >
+                {t('chat.tryAgain')}
+              </button>
+            </div>
+          ) : storyReactions.data?.pages.some((page) => page.items.length) ? (
             <ul className="max-h-80 space-y-3 overflow-y-auto">
-              {views.data.pages
+              {storyReactions.data.pages
                 .flatMap((page) => page.items)
                 .map((item) => (
-                  <li key={item.user.id} className="flex items-center gap-3">
+                  <li key={item.userId} className="flex items-center gap-3">
                     <UserAvatar
                       name={item.user.fullName}
                       src={item.user.avatarUrl}
                       className="size-9"
                     />
                     <span className="flex-1 text-sm">{item.user.fullName}</span>
-                    {item.reaction && <span aria-label={item.reaction}>{item.reaction}</span>}
+                    <span aria-label={item.reaction} className="text-xl">
+                      {item.reaction}
+                    </span>
                   </li>
                 ))}
-              {views.hasNextPage && (
+              {storyReactions.hasNextPage && (
                 <li>
                   <button
                     type="button"
-                    disabled={views.isFetchingNextPage}
-                    onClick={() => void views.fetchNextPage()}
+                    disabled={storyReactions.isFetchingNextPage}
+                    onClick={() => void storyReactions.fetchNextPage()}
                     className="text-sm underline"
                   >
-                    {t('chat.loadMore', { defaultValue: 'Xem thêm' })}
+                    {storyReactions.isFetchNextPageError ? t('chat.tryAgain') : t('chat.loadMore')}
                   </button>
                 </li>
               )}
             </ul>
           ) : (
-            <p className="text-sm text-muted-foreground">
-              {t('chat.noStoryViews', { defaultValue: 'Chưa có lượt xem.' })}
-            </p>
+            <p className="text-sm text-muted-foreground">{t('chat.noStoryReactions')}</p>
           )}
         </DialogContent>
       </Dialog>

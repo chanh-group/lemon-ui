@@ -34,6 +34,13 @@ export function mergeMessagesByTime(
   )
 }
 
+export function reconnectCursor(pages: MessageTimelineResponse[]): string | undefined {
+  return mergeMessagesByTime(
+    [],
+    pages.flatMap((page) => page.items).filter((message) => !message.id.startsWith('temp-')),
+  ).at(-1)?.id
+}
+
 export function correlateSentMessage(
   messages: MessageResponse[],
   id: string,
@@ -82,33 +89,23 @@ export function useChatRealtime(activeConversationId: string | null) {
       void queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.conversations })
     }
     const syncMissedMessages = async (conversationId: string) => {
-      const live =
-        queryClient.getQueryData<MessageResponse[]>(CHAT_QUERY_KEYS.liveMessages(conversationId)) ??
-        []
       const timeline = queryClient.getQueryData<
         InfiniteData<MessageTimelineResponse, MessagePageParam>
       >(CHAT_QUERY_KEYS.messages(conversationId))
-      const cached = [...(timeline?.pages.flatMap((page) => page.items) ?? []), ...live]
-      const lastMessage = cached
-        .sort(
-          (left, right) =>
-            Date.parse(left.createdAt) - Date.parse(right.createdAt) ||
-            left.id.localeCompare(right.id),
-        )
-        .at(-1)
-      if (!lastMessage) {
+      const cursor = reconnectCursor(timeline?.pages ?? [])
+      if (!cursor) {
         void queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.messages(conversationId) })
         return
       }
 
-      const missed = await fetchMissedMessages(lastMessage.id, (cursor) =>
-        getConversationMessages(conversationId, undefined, 100, cursor),
+      const missed = await fetchMissedMessages(cursor, (after) =>
+        getConversationMessages(conversationId, undefined, 50, after),
       )
 
       if (missed.length > 0) {
         queryClient.setQueryData<MessageResponse[]>(
           CHAT_QUERY_KEYS.liveMessages(conversationId),
-          (old) => mergeMessagesByTime(old ?? [], missed),
+          (old) => mergeMessagesByTime(missed, old ?? []),
         )
       }
       // Không invalidate timeline: missed đã nằm trong liveMessages, còn refetch
