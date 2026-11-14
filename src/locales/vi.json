@@ -386,7 +386,7 @@
       "toLight": "Chuyển sang chế độ sáng",
       "toDark": "Chuyển sang chế độ tối"
     },
-    "viewStoryOf": "Xem tin của {name}",
+    "viewStoryOf": "Xem tin của {{name}}",
     "unnamedStory": "Tin không chú thích",
     "createStoryOptionText": "Tạo tin dạng văn bản",
     "addTextHint": "Thêm dòng chữ…",

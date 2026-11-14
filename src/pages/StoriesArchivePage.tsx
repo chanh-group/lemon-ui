@@ -10,6 +10,7 @@ import { useArchivedStories, useStoryMedia } from '@/features/chat/hooks/useStor
 import type { StoryEntry } from '@/features/chat/types/chat.types'
 import { TEXT_STORY_BG } from '@/features/chat/data/storiesData'
 import { cn } from '@/lib/utils'
+import { useAuth } from '@/features/auth/api'
 
 const ArrowLeft = createIcon(ArrowLeft01Icon)
 const Archive = createIcon(ArchiveIcon)
@@ -17,6 +18,7 @@ const Archive = createIcon(ArchiveIcon)
 export function StoriesArchivePage() {
   const navigate = useNavigate()
   const { t, i18n } = useTranslation()
+  const { user } = useAuth()
   const { data, isLoading, isError, refetch, hasNextPage, fetchNextPage, isFetchingNextPage } =
     useArchivedStories()
   const [selectedStory, setSelectedStory] = useState<StoryEntry | null>(null)
@@ -30,7 +32,12 @@ export function StoriesArchivePage() {
   const items =
     data?.pages
       .flatMap((page) => page.items)
-      .map((item) => ({ ...item, time: formatDate(item.createdAt) })) ?? []
+      .map((item) => ({
+        ...item,
+        name: user?.fullName || user?.username || t('chat.myStories'),
+        authorAvatar: user?.avatarUrl,
+        time: formatDate(item.createdAt),
+      })) ?? []
 
   const backToStories = () => {
     navigate(ROUTES.messages, { state: { tab: 'stories' } })
