@@ -112,6 +112,7 @@ export function mapBackendStoryToEntry(
     id: item.id,
     name: item.user?.fullName || item.caption?.slice(0, 18) || 'Story',
     time: formatRelativeTime(item.createdAt),
+    createdAt: item.createdAt,
     viewed: Boolean(item.viewerHasViewed),
     mine: isMine,
     online: true,
@@ -562,8 +563,10 @@ export async function getArchivedStories(
   }
   const params = new URLSearchParams()
   if (cursor) params.append('cursor', cursor)
-  const res = await api.get<any>(`/stories/archive?${params.toString()}`)
-  const raw = res.data?.items ?? res.data ?? []
+  const res = await api.get<{ items: BackendStoryResponse[]; nextCursor: string | null }>(
+    `/stories/archive?${params.toString()}`,
+  )
+  const raw = res.data.items
   return {
     items: raw.map((item: BackendStoryResponse) => ({
       ...mapBackendStoryToEntry(item),

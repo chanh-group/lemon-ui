@@ -146,6 +146,7 @@ export interface StoryEntry {
   id: string
   name: string
   time: string
+  createdAt?: string
   viewed: boolean
   /** Tin của chính ta — dành riêng cho hàng "Tin của bạn". */
   mine?: boolean
