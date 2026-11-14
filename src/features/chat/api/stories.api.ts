@@ -322,6 +322,7 @@ export async function reactStory(
       return {
         ...s,
         viewerReaction: reaction,
+        myReactionKind: 'REACTION',
         reactionsCount: (s.reactionsCount ?? 0) + countDiff,
       }
     })
@@ -346,6 +347,7 @@ export async function unreactStory(storyId: string): Promise<{ success: boolean 
       return {
         ...s,
         viewerReaction: null,
+        myReactionKind: null,
         reactionsCount: Math.max(0, (s.reactionsCount ?? 0) - (hadReaction ? 1 : 0)),
       }
     })
@@ -355,38 +357,68 @@ export async function unreactStory(storyId: string): Promise<{ success: boolean 
   return { success: true }
 }
 
-/** Danh sách cảm xúc đã thả của một Story. */
-export async function getStoryReactions(storyId: string): Promise<StoryReactionItem[]> {
+/** Danh sách cảm xúc của story, chỉ chủ story có quyền xem. */
+export async function getStoryReactions(
+  storyId: string,
+  cursor?: string,
+): Promise<{
+  items: StoryReactionItem[]
+  nextCursor: string | null
+  hasMore: boolean
+  totalCount?: number
+  summary?: Array<{ emoji: string; count: number }>
+}> {
   if (isAuthBypass()) {
     await delay(100)
     const story = storyStore.find((s) => s.id === storyId)
-    if (!story || !story.viewerReaction) return []
-    return [
-      {
-        id: `react-${storyId}`,
-        storyId,
-        userId: 'me',
-        reaction: story.viewerReaction,
-        createdAt: new Date().toISOString(),
-        user: {
-          id: 'me',
-          fullName: 'Bạn',
-          avatarUrl: null,
-        },
-      },
-    ]
+    const items: StoryReactionItem[] = story?.viewerReaction
+      ? [
+          {
+            id: `react-${storyId}`,
+            storyId,
+            userId: 'me',
+            reaction: story.viewerReaction,
+            kind: story.myReactionKind ?? 'REACTION',
+            createdAt: new Date().toISOString(),
+            user: { id: 'me', fullName: 'Bạn', avatarUrl: null },
+          },
+        ]
+      : []
+    return {
+      items,
+      nextCursor: null,
+      hasMore: false,
+      totalCount: items.length,
+      summary: items.map((item) => ({ emoji: item.reaction, count: 1 })),
+    }
   }
   const res = await api.get<{
-    items: Array<{ user: StoryReactionItem['user']; emoji: string; createdAt: string }>
-  }>(`/stories/${storyId}/reactions`)
-  return (res.data?.items ?? []).map((item) => ({
-    id: item.user.id,
-    userId: item.user.id,
-    storyId,
-    reaction: item.emoji,
-    createdAt: item.createdAt,
-    user: item.user,
-  }))
+    items: Array<{
+      user: StoryReactionItem['user']
+      emoji: string
+      kind: 'REACTION' | 'LIKE'
+      createdAt: string
+    }>
+    nextCursor: string | null
+    hasMore: boolean
+    totalCount?: number
+    summary?: Array<{ emoji: string; count: number }>
+  }>(`/stories/${storyId}/reactions`, { params: { cursor } })
+  return {
+    items: (res.data?.items ?? []).map((item) => ({
+      id: item.user.id,
+      userId: item.user.id,
+      storyId,
+      reaction: item.emoji,
+      kind: item.kind,
+      createdAt: item.createdAt,
+      user: item.user,
+    })),
+    nextCursor: res.data?.nextCursor ?? null,
+    hasMore: res.data?.hasMore ?? false,
+    totalCount: res.data?.totalCount,
+    summary: res.data?.summary,
+  }
 }
 
 /** Phản hồi (reply) story bằng tin nhắn, tự động gửi vào hội thoại 1:1 với tác giả. */
@@ -471,6 +503,7 @@ export async function likeStory(
       return {
         ...s,
         viewerReaction: '❤️',
+        myReactionKind: 'LIKE',
         reactionsCount: (s.reactionsCount ?? 0) + (hadReaction ? 0 : 1),
       }
     })
