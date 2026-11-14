@@ -4,7 +4,12 @@ import { toast } from 'sonner'
 import { ArrowDown01Icon as ArrowDownData } from '@hugeicons/core-free-icons'
 import { createIcon } from '@/components/icons/hugeIcon'
 const ArrowDown = createIcon(ArrowDownData)
-import type { Conversation, DayGroup, MessageAttachmentInput } from '../../types/chat.types'
+import type {
+  ChatMessage,
+  Conversation,
+  DayGroup,
+  MessageAttachmentInput,
+} from '../../types/chat.types'
 import { ConversationHeader } from './ConversationHeader'
 import { ConversationInfoPanel } from './ConversationInfoPanel'
 import { MessageList, type MessageListHandle } from './MessageList'
@@ -35,6 +40,7 @@ interface ConversationViewProps {
     text: string,
     attachments?: MessageAttachmentInput[],
     pendingFiles?: PendingFile[],
+    replyToId?: string,
   ) => Promise<boolean>
   isSending: boolean
   onBack?: () => void
@@ -81,6 +87,7 @@ export function ConversationView({
   const { t } = useTranslation()
   const [initialRestorePosition] = useState(restorePosition)
   const [draft, setDraft] = useState('')
+  const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null)
   const [isInfoOpen, setIsInfoOpen] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(null)
@@ -235,13 +242,21 @@ export function ConversationView({
       isSending
     )
       return false
-    const sent = await onSend(text, attachments, pendingFiles)
+    const sent = await onSend(text, attachments, pendingFiles, replyingTo?.id)
     if (!sent) return false
+    setReplyingTo(null)
     // Giữ text người dùng gõ thêm trong lúc tin trước đang gửi.
     setDraft((current) => (current === text ? '' : current))
     await goToLatest()
     return true
   }
+
+  // Group chats have no per-sender name here, so don't show the group name as the author.
+  const replyDraftName = replyingTo
+    ? replyingTo.fromMe
+      ? t('chat.you')
+      : (replyingTo.sender ?? (conversation.isGroup ? null : conversation.name))
+    : null
 
   return (
     <div className="relative flex h-full min-h-0 w-full min-w-0 flex-1 overflow-hidden">
@@ -326,6 +341,8 @@ export function ConversationView({
               scrollElement={scrollElement}
               isVisible={isVisible}
               conversationId={conversation.id}
+              isGroup={conversation.isGroup}
+              onReply={setReplyingTo}
               followBottom={atBottom && hasLatest}
               onVisibleMessage={onVisibleMessage}
               onRetryMessage={onRetryMessage}
@@ -347,6 +364,29 @@ export function ConversationView({
           )}
         </div>
 
+        {replyingTo && (
+          <div className="flex items-center gap-3 border-t border-border bg-muted/50 px-4 py-2 text-sm">
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold">
+                {replyDraftName
+                  ? t('chat.replyingTo', { name: replyDraftName })
+                  : t('chat.replyMessage')}
+              </p>
+              <p className="truncate text-muted-foreground">
+                {replyingTo.text ||
+                  (replyingTo.storyPreview ? t('chat.replyToStory') : t('chat.attachment'))}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setReplyingTo(null)}
+              aria-label={t('chat.cancelReply')}
+              className="rounded-lg p-2 hover:bg-muted"
+            >
+              ✕
+            </button>
+          </div>
+        )}
         <MessageComposer
           draft={draft}
           onDraftChange={setDraft}

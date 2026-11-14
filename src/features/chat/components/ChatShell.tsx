@@ -180,7 +180,26 @@ export function ChatShell() {
   // API trả từng trang mới nhất trước; UI cần timeline cũ đến mới.
   const groups = useMemo(() => {
     if (!selected || !messageItems) return []
-    const chatMsgs = messageItems.map((m) => mapMessageResponse(m, user?.id))
+    const byId = new Map(messageItems.map((message) => [message.id, message]))
+    const chatMsgs = messageItems.map((message) => {
+      const target = message.replyToId ? byId.get(message.replyToId) : undefined
+      return mapMessageResponse(
+        {
+          ...message,
+          replyTarget: target
+            ? {
+                id: target.id,
+                senderId: target.senderId,
+                kind: target.kind,
+                body: target.deletedAt ? null : target.body,
+                deletedAt: target.deletedAt,
+                storyPreview: target.deletedAt ? null : target.storyPreview,
+              }
+            : message.replyTarget,
+        },
+        user?.id,
+      )
+    })
     return buildDayGroupsFromMessages(chatMsgs, todayLabel)
   }, [selected, messageItems, user?.id, todayLabel])
 
@@ -234,6 +253,7 @@ export function ChatShell() {
     text: string,
     attachments?: MessageAttachmentInput[],
     pendingFiles?: SendMessagePendingFile[],
+    replyToId?: string,
   ): Promise<boolean> => {
     if (!selectedId) return false
     try {
@@ -242,6 +262,7 @@ export function ChatShell() {
         body: text,
         attachments,
         pendingFiles,
+        replyToId,
       })
       return true
     } catch {

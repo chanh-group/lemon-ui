@@ -70,7 +70,7 @@ export type StoryReactionType = '👍' | '❤️' | '🥰' | '😆' | '😂' | '
 
 export interface StoryPreview {
   id: string
-  kind: 'TEXT' | 'MEDIA' | 'text' | 'media'
+  kind: 'TEXT' | 'MEDIA' | 'IMAGE' | 'VIDEO' | 'text' | 'media'
   caption?: string | null
   mediaUrl?: string | null
   background?: string | null
@@ -124,6 +124,8 @@ export interface ChatMessage {
   isForwarded?: boolean
   storyId?: string | null
   storyPreview?: StoryPreview | null
+  replyToId?: string | null
+  replyTarget?: MessageReplyTarget | null
   createdAt?: string
   editedAt?: string | null
   deletedAt?: string | null
@@ -204,6 +206,9 @@ export interface MessageResponse {
   kind: 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE' | 'SYSTEM' | 'STORY_REPLY' | 'STORY_REACTION'
   body: string | null
   replyToId: string | null
+  replyTarget?: MessageReplyTarget | null
+  storyId?: string | null
+  storyPreview?: StoryPreview | null
   clientMsgId?: string | null
   sendState?: 'uncertain'
   retryPayload?: SendMessageDto
@@ -213,6 +218,15 @@ export interface MessageResponse {
   createdAt: string
   editedAt: string | null
   deletedAt: string | null
+}
+
+export interface MessageReplyTarget {
+  id: string
+  senderId: string
+  kind: MessageResponse['kind']
+  body: string | null
+  deletedAt: string | null
+  storyPreview?: StoryPreview | null
 }
 
 export interface MessageTimelineResponse {

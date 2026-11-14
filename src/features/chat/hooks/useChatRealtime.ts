@@ -234,7 +234,11 @@ export function useChatRealtime(activeConversationId: string | null) {
             pages: old.pages.map((page) => ({
               ...page,
               items: page.items.map((m) =>
-                m.id === updated.id ? { ...m, body: updated.body, editedAt: updated.editedAt } : m,
+                m.id === updated.id
+                  ? { ...m, body: updated.body, editedAt: updated.editedAt }
+                  : m.replyTarget?.id === updated.id && !m.replyTarget.deletedAt
+                    ? { ...m, replyTarget: { ...m.replyTarget, body: updated.body } }
+                    : m,
               ),
             })),
           }
@@ -246,7 +250,9 @@ export function useChatRealtime(activeConversationId: string | null) {
           old?.map((message) =>
             message.id === updated.id
               ? { ...message, body: updated.body, editedAt: updated.editedAt }
-              : message,
+              : message.replyTarget?.id === updated.id && !message.replyTarget.deletedAt
+                ? { ...message, replyTarget: { ...message.replyTarget, body: updated.body } }
+                : message,
           ),
       )
 
@@ -264,7 +270,19 @@ export function useChatRealtime(activeConversationId: string | null) {
             pages: old.pages.map((page) => ({
               ...page,
               items: page.items.map((m) =>
-                m.id === revoked.id ? { ...m, deletedAt: revoked.deletedAt } : m,
+                m.id === revoked.id
+                  ? { ...m, deletedAt: revoked.deletedAt }
+                  : m.replyTarget?.id === revoked.id
+                    ? {
+                        ...m,
+                        replyTarget: {
+                          ...m.replyTarget,
+                          body: null,
+                          storyPreview: null,
+                          deletedAt: revoked.deletedAt,
+                        },
+                      }
+                    : m,
               ),
             })),
           }
@@ -274,7 +292,19 @@ export function useChatRealtime(activeConversationId: string | null) {
         CHAT_QUERY_KEYS.liveMessages(revoked.conversationId),
         (old) =>
           old?.map((message) =>
-            message.id === revoked.id ? { ...message, deletedAt: revoked.deletedAt } : message,
+            message.id === revoked.id
+              ? { ...message, deletedAt: revoked.deletedAt }
+              : message.replyTarget?.id === revoked.id
+                ? {
+                    ...message,
+                    replyTarget: {
+                      ...message.replyTarget,
+                      body: null,
+                      storyPreview: null,
+                      deletedAt: revoked.deletedAt,
+                    },
+                  }
+                : message,
           ),
       )
 

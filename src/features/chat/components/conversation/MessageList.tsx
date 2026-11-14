@@ -132,15 +132,8 @@ function MediaBubble({ label, kind }: { label: string; kind: ChatMessage['kind']
   )
 }
 
-function StoryReplyQuote({
-  preview,
-  defaultAuthor,
-}: {
-  preview: NonNullable<ChatMessage['storyPreview']>
-  defaultAuthor: string
-}) {
+function StoryReplyQuote({ preview }: { preview: NonNullable<ChatMessage['storyPreview']> }) {
   const { t } = useTranslation()
-  const author = preview.authorName || defaultAuthor
   return (
     <div className="mb-2 flex items-center gap-2.5 rounded-xl border border-border/80 bg-muted/70 p-2 text-xs shadow-xs">
       <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-linear-to-br from-primary via-secondary to-ring text-xs font-bold shadow-xs">
@@ -149,7 +142,9 @@ function StoryReplyQuote({
       <div className="min-w-0 flex-1 text-left">
         <p className="flex items-center gap-1 text-[11px] font-semibold text-brand-ink">
           <span>{t('chat.replyToStory')}</span>
-          <span className="font-normal text-muted-foreground">· {author}</span>
+          {preview.authorName && (
+            <span className="font-normal text-muted-foreground">· {preview.authorName}</span>
+          )}
         </p>
         <p className="truncate text-xs text-muted-foreground">
           {preview.caption || t('chat.unnamedStory')}
@@ -165,11 +160,13 @@ const MessageRowView = memo(function MessageRowView({
   senderLabel,
   senderAvatarUrl,
   currentUserId,
+  isGroup,
   onOpenLightbox,
   onOpenDocument,
   onRevoke,
   onReact,
   onForward,
+  onReply,
   onRetryMessage,
 }: {
   group: MessageGroup
@@ -177,11 +174,13 @@ const MessageRowView = memo(function MessageRowView({
   senderLabel: string
   senderAvatarUrl?: string | null
   currentUserId?: string
+  isGroup?: boolean
   onOpenLightbox: (attachment: MessageAttachmentItem) => void
   onOpenDocument: (attachment: MessageAttachmentItem) => void
   onRevoke?: (messageId: string) => void
   onReact?: (messageId: string, emoji: string) => void
   onForward?: (message: ChatMessage) => void
+  onReply?: (message: ChatMessage) => void
   onRetryMessage?: (messageId: string) => void
 }) {
   const { t } = useTranslation()
@@ -191,6 +190,8 @@ const MessageRowView = memo(function MessageRowView({
   const isFirst = messageIndex === 0
   const isLast = messageIndex === total - 1
   const authorName = group.sender ?? senderLabel
+  const replyTargetName =
+    msg.replyTarget?.senderId === currentUserId ? t('chat.you') : isGroup ? null : senderLabel
   const hasAttachments = Boolean(msg.attachments && msg.attachments.length > 0)
   const firstAttachment = hasAttachments ? msg.attachments![0] : undefined
 
@@ -239,6 +240,7 @@ const MessageRowView = memo(function MessageRowView({
         onRevoke={onRevoke}
         onReact={onReact}
         onForward={onForward}
+        onReply={msg.status === 'sending' || msg.status === 'uncertain' ? undefined : onReply}
         align={isMe ? 'end' : 'start'}
         onOpenChange={setIsMenuOpen}
       />
@@ -323,9 +325,23 @@ const MessageRowView = memo(function MessageRowView({
             </div>
           )}
 
-          {msg.storyPreview && (
-            <StoryReplyQuote preview={msg.storyPreview} defaultAuthor={authorName} />
+          {msg.replyToId && (
+            <div className="mb-2 rounded-lg border-l-2 border-primary bg-muted/70 px-2 py-1 text-xs">
+              <p className="font-semibold">
+                {replyTargetName
+                  ? t('chat.replyingTo', { name: replyTargetName })
+                  : t('chat.replyMessage')}
+              </p>
+              <p className="truncate text-muted-foreground">
+                {!msg.replyTarget || msg.replyTarget.deletedAt
+                  ? t('chat.replyUnavailable')
+                  : msg.replyTarget.body ||
+                    (msg.replyTarget.storyPreview ? t('chat.replyToStory') : t('chat.attachment'))}
+              </p>
+            </div>
           )}
+
+          {msg.storyPreview && <StoryReplyQuote preview={msg.storyPreview} />}
 
           {msg.deletedAt ? (
             <span className="italic text-muted-foreground text-xs">
@@ -447,8 +463,10 @@ interface MessageListProps {
   scrollElement: HTMLDivElement | null
   isVisible: boolean
   conversationId?: string
+  isGroup?: boolean
   /** Còn đang ở cuối danh sách thì tự bám tin mới nhất; cuộn lên thì thôi. */
   followBottom?: boolean
+  onReply?: (message: ChatMessage) => void
   onVisibleMessage?: (messageId: string) => void
   onRetryMessage?: (messageId: string) => void
   restorePosition?: MessageScrollPosition
@@ -490,10 +508,12 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
     scrollElement,
     isVisible,
     conversationId,
+    isGroup,
     followBottom = true,
     onVisibleMessage,
     onRetryMessage,
     restorePosition,
+    onReply,
   },
   ref,
 ) {
@@ -695,11 +715,13 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
         senderLabel={senderLabel}
         senderAvatarUrl={senderAvatarUrl}
         currentUserId={currentUserId}
+        isGroup={isGroup}
         onOpenLightbox={setLightboxAttachment}
         onOpenDocument={setDocumentAttachment}
         onRevoke={handleRevokeMessage}
         onReact={handleReactMessage}
         onForward={handleForwardMessage}
+        onReply={onReply}
         onRetryMessage={onRetryMessage}
       />
     )

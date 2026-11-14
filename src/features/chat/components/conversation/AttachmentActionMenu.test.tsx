@@ -16,10 +16,12 @@ describe('AttachmentActionMenu & MessageActionPill Component', () => {
   }
 
   it('renders 3 action buttons for message interaction', () => {
-    const html = renderToString(<MessageActionPill message={dummyMessage} isMe={true} />)
+    const html = renderToString(
+      <MessageActionPill message={dummyMessage} isMe={true} onReply={() => {}} />,
+    )
 
     expect(html).toContain('title="Thả cảm xúc"')
-    expect(html).toContain('title="Chuyển tiếp"')
+    expect(html).toContain('title="Trả lời"')
     expect(html).toContain('title="Tùy chọn khác"')
   })
 
