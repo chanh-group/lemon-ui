@@ -9,6 +9,7 @@ import {
 import { Switch } from '@/components/ui/switch'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
+import { useFriends } from '../../hooks/useFriends'
 import {
   useMutedAuthors,
   useStorySettings,
@@ -25,7 +26,12 @@ export function StorySettingsModal({ open, onOpenChange }: StorySettingsModalPro
   const { t } = useTranslation()
   const { data: settings, isLoading } = useStorySettings()
   const updateSettings = useUpdateStorySettings()
-  const { data: mutedAuthors = [] } = useMutedAuthors()
+  const {
+    data: mutedAuthors = [],
+    isLoading: mutesLoading,
+    isError: mutesError,
+  } = useMutedAuthors()
+  const { data: friends = [] } = useFriends()
   const unmuteMutation = useUnmuteAuthor()
 
   const viewedReceipts = settings?.viewedReceiptsEnabled ?? true
@@ -113,7 +119,11 @@ export function StorySettingsModal({ open, onOpenChange }: StorySettingsModalPro
             <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
               {t('chat.mutedStoriesTitle')} ({mutedAuthors.length})
             </h3>
-            {mutedAuthors.length === 0 ? (
+            {mutesLoading ? (
+              <p className="px-1 text-xs text-muted-foreground">{t('common.loading')}</p>
+            ) : mutesError ? (
+              <p className="px-1 text-xs text-destructive">{t('common.errorMessage')}</p>
+            ) : mutedAuthors.length === 0 ? (
               <p className="px-1 text-xs italic text-muted-foreground">
                 {t('chat.noMutedStories')}
               </p>
@@ -125,7 +135,8 @@ export function StorySettingsModal({ open, onOpenChange }: StorySettingsModalPro
                     className="flex items-center justify-between gap-2 rounded-lg border border-border bg-card p-2.5"
                   >
                     <span className="truncate text-xs font-medium text-card-foreground">
-                      {t('chat.storyAuthorId', { id: authorId.slice(0, 8) })}
+                      {friends.find((friend) => friend.id === authorId)?.name ??
+                        t('chat.storyAuthorId', { id: authorId.slice(0, 8) })}
                     </span>
                     <Button
                       size="sm"
