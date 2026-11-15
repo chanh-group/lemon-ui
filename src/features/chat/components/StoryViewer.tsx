@@ -128,7 +128,10 @@ export function StoryViewer({
 
   useEffect(() => {
     if (stopped || isVideo || (isMedia && !mediaUrl)) return
-    const timer = window.setInterval(() => setProgress((value) => Math.min(100, value + 2)), 100)
+    const timer = window.setInterval(
+      () => setProgress((value) => Math.min(100, value + (isMedia ? 1 : 2))),
+      100,
+    )
     return () => window.clearInterval(timer)
   }, [stopped, isVideo, isMedia, story.id, mediaUrl])
   useEffect(() => {
