@@ -99,7 +99,8 @@ export function ConversationView({
   const [showJump, setShowJump] = useState(false)
   const [atBottom, setAtBottom] = useState(initialRestorePosition?.kind !== 'message')
   const [jumpPending, setJumpPending] = useState(false)
-  const [jumpReady, setJumpReady] = useState(false)
+  const [jumpRequest, setJumpRequest] = useState(0)
+  const handledJumpRequest = useRef(0)
   const atBottomRef = useRef(initialRestorePosition?.kind !== 'message')
   const olderRequestPending = useRef(false)
   const newerRequestPending = useRef(false)
@@ -125,13 +126,11 @@ export function ConversationView({
   }
 
   useLayoutEffect(() => {
-    if (!jumpReady || !hasLatest) return
+    if (jumpRequest === handledJumpRequest.current || !hasLatest) return
+    handledJumpRequest.current = jumpRequest
     scrollToBottom(false)
-    setJumpReady(false)
-    setShowJump(false)
     atBottomRef.current = true
-    setAtBottom(true)
-  }, [jumpReady, hasLatest, groups])
+  }, [jumpRequest, hasLatest, groups])
 
   useLayoutEffect(() => {
     if (isVisible && atBottom && hasLatest) onPositionChange({ kind: 'bottom' })
@@ -142,7 +141,10 @@ export function ConversationView({
     setJumpPending(true)
     try {
       if (!hasLatest) await onLoadLatest()
-      setJumpReady(true)
+      atBottomRef.current = true
+      setAtBottom(true)
+      setShowJump(false)
+      setJumpRequest((request) => request + 1)
     } catch {
       toast.error(t('chat.messagesLoadError'))
     } finally {

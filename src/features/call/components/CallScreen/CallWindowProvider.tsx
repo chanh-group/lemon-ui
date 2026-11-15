@@ -144,11 +144,21 @@ export function CallWindowProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => {
-    if (status !== 'authenticated') closeCall()
-  }, [status, closeCall])
+    if (status === 'authenticated') return
+    generation.current += 1
+    const current = sessionRef.current
+    sessionRef.current = null
+    if (current && !current.window.closed) current.window.close()
+  }, [status])
 
   return (
-    <CallWindowContext.Provider value={{ openCall, closeCall, session }}>
+    <CallWindowContext.Provider
+      value={{
+        openCall,
+        closeCall,
+        session: status === 'authenticated' && session && !session.window.closed ? session : null,
+      }}
+    >
       {children}
     </CallWindowContext.Provider>
   )
