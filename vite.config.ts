@@ -2,7 +2,7 @@ import react, { reactCompilerPreset } from '@vitejs/plugin-react'
 import babel from '@rolldown/plugin-babel'
 import tailwindcss from '@tailwindcss/vite'
 import { compression } from 'vite-plugin-compression2'
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vitest/config'
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -30,6 +30,10 @@ export default defineConfig({
     alias: {
       '@': import.meta.dirname + '/src',
     },
+  },
+  test: {
+    environment: 'node',
+    include: ['src/**/*.test.{ts,tsx}'],
   },
   build: {
     rolldownOptions: {

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'bun:test'
+import { describe, expect, it } from 'vitest'
 import { renderToString } from 'react-dom/server'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -37,7 +37,7 @@ describe('AttachmentActionMenu & MessageActionPill Component', () => {
   })
 
   it('globals.css defines @custom-variant dark to isolate OS dark mode from light theme', () => {
-    const cssPath = resolve(import.meta.dir, '../../../../app/styles/globals.css')
+    const cssPath = resolve(import.meta.dirname, '../../../../app/styles/globals.css')
     const cssContent = readFileSync(cssPath, 'utf-8')
 
     expect(cssContent).toContain('@custom-variant dark (&:where(.dark, .dark *));')

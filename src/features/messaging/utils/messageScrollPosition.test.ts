@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'bun:test'
+import { describe, expect, it } from 'vitest'
 import { getMessageScrollPosition, saveMessageScrollPosition } from './messageScrollPosition'
 
 describe('message scroll positions', () => {

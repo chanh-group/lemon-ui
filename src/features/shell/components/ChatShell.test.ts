@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'bun:test'
+import { describe, expect, it } from 'vitest'
 import { visibleLiveMessages } from './ChatShell'
 import type { MessageResponse } from '@/features/messaging/types/message.types'
 

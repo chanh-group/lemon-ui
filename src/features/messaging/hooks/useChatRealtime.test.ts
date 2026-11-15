@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'bun:test'
+import { describe, expect, it } from 'vitest'
 import { correlateSentMessage, mergeMessagesByTime, reconnectCursor } from './useMessagingRealtime'
 import type { MessageResponse } from '@/features/messaging/types/message.types'
 

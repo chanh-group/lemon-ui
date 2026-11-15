@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'bun:test'
+import { describe, expect, it } from 'vitest'
 import { findUserByUsername, presignFile } from './api/chat.api'
 import { listStories } from './api/stories.api'
 import { ChatShell } from './components/ChatShell'

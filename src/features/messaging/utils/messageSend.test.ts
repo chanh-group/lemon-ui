@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'bun:test'
+import { describe, expect, it } from 'vitest'
 import { resolveSendMessageKind, retryUncertainSend } from './messageSend'
 import { ApiError } from '@/infrastructure/api/errors'
 import type { MessageAttachmentInput } from '@/features/messaging/types/message.types'

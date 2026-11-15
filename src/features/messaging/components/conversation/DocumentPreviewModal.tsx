@@ -7,7 +7,7 @@ import {
 } from '@hugeicons/core-free-icons'
 import { createIcon } from '@/components/icons/hugeIcon'
 import type { MessageAttachmentItem } from '@/features/messaging/types/message.types'
-import { formatBytes, isPdf, isText } from '@/features/file/utils/fileTypes'
+import { formatBytes, isHtml, isPdf, isText } from '@/features/file/utils/fileTypes'
 
 const CloseIcon = createIcon(CloseData)
 const DownloadIcon = createIcon(DownloadData)
@@ -20,6 +20,7 @@ interface DocumentPreviewModalProps {
 
 export function DocumentPreviewModal({ attachment, onClose }: DocumentPreviewModalProps) {
   const isPdfDoc = Boolean(attachment && isPdf(attachment.mimeType, attachment.fileName))
+  const isHtmlDoc = Boolean(attachment && isHtml(attachment.mimeType, attachment.fileName))
   const isTextDoc = Boolean(attachment && isText(attachment.mimeType, attachment.fileName))
   const [textContent, setTextContent] = useState<string | null>(null)
   const [loading, setLoading] = useState(isTextDoc)
@@ -84,7 +85,7 @@ export function DocumentPreviewModal({ attachment, onClose }: DocumentPreviewMod
       role="dialog"
       aria-modal="true"
       onClick={onClose}
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 backdrop-blur-xs p-4 sm:p-6 animate-in fade-in"
+      className="fixed inset-0 z-100 flex items-center justify-center bg-black/75 backdrop-blur-xs p-4 sm:p-6 animate-in fade-in"
     >
       <div
         onClick={(e) => e.stopPropagation()}
@@ -133,6 +134,14 @@ export function DocumentPreviewModal({ attachment, onClose }: DocumentPreviewMod
               title={attachment.fileName}
               className="w-full h-full border-0"
             />
+          ) : isHtmlDoc ? (
+            // sandbox without allow-same-origin: page chạy ở origin rỗng, không đọc được app origin
+            <iframe
+              src={attachment.previewUrl || attachment.downloadUrl}
+              sandbox="allow-scripts"
+              title={attachment.fileName}
+              className="w-full h-full border-0"
+            />
           ) : isTextDoc ? (
             <div className="flex-1 overflow-auto p-4 sm:p-6 font-mono text-xs leading-relaxed text-foreground select-text">
               {loading ? (
@@ -150,7 +159,7 @@ export function DocumentPreviewModal({ attachment, onClose }: DocumentPreviewMod
                   </button>
                 </div>
               ) : (
-                <pre className="whitespace-pre-wrap break-words">{textContent}</pre>
+                <pre className="whitespace-pre-wrap wrap-break-word">{textContent}</pre>
               )}
             </div>
           ) : (

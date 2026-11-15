@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, mock } from 'bun:test'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { api } from '@/infrastructure/api/client'
 import {
   createMediaStory,
@@ -17,12 +17,12 @@ afterEach(() => {
   api.get = originalGet
   api.post = originalPost
   globalThis.fetch = originalFetch
-  mock.restore()
+  vi.restoreAllMocks()
 })
 
 describe('story API contract', () => {
   it('maps the grouped feed with owner, video, view and reaction state', async () => {
-    api.get = mock(() =>
+    api.get = vi.fn(() =>
       Promise.resolve({
         data: [
           {
@@ -57,7 +57,7 @@ describe('story API contract', () => {
 
   it('uploads the selected bytes before creating a media story', async () => {
     const calls: Array<{ path: string; body: unknown }> = []
-    api.post = mock((path: string, body: unknown) => {
+    api.post = vi.fn((path: string, body: unknown) => {
       calls.push({ path, body })
       return Promise.resolve({
         data:
@@ -66,7 +66,7 @@ describe('story API contract', () => {
             : { id: 's', userId: 'u', kind: 'IMAGE', createdAt: new Date().toISOString() },
       })
     }) as unknown as typeof api.post
-    const put = mock(() => Promise.resolve(new Response(null, { status: 200 })))
+    const put = vi.fn(() => Promise.resolve(new Response(null, { status: 200 })))
     globalThis.fetch = put as unknown as typeof fetch
     const file = new File(['image'], 'photo.jpg', { type: 'image/jpeg' })
     await createMediaStory({ file, captionText: 'hello' })
@@ -86,7 +86,7 @@ describe('story API contract', () => {
 
   it('uses the fallback object key after direct upload fails', async () => {
     const calls: Array<{ path: string; body: unknown }> = []
-    api.post = mock((path: string, body: unknown) => {
+    api.post = vi.fn((path: string, body: unknown) => {
       calls.push({ path, body })
       return Promise.resolve({
         data:
@@ -97,7 +97,7 @@ describe('story API contract', () => {
               : { id: 's', userId: 'u', kind: 'VIDEO', createdAt: new Date().toISOString() },
       })
     }) as unknown as typeof api.post
-    globalThis.fetch = mock(() => Promise.reject(new Error('CORS'))) as unknown as typeof fetch
+    globalThis.fetch = vi.fn(() => Promise.reject(new Error('CORS'))) as unknown as typeof fetch
     await createMediaStory({
       file: new File(['video'], 'video.mp4', { type: 'video/mp4' }),
       captionText: '',
@@ -107,7 +107,7 @@ describe('story API contract', () => {
   })
 
   it('preserves reaction identities, kinds and pagination from the backend', async () => {
-    const get = mock(() =>
+    const get = vi.fn(() =>
       Promise.resolve({
         data: {
           items: [
@@ -145,24 +145,24 @@ describe('story API contract', () => {
       caption: 'archived',
       createdAt: '2026-01-01T00:00:00Z',
     }
-    api.get = mock(() =>
+    api.get = vi.fn(() =>
       Promise.resolve({ data: { items: [item], nextCursor: null } }),
     ) as unknown as typeof api.get
     expect(await getArchivedStories()).toMatchObject({
       items: [{ id: 's', mine: true, archived: true, createdAt: '2026-01-01T00:00:00Z' }],
       nextCursor: null,
     })
-    api.get = mock(() => Promise.resolve({ data: {} })) as unknown as typeof api.get
+    api.get = vi.fn(() => Promise.resolve({ data: {} })) as unknown as typeof api.get
     expect((await getArchivedStories()).items).toEqual([])
   })
 
   it('uses backend view pagination and reply body', async () => {
-    const get = mock(() =>
+    const get = vi.fn(() =>
       Promise.resolve({
         data: { items: [], totalViewsCount: 3, nextCursor: 'next', hasMore: true },
       }),
     )
-    const post = mock(() => Promise.resolve({ data: {} }))
+    const post = vi.fn(() => Promise.resolve({ data: {} }))
     api.get = get as unknown as typeof api.get
     api.post = post as unknown as typeof api.post
     expect((await getStoryViews('s', 'cursor')).totalViewsCount).toBe(3)
