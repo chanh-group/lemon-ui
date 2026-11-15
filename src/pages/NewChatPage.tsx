@@ -1,4 +1,4 @@
-import { NewChatView } from '@/features/chat'
+import { NewChatView } from '@/features/friend'
 
 /**
  * Màn "New chat" (route /new-chat) — Signal style.

@@ -1,4 +1,4 @@
-import { StoriesCreateView } from '@/features/chat'
+import { StoriesCreateView } from '@/features/story'
 
 /**
  * Màn đăng tin (route /stories/create) — style Facebook.
