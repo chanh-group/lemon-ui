@@ -3,6 +3,7 @@ import {
   formatBytes,
   getKindFromMime,
   isAudio,
+  isHtml,
   isImage,
   isPdf,
   isPreviewable,
@@ -73,6 +74,16 @@ describe('fileTypes utility', () => {
     })
   })
 
+  describe('isHtml', () => {
+    it('detects HTML by mime and extension', () => {
+      expect(isHtml('text/html', 'page')).toBe(true)
+      expect(isHtml('application/xhtml+xml', 'page')).toBe(true)
+      expect(isHtml('', 'await.html')).toBe(true)
+      expect(isHtml('', 'page.htm')).toBe(true)
+      expect(isHtml('text/plain', 'note.txt')).toBe(false)
+    })
+  })
+
   describe('isText', () => {
     it('detects text files and code', () => {
       expect(isText('text/plain', 'note')).toBe(true)
@@ -82,6 +93,11 @@ describe('fileTypes utility', () => {
       expect(isText('', 'config.yaml')).toBe(true)
       expect(isText('', 'archive.zip')).toBe(false)
     })
+
+    it('leaves HTML to the rendered preview branch', () => {
+      expect(isText('text/html', 'await.html')).toBe(false)
+      expect(isText('', 'index.htm')).toBe(false)
+    })
   })
 
   describe('isPreviewable', () => {
@@ -90,6 +106,7 @@ describe('fileTypes utility', () => {
       expect(isPreviewable('video/mp4', 'sample.mp4')).toBe(true)
       expect(isPreviewable('application/pdf', 'sample.pdf')).toBe(true)
       expect(isPreviewable('text/plain', 'sample.txt')).toBe(true)
+      expect(isPreviewable('text/html', 'sample.html')).toBe(true)
     })
 
     it('returns false for archives, binaries, docx, etc.', () => {

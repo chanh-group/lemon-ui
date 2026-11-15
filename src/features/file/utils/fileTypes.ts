@@ -32,7 +32,13 @@ export function isPdf(mimeType = '', fileName = ''): boolean {
   return /\.pdf$/i.test(fileName)
 }
 
+export function isHtml(mimeType = '', fileName = ''): boolean {
+  if (mimeType === 'text/html' || mimeType === 'application/xhtml+xml') return true
+  return /\.(html?|xhtml)$/i.test(fileName)
+}
+
 export function isText(mimeType = '', fileName = ''): boolean {
+  if (isHtml(mimeType, fileName)) return false
   if (mimeType.startsWith('text/')) return true
   if (
     mimeType === 'application/json' ||
@@ -41,7 +47,7 @@ export function isText(mimeType = '', fileName = ''): boolean {
   ) {
     return true
   }
-  return /\.(txt|json|csv|log|md|xml|js|ts|tsx|jsx|css|html|yaml|yml)$/i.test(fileName)
+  return /\.(txt|json|csv|log|md|xml|js|ts|tsx|jsx|css|yaml|yml)$/i.test(fileName)
 }
 
 export function isPreviewable(mimeType = '', fileName = ''): boolean {
@@ -50,6 +56,7 @@ export function isPreviewable(mimeType = '', fileName = ''): boolean {
     isVideo(mimeType, fileName) ||
     isAudio(mimeType, fileName) ||
     isPdf(mimeType, fileName) ||
+    isHtml(mimeType, fileName) ||
     isText(mimeType, fileName)
   )
 }

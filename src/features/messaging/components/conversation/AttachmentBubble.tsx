@@ -8,6 +8,7 @@ import type { MessageAttachmentItem } from '@/features/messaging/types/message.t
 import {
   formatBytes,
   isAudio,
+  isHtml,
   isImage,
   isPdf,
   isPreviewable,
@@ -183,6 +184,7 @@ export function AttachmentBubble({
       onOpenLightbox?.(attachment)
     } else if (
       isPdf(attachment.mimeType, attachment.fileName) ||
+      isHtml(attachment.mimeType, attachment.fileName) ||
       isText(attachment.mimeType, attachment.fileName)
     ) {
       onOpenDocument?.(attachment)
