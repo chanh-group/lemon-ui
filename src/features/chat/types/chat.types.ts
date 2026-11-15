@@ -1,285 +1,35 @@
-export type ChatTab = 'messages' | 'calls' | 'stories'
-
-/** Người dùng trong mạng lưới (bạn bè hoặc người lạ tìm được). */
-export interface ChatUser {
-  id: string
-  name: string
-  username: string
-  email?: string
-  avatarUrl?: string | null
-}
-
-/** Lời mời kết bạn — direction: 'incoming' (chờ mình chấp nhận) | 'outgoing' (chờ đối phương chấp nhận). */
-export interface FriendRequest {
-  id: string
-  user: ChatUser
-  direction: 'incoming' | 'outgoing'
-  createdAt: string
-}
-
-export interface CursorPage<T> {
-  items: T[]
-  nextCursor?: string
-  hasMore: boolean
-}
-
-export interface FriendRequestsPageResponse {
-  incoming: CursorPage<FriendRequest>
-  outgoing: CursorPage<FriendRequest>
-}
-
-export interface UserSearchItem {
-  id: string
-  name: string
-  username: string
-  avatarUrl?: string | null
-}
-
-export interface Conversation {
-  id: string
-  name: string
-  preview: string
-  previewKind: 'text' | 'photo' | 'video' | 'audio' | 'file' | 'gif' | 'sticker' | 'call'
-  time: string
-  unread: number
-  online: boolean
-  isGroup: boolean
-  members?: string
-  lastActive?: string
-  partnerId?: string
-  partnerUsername?: string
-  partnerBio?: string | null
-  partnerAvatar?: string | null
-  lastMessageSenderId?: string | null
-}
-
-export interface MessageAttachmentItem {
-  id: string
-  kind: 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE'
-  fileName: string
-  mimeType: string
-  sizeBytes: number
-  width?: number | null
-  height?: number | null
-  durationMs?: number | null
-  previewUrl: string
-  downloadUrl: string
-}
-
-export type StoryReactionType = '👍' | '❤️' | '🥰' | '😆' | '😂' | '😮' | '😢' | '😡' | '🔥' | '👏'
-
-export interface StoryPreview {
-  id: string
-  kind: 'TEXT' | 'MEDIA' | 'IMAGE' | 'VIDEO' | 'text' | 'media'
-  caption?: string | null
-  mediaUrl?: string | null
-  background?: string | null
-  authorName?: string | null
-}
-
-export interface StoryReactionItem {
-  id: string
-  storyId: string
-  userId: string
-  reaction: string
-  kind: 'REACTION' | 'LIKE'
-  createdAt: string
-  user: {
-    id: string
-    fullName: string
-    avatarUrl?: string | null
-  }
-}
-
-/** Một lượt xem story — khớp `StoryViewerResponse` của backend. */
-export interface StoryViewerItem {
-  viewedAt: string
-  reaction?: string | null
-  reactionKind?: 'REACTION' | 'LIKE' | null
-  user: {
-    id: string
-    username?: string
-    fullName: string
-    avatarUrl?: string | null
-  }
-}
-
-export interface MessageReactionItem {
-  emoji: string
-  count: number
-  userIds: string[]
-}
-
-export interface ChatMessage {
-  id: string
-  fromMe: boolean
-  sender?: string
-  text?: string
-  kind: 'text' | 'photo' | 'video' | 'audio' | 'file' | 'gif' | 'sticker'
-  photoLabel?: string
-  attachments?: MessageAttachmentItem[]
-  time: string
-  status?: 'sent' | 'read' | 'sending' | 'failed' | 'uncertain'
-  reactions?: MessageReactionItem[]
-  isForwarded?: boolean
-  storyId?: string | null
-  storyPreview?: StoryPreview | null
-  replyToId?: string | null
-  replyTarget?: MessageReplyTarget | null
-  createdAt?: string
-  editedAt?: string | null
-  deletedAt?: string | null
-}
-
-export interface DayGroup {
-  date: string
-  messages: ChatMessage[]
-}
-
-export interface CallEntry {
-  id: string
-  name: string
-  direction: 'incoming' | 'outgoing' | 'missed'
-  kind: 'voice' | 'video'
-  time: string
-  online: boolean
-}
-
-export interface StoryEntry {
-  id: string
-  name: string
-  time: string
-  createdAt?: string
-  viewed: boolean
-  /** Tin của chính ta — dành riêng cho hàng "Tin của bạn". */
-  mine?: boolean
-  online: boolean
-  authorId?: string
-  authorAvatar?: string | null
-  kind?: 'text' | 'media' | 'TEXT' | 'MEDIA'
-  caption?: string | null
-  mediaUrl?: string | null
-  mediaType?: 'image' | 'video'
-  archived?: boolean
-  background?: string | null
-  viewsCount?: number
-  reactionsCount?: number
-  viewerReaction?: string | null
-  viewerHasViewed?: boolean
-  reactionsSummary?: { reaction: string; count: number }[]
-  allowReplies?: boolean
-  allowReactions?: boolean
-  audienceMode?: 'ALL_FRIENDS' | 'CUSTOM' | 'EXCLUDE'
-  myReactionKind?: 'REACTION' | 'LIKE' | null
-}
-
-/* ------------------------------------------------------------------ */
-/* Backend DTOs & Realtime Payloads (API_CHAT_1_1.md)                */
-/* ------------------------------------------------------------------ */
-
-export interface ConversationPartnerResponse {
-  id: string
-  username: string
-  fullName: string
-  avatarUrl: string | null
-  bio?: string | null
-  isOnline: boolean
-}
-
-export interface ConversationResponse {
-  id: string
-  kind: 'DIRECT' | 'GROUP'
-  partner?: ConversationPartnerResponse
-  lastMessagePreview: string | null
-  lastMessageSenderId?: string | null
-  lastMessageAt: string | null
-  unreadCount: number
-  createdAt: string
-  /** Client-side metadata, populated only when the corresponding message is known. */
-  lastMessageDetail?: MessageResponse
-}
-
-export interface MessageResponse {
-  id: string
-  conversationId: string
-  senderId: string
-  kind: 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE' | 'SYSTEM' | 'STORY_REPLY' | 'STORY_REACTION'
-  body: string | null
-  replyToId: string | null
-  replyTarget?: MessageReplyTarget | null
-  storyId?: string | null
-  storyPreview?: StoryPreview | null
-  clientMsgId?: string | null
-  sendState?: 'uncertain'
-  retryPayload?: SendMessageDto
-  attachments?: MessageAttachmentItem[]
-  reactions?: MessageReactionItem[]
-  isForwarded?: boolean
-  createdAt: string
-  editedAt: string | null
-  deletedAt: string | null
-}
-
-export interface MessageReplyTarget {
-  id: string
-  senderId: string
-  kind: MessageResponse['kind']
-  body: string | null
-  deletedAt: string | null
-  storyPreview?: StoryPreview | null
-}
-
-export interface MessageTimelineResponse {
-  items: MessageResponse[]
-  nextCursor?: string
-  hasMore: boolean
-}
-
-export interface MessageAttachmentInput {
-  objectKey: string
-  fileName: string
-  mimeType: string
-  sizeBytes: number
-  kind?: 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE'
-  width?: number
-  height?: number
-  durationMs?: number
-  checksum?: string
-}
-
-export interface SendMessageDto {
-  body?: string
-  clientMsgId: string
-  replyToId?: string | null
-  kind?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE' | 'SYSTEM'
-  attachments?: MessageAttachmentInput[]
-  isForwarded?: boolean
-  sourceMessageId?: string
-}
-
-export interface MessageReactionPayload {
-  messageId: string
-  conversationId: string
-  userId: string
-  emoji: string
-  reactions: MessageReactionItem[]
-}
-
-export interface TypingEventPayload {
-  conversationId: string
-  userId: string
-  isTyping: boolean
-}
-
-export interface ReadUpdatedPayload {
-  conversationId: string
-  userId: string
-  lastReadMessageId: string
-  readAt: string
-}
-
-export interface MessageRevokedPayload {
-  id: string
-  conversationId: string
-  deletedAt: string
-}
+export type { ChatTab, CursorPage } from '@/types/common'
+export type {
+  Conversation,
+  ConversationPartnerResponse,
+  ConversationResponse,
+} from '@/features/conversation/types/conversation.types'
+export type { CallEntry } from '@/features/call/types/call.types'
+export type {
+  ChatMessage,
+  DayGroup,
+  MessageAttachmentInput,
+  MessageAttachmentItem,
+  MessageReactionItem,
+  MessageReactionPayload,
+  MessageReplyTarget,
+  MessageResponse,
+  MessageRevokedPayload,
+  MessageTimelineResponse,
+  ReadUpdatedPayload,
+  SendMessageDto,
+  TypingEventPayload,
+} from '@/features/messaging/types/message.types'
+export type {
+  ChatUser,
+  FriendRequest,
+  FriendRequestsPageResponse,
+  UserSearchItem,
+} from '@/features/friend/types/friend.types'
+export type {
+  StoryEntry,
+  StoryPreview,
+  StoryReactionItem,
+  StoryReactionType,
+  StoryViewerItem,
+} from '@/features/story/types/story.types'
