@@ -387,7 +387,7 @@
       "toLight": "Switch to light mode",
       "toDark": "Switch to dark mode"
     },
-    "viewStoryOf": "View {name}'s story",
+    "viewStoryOf": "View {{name}}'s story",
     "unnamedStory": "Untitled story",
     "createStoryOptionText": "Create a text story",
     "addTextHint": "Tap to add text…",
