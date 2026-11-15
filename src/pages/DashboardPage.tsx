@@ -1,4 +1,4 @@
-import { ChatShell } from '@/features/chat/components/ChatShell'
+import { ChatShell } from '@/features/shell/components/ChatShell'
 
 /**
  * Màn hình chat chính (route /messages).

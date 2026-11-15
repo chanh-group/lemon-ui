@@ -1,1 +1,1 @@
-export { NewChatView } from './NewChatView'
+export * from '@/features/friend/components'
