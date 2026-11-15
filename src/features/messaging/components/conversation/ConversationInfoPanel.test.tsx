@@ -2,12 +2,13 @@ import { describe, expect, it } from 'bun:test'
 import { renderToString } from 'react-dom/server'
 import { MemoryRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { CHAT_QUERY_KEYS } from '../../hooks/useChatQueries'
+import { CHAT_QUERY_KEYS } from '@/features/messaging/hooks/useMessages'
 import { ConversationInfoPanel, UserProfileCardContent } from './ConversationInfoPanel'
 import { ConversationHeader } from './ConversationHeader'
 import { ImageLightboxModal } from './ImageLightboxModal'
 import { AttachmentBubble } from './AttachmentBubble'
-import type { Conversation, DayGroup, MessageAttachmentItem } from '../../types/chat.types'
+import type { DayGroup, MessageAttachmentItem } from '@/features/messaging/types/message.types'
+import type { Conversation } from '@/features/conversation/types/conversation.types'
 
 describe('ConversationInfoPanel & Header Integration Tests', () => {
   const queryClient = new QueryClient({

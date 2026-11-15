@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { buildMessageGroups, newestVisibleIncoming } from './MessageList'
-import type { ChatMessage } from '../../types/chat.types'
+import type { ChatMessage } from '@/features/messaging/types/message.types'
 
 describe('newestVisibleIncoming', () => {
   it('selects the newest incoming message whose bottom is visible', () => {

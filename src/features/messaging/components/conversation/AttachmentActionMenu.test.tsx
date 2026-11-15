@@ -3,7 +3,7 @@ import { renderToString } from 'react-dom/server'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { MessageActionPill } from './AttachmentActionMenu'
-import type { ChatMessage } from '../../types/chat.types'
+import type { ChatMessage } from '@/features/messaging/types/message.types'
 
 describe('AttachmentActionMenu & MessageActionPill Component', () => {
   const dummyMessage: ChatMessage = {
