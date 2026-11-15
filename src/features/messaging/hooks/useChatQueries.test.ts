@@ -4,9 +4,10 @@ import {
   rollbackOptimisticConversationPreview,
   upsertOptimisticMessage,
   windowHasLatest,
-} from './useChatQueries'
-import { updateConversationLastMessage } from '../utils/chat.mapper'
-import type { ConversationResponse, MessageResponse } from '../types/chat.types'
+} from './useMessages'
+import { updateConversationLastMessage } from '@/features/conversation/utils/chat.mapper'
+import type { ConversationResponse } from '@/features/conversation/types/conversation.types'
+import type { MessageResponse } from '@/features/messaging/types/message.types'
 
 const previousConversation: ConversationResponse = {
   id: 'conversation-1',

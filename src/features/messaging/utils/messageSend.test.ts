@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import { resolveSendMessageKind, retryUncertainSend } from './messageSend'
 import { ApiError } from '@/infrastructure/api/errors'
-import type { MessageAttachmentInput } from '../types/chat.types'
+import type { MessageAttachmentInput } from '@/features/messaging/types/message.types'
 
 const image: MessageAttachmentInput = {
   objectKey: 'image',

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import type { StoryEntry } from '../types/chat.types'
+import type { StoryEntry } from '@/features/story/types/story.types'
 import { resolveArchiveAuthor } from './storyAuthor'
 
 const story = (overrides: Partial<StoryEntry> = {}): StoryEntry => ({

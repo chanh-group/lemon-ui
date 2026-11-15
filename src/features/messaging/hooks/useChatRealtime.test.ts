@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
-import { correlateSentMessage, mergeMessagesByTime, reconnectCursor } from './useChatRealtime'
-import type { MessageResponse } from '../types/chat.types'
+import { correlateSentMessage, mergeMessagesByTime, reconnectCursor } from './useMessagingRealtime'
+import type { MessageResponse } from '@/features/messaging/types/message.types'
 
 function message(id: string, createdAt: string, body = id): MessageResponse {
   return {

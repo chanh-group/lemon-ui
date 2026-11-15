@@ -7,7 +7,11 @@ import {
   mapMessageResponse,
   updateConversationLastMessage,
 } from './chat.mapper'
-import type { Conversation, ConversationResponse, MessageResponse } from '../types/chat.types'
+import type {
+  Conversation,
+  ConversationResponse,
+} from '@/features/conversation/types/conversation.types'
+import type { MessageResponse } from '@/features/messaging/types/message.types'
 import vi from '@/locales/vi.json'
 import en from '@/locales/en.json'
 

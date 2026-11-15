@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'bun:test'
 import { fetchMissedMessages } from './messageSync'
-import type { MessageResponse, MessageTimelineResponse } from '../types/chat.types'
+import type {
+  MessageResponse,
+  MessageTimelineResponse,
+} from '@/features/messaging/types/message.types'
 
 function page(ids: string[], nextCursor?: string): MessageTimelineResponse {
   return {
