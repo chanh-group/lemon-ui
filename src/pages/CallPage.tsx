@@ -1,4 +1,4 @@
-import { CallScreen } from '@/features/chat'
+import { CallScreen } from '@/features/call'
 
 /** Màn gọi thoại/video đang hoạt động (route /call/:conversationId). */
 export function CallPage() {
