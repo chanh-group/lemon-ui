@@ -142,6 +142,7 @@ export function mapBackendStoryToEntry(
 export interface CreateMediaStoryPayload {
   file: File
   captionText: string
+  durationMs?: number
   allowReplies?: boolean
   allowReactions?: boolean
   audienceMode?: 'ALL_FRIENDS' | 'CUSTOM' | 'EXCLUDE'
@@ -298,6 +299,7 @@ export async function createMediaStory(payload: CreateMediaStoryPayload): Promis
   }
   const res = await api.post<BackendStoryResponse>('/stories', {
     kind: isVideo ? 'VIDEO' : 'IMAGE',
+    durationMs: isVideo ? payload.durationMs : undefined,
     caption: payload.captionText.trim() || undefined,
     objectKey,
     allowReplies: payload.allowReplies ?? true,

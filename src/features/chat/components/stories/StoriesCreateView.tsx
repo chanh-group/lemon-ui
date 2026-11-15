@@ -66,7 +66,8 @@ export function StoriesCreateView() {
     })
   }
 
-  const shareMediaPayload = (file: File, captionText: string) => shareMedia({ file, captionText })
+  const shareMediaPayload = (file: File, captionText: string, durationMs?: number) =>
+    shareMedia({ file, captionText, durationMs })
   return (
     <main className="flex h-dvh w-full overflow-hidden bg-background pb-16 text-foreground md:pb-0">
       <SideNav
