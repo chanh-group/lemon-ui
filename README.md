@@ -21,6 +21,8 @@ bun run dev
 | `bun run fmt:check` | Kiểm tra format     |
 | `bun run preview`   | Xem trước bản build |
 
+Build production tạo thêm file `.gz` cho asset lớn hơn 1 KB. Web server production cần phục vụ file nén với `Content-Encoding: gzip` và `Vary: Accept-Encoding`.
+
 ## Cấu trúc thư mục
 
 ```
