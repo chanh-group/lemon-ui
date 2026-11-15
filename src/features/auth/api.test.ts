@@ -1,10 +1,10 @@
-import { beforeEach, describe, expect, it, mock } from 'bun:test'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '@/infrastructure/api/client'
 import { updateProfile } from './api'
 
 describe('updateProfile API', () => {
   beforeEach(() => {
-    mock.restore()
+    vi.restoreAllMocks()
   })
 
   it('calls PATCH /users/me with provided payload and returns updated user', async () => {
@@ -19,7 +19,7 @@ describe('updateProfile API', () => {
       createdAt: '2026-01-01T00:00:00.000Z',
     }
 
-    const patchSpy = mock(() => Promise.resolve({ data: updatedUser }))
+    const patchSpy = vi.fn(() => Promise.resolve({ data: updatedUser }))
     api.patch = patchSpy as unknown as typeof api.patch
 
     const payload = {
@@ -45,7 +45,7 @@ describe('updateProfile API', () => {
       createdAt: '2026-01-01T00:00:00.000Z',
     }
 
-    const patchSpy = mock(() => Promise.resolve({ data: updatedUser }))
+    const patchSpy = vi.fn(() => Promise.resolve({ data: updatedUser }))
     api.patch = patchSpy as unknown as typeof api.patch
 
     const res = await updateProfile({ avatarUrl: null, bio: null })
@@ -66,7 +66,7 @@ describe('updateProfile API', () => {
       createdAt: '2026-01-01T00:00:00.000Z',
     }
 
-    const patchSpy = mock(() => Promise.resolve({ data: updatedUser }))
+    const patchSpy = vi.fn(() => Promise.resolve({ data: updatedUser }))
     api.patch = patchSpy as unknown as typeof api.patch
 
     const res = await updateProfile({ fullName: 'Updated Name Only' })
@@ -87,7 +87,7 @@ describe('updateProfile API', () => {
       createdAt: '2026-01-01T00:00:00.000Z',
     }
 
-    const patchSpy = mock(() => Promise.resolve({ data: updatedUser }))
+    const patchSpy = vi.fn(() => Promise.resolve({ data: updatedUser }))
     api.patch = patchSpy as unknown as typeof api.patch
 
     const res = await updateProfile({ avatarUrl: dataUrl })
@@ -97,7 +97,7 @@ describe('updateProfile API', () => {
   })
 
   it('rejects when API call fails', async () => {
-    const patchSpy = mock(() => Promise.reject(new Error('Network error')))
+    const patchSpy = vi.fn(() => Promise.reject(new Error('Network error')))
     api.patch = patchSpy as unknown as typeof api.patch
 
     await expect(updateProfile({ fullName: 'Fail' })).rejects.toThrow('Network error')

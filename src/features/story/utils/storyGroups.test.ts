@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'bun:test'
+import { describe, expect, it } from 'vitest'
 import type { StoryEntry } from '@/features/story/types/story.types'
 import { groupStoriesByAuthor } from './storyGroups'
 

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'bun:test'
+import { describe, expect, it } from 'vitest'
 import { buildMessageGroups, newestVisibleIncoming } from './MessageList'
 import type { ChatMessage } from '@/features/messaging/types/message.types'
 
