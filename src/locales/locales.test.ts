@@ -6,10 +6,16 @@ import vi from './vi.json'
 describe('Localization Integrity & Avatar Text Tests', () => {
   it('interpolates the story author in the avatar label in both languages', async () => {
     const i18n = createInstance()
-    await i18n.init({ lng: 'vi', resources: { vi: { translation: vi }, en: { translation: en } } })
+    await i18n.init({
+      lng: 'vi',
+      resources: { vi: { translation: vi }, en: { translation: en } },
+      // Khớp với cấu hình runtime trong src/i18n.ts
+      interpolation: { escapeValue: false },
+    })
     expect(i18n.t('chat.viewStoryOf', { name: 'Linh' })).toBe('Xem tin của Linh')
     await i18n.changeLanguage('en')
     expect(i18n.t('chat.viewStoryOf', { name: 'Linh' })).toBe("View Linh's story")
+    expect(i18n.t('chat.viewStoryOf', { name: "O'Brien" })).toBe("View O'Brien's story")
   })
   it('has valid translation objects for both EN and VI', () => {
     expect(en).toBeDefined()

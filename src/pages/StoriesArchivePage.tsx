@@ -7,6 +7,7 @@ import { ROUTES } from '@/config/constants'
 import { StoryViewer } from '@/features/chat/components/StoryViewer'
 import { SideNav } from '@/features/chat/components/SideNav'
 import { useArchivedStories, useStoryMedia } from '@/features/chat/hooks/useStories'
+import { resolveArchiveAuthor } from '@/features/chat/utils/storyAuthor'
 import type { StoryEntry } from '@/features/chat/types/chat.types'
 import { TEXT_STORY_BG } from '@/features/chat/data/storiesData'
 import { cn } from '@/lib/utils'
@@ -34,8 +35,7 @@ export function StoriesArchivePage() {
       .flatMap((page) => page.items)
       .map((item) => ({
         ...item,
-        name: user?.fullName || user?.username || t('chat.myStories'),
-        authorAvatar: user?.avatarUrl,
+        ...resolveArchiveAuthor(item, user),
         time: formatDate(item.createdAt),
       })) ?? []
 
