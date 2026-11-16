@@ -128,6 +128,7 @@ export function StoryViewer({
 
   useEffect(() => {
     if (stopped || isVideo || (isMedia && !mediaUrl)) return
+    // Images advance 1%/100ms (10s), text stories 2% (5s).
     const timer = window.setInterval(
       () => setProgress((value) => Math.min(100, value + (isMedia ? 1 : 2))),
       100,
