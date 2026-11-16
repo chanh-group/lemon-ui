@@ -22,6 +22,46 @@ import type {
 } from '@/features/messaging/types/message.types'
 import type { ConversationResponse } from '@/features/conversation/types/conversation.types'
 
+const TYPING_STALE_TIMEOUT_MS = 4_500
+
+export type PartnerTypingMap = Record<string, string[]>
+
+export function updateTypingUsers(
+  current: PartnerTypingMap,
+  data: TypingEventPayload,
+  currentUserId?: string,
+): PartnerTypingMap {
+  if (data.userId === currentUserId) return current
+
+  const existing = current[data.conversationId] ?? []
+  const users = data.isTyping
+    ? existing.includes(data.userId)
+      ? existing
+      : [...existing, data.userId]
+    : existing.filter((id) => id !== data.userId)
+
+  if (users.length === 0) {
+    const next = { ...current }
+    delete next[data.conversationId]
+    return next
+  }
+  return { ...current, [data.conversationId]: users }
+}
+
+export function removeTypingUser(
+  current: PartnerTypingMap,
+  conversationId: string,
+  userId: string,
+): PartnerTypingMap {
+  const users = (current[conversationId] ?? []).filter((id) => id !== userId)
+  if (users.length === 0) {
+    const next = { ...current }
+    delete next[conversationId]
+    return next
+  }
+  return { ...current, [conversationId]: users }
+}
+
 export function mergeMessagesByTime(
   existing: MessageResponse[],
   incoming: MessageResponse[],
@@ -59,7 +99,8 @@ export function useChatRealtime(activeConversationId: string | null) {
   const { user, status } = useAuth()
   const { t } = useTranslation()
   const queryClient = useQueryClient()
-  const [partnerTypingMap, setPartnerTypingMap] = useState<Record<string, boolean>>({})
+  const [partnerTypingMap, setPartnerTypingMap] = useState<PartnerTypingMap>({})
+  const typingExpiryTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>())
   const refreshedInboxOnConnection = useRef(false)
   const [connectionStatus, setConnectionStatus] = useState<SocketConnectionStatus | null>(() => {
     if (status !== 'authenticated') return null
@@ -83,6 +124,7 @@ export function useChatRealtime(activeConversationId: string | null) {
     if (status !== 'authenticated') return
 
     const socket = getChatSocket()
+    const timersForEffect = typingExpiryTimers.current
     const refreshInbox = () => {
       if (refreshedInboxOnConnection.current) return
       refreshedInboxOnConnection.current = true
@@ -124,6 +166,9 @@ export function useChatRealtime(activeConversationId: string | null) {
       refreshedInboxOnConnection.current = false
       setPartnerTypingMap({})
       setConnectionStatus('disconnected')
+      timersForEffect.forEach((timer) => clearTimeout(timer))
+      timersForEffect.clear()
+      setPartnerTypingMap({})
     }
     const handleConnectError = () => setConnectionStatus('error')
     const handleReconnectAttempt = () => setConnectionStatus('connecting')
@@ -318,10 +363,21 @@ export function useChatRealtime(activeConversationId: string | null) {
     // D. Đối phương đang gõ phím
     const handleTyping = (data: TypingEventPayload) => {
       if (data.userId === userId) return
-      setPartnerTypingMap((prev) => ({
-        ...prev,
-        [data.conversationId]: data.isTyping,
-      }))
+
+      const timerKey = `${data.conversationId}:${data.userId}`
+      const oldTimer = typingExpiryTimers.current.get(timerKey)
+      if (oldTimer) clearTimeout(oldTimer)
+      typingExpiryTimers.current.delete(timerKey)
+
+      setPartnerTypingMap((prev) => updateTypingUsers(prev, data, userId))
+
+      if (data.isTyping) {
+        const timer = setTimeout(() => {
+          typingExpiryTimers.current.delete(timerKey)
+          setPartnerTypingMap((prev) => removeTypingUser(prev, data.conversationId, data.userId))
+        }, TYPING_STALE_TIMEOUT_MS)
+        typingExpiryTimers.current.set(timerKey, timer)
+      }
     }
 
     const handleReadUpdated = (event: { userId: string }) => {
@@ -362,6 +418,9 @@ export function useChatRealtime(activeConversationId: string | null) {
     socket.on('message:reaction', handleMessageReaction)
 
     return () => {
+      timersForEffect.forEach((timer) => clearTimeout(timer))
+      timersForEffect.clear()
+      setPartnerTypingMap({})
       socket.off('connect', handleConnect)
       socket.off('disconnect', handleDisconnect)
       socket.off('connect_error', handleConnectError)
@@ -376,10 +435,14 @@ export function useChatRealtime(activeConversationId: string | null) {
     }
   }, [status, activeConversationId, userId, queryClient, t])
 
-  const isPartnerTyping = Boolean(activeConversationId && partnerTypingMap[activeConversationId])
+  const typingUserCount = activeConversationId
+    ? (partnerTypingMap[activeConversationId]?.length ?? 0)
+    : 0
+  const isPartnerTyping = typingUserCount > 0
 
   return {
     isPartnerTyping,
+    typingUserCount,
     connectionStatus,
   }
 }

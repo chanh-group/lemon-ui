@@ -104,7 +104,6 @@ describe('Localization Integrity & Avatar Text Tests', () => {
       'copyUsername',
       'usernameCopied',
       'friendBadge',
-      'closeAction',
       'searchInConversationComingSoon',
       'mute',
       'searchInConversation',

@@ -190,7 +190,6 @@ describe('ConversationInfoPanel & Header Integration Tests', () => {
         conversation={convWithUsername}
         username="antran_hust"
         bio="Yêu công nghệ"
-        onClose={() => {}}
       />,
     )
 
@@ -201,7 +200,7 @@ describe('ConversationInfoPanel & Header Integration Tests', () => {
     expect(html).toContain('Yêu công nghệ')
     expect(html).toContain('Hủy kết bạn')
     expect(html).toContain('Chặn người dùng')
-    expect(html).toContain('Đóng')
+    expect(html).not.toContain('Đóng')
     // Must NOT contain technical ID field
     expect(html).not.toContain('ID user-friend-01')
   })

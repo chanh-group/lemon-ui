@@ -42,4 +42,12 @@ describe('AttachmentActionMenu & MessageActionPill Component', () => {
 
     expect(cssContent).toContain('@custom-variant dark (&:where(.dark, .dark *));')
   })
+
+  it('does not expose a report action', () => {
+    const sourcePath = resolve(import.meta.dirname, './AttachmentActionMenu.tsx')
+    const source = readFileSync(sourcePath, 'utf-8')
+
+    expect(source).not.toContain('report')
+    expect(source).not.toContain('Flag01Icon')
+  })
 })

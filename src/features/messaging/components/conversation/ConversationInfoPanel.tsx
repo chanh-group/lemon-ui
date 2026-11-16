@@ -62,7 +62,6 @@ export interface UserProfileCardContentProps {
   bio?: string | null
   onUnfriend?: () => void
   onBlock?: () => void
-  onClose?: () => void
 }
 
 export function UserProfileCardContent({
@@ -71,7 +70,6 @@ export function UserProfileCardContent({
   bio,
   onUnfriend,
   onBlock,
-  onClose,
 }: UserProfileCardContentProps) {
   const { t } = useTranslation()
   const [isCopied, setIsCopied] = useState(false)
@@ -165,14 +163,6 @@ export function UserProfileCardContent({
           </Button>
         </div>
       )}
-
-      {onClose && (
-        <div className="mt-4 w-full">
-          <Button variant="secondary" className="w-full text-xs" onClick={onClose}>
-            {t('chat.closeAction')}
-          </Button>
-        </div>
-      )}
     </div>
   )
 }
@@ -216,7 +206,6 @@ export function UserProfileDialog({
             onOpenChange(false)
             onBlock?.()
           }}
-          onClose={() => onOpenChange(false)}
         />
       </DialogContent>
     </Dialog>

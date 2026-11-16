@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { correlateSentMessage, mergeMessagesByTime, reconnectCursor } from './useMessagingRealtime'
+import {
+  correlateSentMessage,
+  mergeMessagesByTime,
+  reconnectCursor,
+  removeTypingUser,
+  updateTypingUsers,
+} from './useMessagingRealtime'
 import type { MessageResponse } from '@/features/messaging/types/message.types'
 
 function message(id: string, createdAt: string, body = id): MessageResponse {
@@ -66,5 +72,32 @@ describe('correlateSentMessage', () => {
     expect(correlateSentMessage([optimistic, server], 'server-1', 'client-1')).toEqual([
       { ...server, clientMsgId: 'client-1' },
     ])
+  })
+})
+
+describe('typing state', () => {
+  it('tracks users independently and ignores the current user', () => {
+    const started = updateTypingUsers(
+      {},
+      { conversationId: 'conv', userId: 'friend-a', isTyping: true },
+      'me',
+    )
+    const twoUsers = updateTypingUsers(
+      started,
+      { conversationId: 'conv', userId: 'friend-b', isTyping: true },
+      'me',
+    )
+
+    expect(twoUsers).toEqual({ conv: ['friend-a', 'friend-b'] })
+    expect(
+      updateTypingUsers(twoUsers, { conversationId: 'conv', userId: 'me', isTyping: true }, 'me'),
+    ).toBe(twoUsers)
+  })
+
+  it('removes only the user who stopped typing', () => {
+    expect(removeTypingUser({ conv: ['friend-a', 'friend-b'] }, 'conv', 'friend-a')).toEqual({
+      conv: ['friend-b'],
+    })
+    expect(removeTypingUser({ conv: ['friend-b'] }, 'conv', 'friend-b')).toEqual({})
   })
 })

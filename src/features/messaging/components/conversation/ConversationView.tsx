@@ -14,6 +14,7 @@ import { ConversationHeader } from './ConversationHeader'
 import { ConversationInfoPanel } from './ConversationInfoPanel'
 import { MessageList, type MessageListHandle } from './MessageList'
 import { MessageComposer, type PendingFile } from './MessageComposer'
+import { TypingIndicator } from './TypingIndicator'
 import type { MessageScrollPosition } from '@/features/messaging/utils/messageScrollPosition'
 
 interface ConversationViewProps {
@@ -45,7 +46,7 @@ interface ConversationViewProps {
   isSending: boolean
   onBack?: () => void
   showBack: boolean
-  isTyping?: boolean
+  typingUserCount?: number
   onTypingStart?: () => void
   onTypingStop?: () => void
   onVoiceCall?: () => void
@@ -77,7 +78,7 @@ export function ConversationView({
   isSending,
   onBack,
   showBack,
-  isTyping,
+  typingUserCount = 0,
   onTypingStart,
   onTypingStop,
   onVoiceCall,
@@ -389,6 +390,7 @@ export function ConversationView({
             </button>
           </div>
         )}
+        <TypingIndicator conversation={conversation} userCount={atBottom ? typingUserCount : 0} />
         <MessageComposer
           draft={draft}
           onDraftChange={setDraft}

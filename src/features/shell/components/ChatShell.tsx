@@ -85,7 +85,7 @@ export function ChatShell() {
   }, [legacySelect, navigate, selectedId, tab])
 
   // Realtime Socket.IO sync
-  const { isPartnerTyping, connectionStatus } = useChatRealtime(selectedId)
+  const { isPartnerTyping, typingUserCount, connectionStatus } = useChatRealtime(selectedId)
 
   // API Queries & Mutations
   const conversationsQuery = useConversationsQuery()
@@ -454,7 +454,7 @@ export function ChatShell() {
             isSending={sendMessageMutation.isPending}
             showBack
             onBack={() => navigate(ROUTES.messages, { state: { tab } })}
-            isTyping={isPartnerTyping}
+            typingUserCount={isPartnerTyping ? typingUserCount : 0}
             onTypingStart={handleTypingStart}
             onTypingStop={handleTypingStop}
             onVoiceCall={() => startCall('voice')}

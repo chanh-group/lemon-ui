@@ -6,7 +6,6 @@ import {
   Delete02Icon as DeleteData,
   Download01Icon as DownloadData,
   EyeIcon as ViewPreviewData,
-  Flag01Icon as FlagData,
   PinIcon as PinData,
   SmileIcon as SmileData,
 } from '@hugeicons/core-free-icons'
@@ -30,7 +29,6 @@ const DeleteIcon = createIcon(DeleteData)
 const CopyIcon = createIcon(CopyData)
 const ViewPreviewIcon = createIcon(ViewPreviewData)
 const PinIcon = createIcon(PinData)
-const FlagIcon = createIcon(FlagData)
 
 export interface MessageActionPillProps {
   message: ChatMessage
@@ -125,12 +123,6 @@ export function MessageActionPill({
     e.stopPropagation()
     setMenuOpen(false)
     onRevoke?.(message.id)
-  }
-
-  const handleReport = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    setMenuOpen(false)
-    toast.success(t('chat.reportSubmitted', 'Đã gửi báo cáo'))
   }
 
   return (
@@ -276,17 +268,6 @@ export function MessageActionPill({
             <PinIcon className="size-4" />
             <span className="font-medium text-xs">{t('chat.pin', 'Ghim')}</span>
           </DropdownMenuItem>
-
-          {/* Báo cáo - for received messages */}
-          {!isMe && (
-            <DropdownMenuItem
-              onClick={handleReport}
-              className="cursor-pointer gap-2.5 rounded-lg py-2 text-muted-foreground focus:bg-muted focus:text-foreground"
-            >
-              <FlagIcon className="size-4" />
-              <span className="font-medium text-xs">{t('chat.report', 'Báo cáo')}</span>
-            </DropdownMenuItem>
-          )}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
