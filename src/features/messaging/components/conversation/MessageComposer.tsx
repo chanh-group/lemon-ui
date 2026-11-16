@@ -61,6 +61,8 @@ export function MessageComposer({
   const inputRef = useRef<HTMLInputElement>(null)
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([])
   const pendingFilesRef = useRef(pendingFiles)
+  const draftRef = useRef(draft)
+  const submittingRef = useRef(false)
   const [isRecording, setIsRecording] = useState(false)
   const [recordingSeconds, setRecordingSeconds] = useState(0)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
@@ -71,6 +73,10 @@ export function MessageComposer({
   useEffect(() => {
     pendingFilesRef.current = pendingFiles
   }, [pendingFiles])
+
+  useEffect(() => {
+    draftRef.current = draft
+  }, [draft])
 
   useEffect(() => {
     return () => {
@@ -289,7 +295,9 @@ export function MessageComposer({
   const handleSubmit = async () => {
     const text = draft.trim()
     if (!text && pendingFiles.length === 0) return
-    if (disabled || isSending) return
+    if (disabled || isSending || submittingRef.current) return
+
+    submittingRef.current = true
 
     if (typingTimer.current) {
       clearTimeout(typingTimer.current)
@@ -299,19 +307,33 @@ export function MessageComposer({
 
     const textToSend = text
     const filesToSend = [...pendingFiles]
-    const sent = await onSubmit(
-      textToSend,
-      undefined,
-      filesToSend.length > 0 ? filesToSend : undefined,
-    )
-    if (sent === false) return
-
-    filesToSend.forEach((file) => {
-      if (file.previewUrl) URL.revokeObjectURL(file.previewUrl)
-    })
     const sentIds = new Set(filesToSend.map((file) => file.id))
     setPendingFiles((current) => current.filter((file) => !sentIds.has(file.id)))
-    requestAnimationFrame(() => inputRef.current?.focus())
+    draftRef.current = ''
+    onDraftChange('')
+
+    try {
+      const sent = await onSubmit(
+        textToSend,
+        undefined,
+        filesToSend.length > 0 ? filesToSend : undefined,
+      )
+      if (sent === false) {
+        setPendingFiles((current) => [...filesToSend, ...current])
+        if (!draftRef.current) onDraftChange(textToSend)
+        return
+      }
+
+      filesToSend.forEach((file) => {
+        if (file.previewUrl) URL.revokeObjectURL(file.previewUrl)
+      })
+      requestAnimationFrame(() => inputRef.current?.focus())
+    } catch {
+      setPendingFiles((current) => [...filesToSend, ...current])
+      if (!draftRef.current) onDraftChange(textToSend)
+    } finally {
+      submittingRef.current = false
+    }
   }
 
   const canSubmit = (draft.trim().length > 0 || pendingFiles.length > 0) && !disabled && !isSending
@@ -356,12 +378,6 @@ export function MessageComposer({
               </button>
             </div>
           ))}
-          {isSending && (
-            <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground animate-pulse">
-              <span className="size-2 rounded-full bg-primary animate-ping" />
-              <span>{t('chat.uploadingFiles', 'Đang gửi tệp đính kèm…')}</span>
-            </div>
-          )}
         </div>
       )}
 
