@@ -17,6 +17,8 @@ import {
 import { queryKeys } from '@/infrastructure/query/keys'
 import {
   getConversationMessages,
+  editMessage,
+  deleteMessageForMe,
   markConversationRead,
   reactToMessage,
   revokeMessage,
@@ -662,7 +664,14 @@ export function useRevokeMessageMutation(conversationId: string | null) {
               ...page,
               items: page.items.map((m) =>
                 m.id === revokedMsg.id
-                  ? { ...m, deletedAt: revokedMsg.deletedAt }
+                  ? {
+                      ...m,
+                      body: null,
+                      attachments: undefined,
+                      reactions: undefined,
+                      storyPreview: null,
+                      deletedAt: revokedMsg.deletedAt,
+                    }
                   : m.replyTarget?.id === revokedMsg.id
                     ? {
                         ...m,
@@ -684,7 +693,14 @@ export function useRevokeMessageMutation(conversationId: string | null) {
         (old) =>
           old?.map((message) =>
             message.id === revokedMsg.id
-              ? { ...message, deletedAt: revokedMsg.deletedAt }
+              ? {
+                  ...message,
+                  body: null,
+                  attachments: undefined,
+                  reactions: undefined,
+                  storyPreview: null,
+                  deletedAt: revokedMsg.deletedAt,
+                }
               : message.replyTarget?.id === revokedMsg.id
                 ? {
                     ...message,
@@ -698,6 +714,71 @@ export function useRevokeMessageMutation(conversationId: string | null) {
                 : message,
           ),
       )
+      void queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.conversations })
+      void queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.mediaArchive(conversationId) })
+    },
+  })
+}
+
+/** Cập nhật tin đã sửa trong lịch sử, tin realtime và các trích dẫn trả lời. */
+export function useEditMessageMutation(conversationId: string | null) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ messageId, body }: { messageId: string; body: string }) =>
+      editMessage(messageId, body),
+    onSuccess: (edited) => {
+      if (!conversationId) return
+      const updateMessage = (message: MessageResponse): MessageResponse =>
+        message.id === edited.id
+          ? { ...message, body: edited.body, editedAt: edited.editedAt }
+          : message.replyTarget?.id === edited.id && !message.replyTarget.deletedAt
+            ? { ...message, replyTarget: { ...message.replyTarget, body: edited.body } }
+            : message
+
+      queryClient.setQueryData<InfiniteData<MessageTimelineResponse, MessagePageParam>>(
+        CHAT_QUERY_KEYS.messages(conversationId),
+        (old) =>
+          old && {
+            ...old,
+            pages: old.pages.map((page) => ({
+              ...page,
+              items: page.items.map(updateMessage),
+            })),
+          },
+      )
+      queryClient.setQueryData<MessageResponse[]>(
+        CHAT_QUERY_KEYS.liveMessages(conversationId),
+        (old) => old?.map(updateMessage),
+      )
+      void queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.conversations })
+    },
+  })
+}
+
+export function useDeleteMessageForMeMutation(conversationId: string | null) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: deleteMessageForMe,
+    onSuccess: (_, messageId) => {
+      if (!conversationId) return
+      queryClient.setQueryData<InfiniteData<MessageTimelineResponse, MessagePageParam>>(
+        CHAT_QUERY_KEYS.messages(conversationId),
+        (old) =>
+          old && {
+            ...old,
+            pages: old.pages.map((page) => ({
+              ...page,
+              items: page.items.filter((message) => message.id !== messageId),
+            })),
+          },
+      )
+      queryClient.setQueryData<MessageResponse[]>(
+        CHAT_QUERY_KEYS.liveMessages(conversationId),
+        (old) => old?.filter((message) => message.id !== messageId),
+      )
+      void queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.conversations })
+      void queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.mediaArchive(conversationId) })
     },
   })
 }

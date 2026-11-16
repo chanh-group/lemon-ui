@@ -90,6 +90,30 @@ describe('conversation cache updates', () => {
 })
 
 describe('chat.mapper', () => {
+  it('offers editing only for persisted text sent by the current user', () => {
+    const raw: MessageResponse = {
+      id: 'message-1',
+      conversationId: 'conv',
+      senderId: 'me',
+      kind: 'TEXT',
+      body: 'hello',
+      replyToId: null,
+      createdAt: '2026-01-01T00:00:00Z',
+      editedAt: null,
+      deletedAt: null,
+    }
+
+    expect(mapMessageResponse(raw, 'me').canEdit).toBe(true)
+    expect(mapMessageResponse(raw, 'other').canEdit).toBe(false)
+    expect(mapMessageResponse({ ...raw, kind: 'STORY_REPLY' }, 'me').canEdit).toBe(false)
+    expect(mapMessageResponse({ ...raw, kind: 'IMAGE' }, 'me').canEdit).toBe(false)
+    expect(mapMessageResponse({ ...raw, id: 'temp-1' }, 'me').canEdit).toBe(false)
+    expect(mapMessageResponse({ ...raw, sendState: 'uncertain' }, 'me').canEdit).toBe(false)
+    expect(mapMessageResponse({ ...raw, deletedAt: '2026-01-02T00:00:00Z' }, 'me').canEdit).toBe(
+      false,
+    )
+  })
+
   it('preserves story replies and the referenced message in the timeline', () => {
     const target = {
       id: 'original',
@@ -214,7 +238,7 @@ describe('chat.mapper', () => {
     }
 
     const mapped = mapMessageResponse(raw, 'user-me')
-    expect(mapped.text).toBe('Tin nhắn đã bị thu hồi')
+    expect(mapped.text).toBe('')
     expect(mapped.deletedAt).toBe('2026-10-25T10:15:00Z')
   })
 
@@ -303,7 +327,7 @@ describe('chat.mapper', () => {
     })
 
     expect(mapped.preview).toBe('[message-revoked]')
-    expect(preview.text).toBe('This message was unsent')
+    expect(preview.text).toBe('This message was deleted')
   })
 
   it('maps reactions and isForwarded flag correctly', () => {

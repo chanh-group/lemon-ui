@@ -320,7 +320,14 @@ export function useChatRealtime(activeConversationId: string | null) {
               ...page,
               items: page.items.map((m) =>
                 m.id === revoked.id
-                  ? { ...m, deletedAt: revoked.deletedAt }
+                  ? {
+                      ...m,
+                      body: null,
+                      attachments: undefined,
+                      reactions: undefined,
+                      storyPreview: null,
+                      deletedAt: revoked.deletedAt,
+                    }
                   : m.replyTarget?.id === revoked.id
                     ? {
                         ...m,
@@ -342,7 +349,14 @@ export function useChatRealtime(activeConversationId: string | null) {
         (old) =>
           old?.map((message) =>
             message.id === revoked.id
-              ? { ...message, deletedAt: revoked.deletedAt }
+              ? {
+                  ...message,
+                  body: null,
+                  attachments: undefined,
+                  reactions: undefined,
+                  storyPreview: null,
+                  deletedAt: revoked.deletedAt,
+                }
               : message.replyTarget?.id === revoked.id
                 ? {
                     ...message,
@@ -358,6 +372,35 @@ export function useChatRealtime(activeConversationId: string | null) {
       )
 
       void queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.conversations })
+      void queryClient.invalidateQueries({
+        queryKey: CHAT_QUERY_KEYS.mediaArchive(revoked.conversationId),
+      })
+    }
+
+    const handleMessageHidden = ({
+      conversationId,
+      messageId,
+    }: {
+      conversationId: string
+      messageId: string
+    }) => {
+      queryClient.setQueryData<InfiniteData<MessageTimelineResponse, MessagePageParam>>(
+        CHAT_QUERY_KEYS.messages(conversationId),
+        (old) =>
+          old && {
+            ...old,
+            pages: old.pages.map((page) => ({
+              ...page,
+              items: page.items.filter((message) => message.id !== messageId),
+            })),
+          },
+      )
+      queryClient.setQueryData<MessageResponse[]>(
+        CHAT_QUERY_KEYS.liveMessages(conversationId),
+        (old) => old?.filter((message) => message.id !== messageId),
+      )
+      void queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.conversations })
+      void queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.mediaArchive(conversationId) })
     }
 
     // D. Đối phương đang gõ phím
@@ -414,6 +457,7 @@ export function useChatRealtime(activeConversationId: string | null) {
     socket.on('read:updated', handleReadUpdated)
     socket.on('message:updated', handleMessageUpdated)
     socket.on('message:revoked', handleMessageRevoked)
+    socket.on('message:hidden', handleMessageHidden)
     socket.on('typing', handleTyping)
     socket.on('message:reaction', handleMessageReaction)
 
@@ -430,6 +474,7 @@ export function useChatRealtime(activeConversationId: string | null) {
       socket.off('read:updated', handleReadUpdated)
       socket.off('message:updated', handleMessageUpdated)
       socket.off('message:revoked', handleMessageRevoked)
+      socket.off('message:hidden', handleMessageHidden)
       socket.off('typing', handleTyping)
       socket.off('message:reaction', handleMessageReaction)
     }

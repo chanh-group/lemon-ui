@@ -16,6 +16,7 @@ import {
   CheckCheckIcon as CheckCheckData,
   CheckIcon as CheckData,
   Clock01Icon as ClockData,
+  Delete02Icon as DeleteData,
   Film01Icon as FilmData,
   Image01Icon as ImageIconData,
   Share01Icon as ForwardData,
@@ -25,6 +26,7 @@ import { createIcon } from '@/components/icons/hugeIcon'
 const Check = createIcon(CheckData)
 const CheckCheck = createIcon(CheckCheckData)
 const Clock = createIcon(ClockData)
+const DeleteIcon = createIcon(DeleteData)
 const Film = createIcon(FilmData)
 const ImageIcon = createIcon(ImageIconData)
 const Sticker = createIcon(StickerData)
@@ -43,6 +45,8 @@ import { isAudio, isImage, isVideo } from '@/features/file/utils/fileTypes'
 import {
   useReactMessageMutation,
   useRevokeMessageMutation,
+  useEditMessageMutation,
+  useDeleteMessageForMeMutation,
 } from '@/features/messaging/hooks/useMessages'
 import { MessageActionPill } from './AttachmentActionMenu'
 import { AttachmentBubble } from './AttachmentBubble'
@@ -171,6 +175,8 @@ const MessageRowView = memo(function MessageRowView({
   onOpenLightbox,
   onOpenDocument,
   onRevoke,
+  onDeleteForMe,
+  onEdit,
   onReact,
   onForward,
   onReply,
@@ -185,6 +191,8 @@ const MessageRowView = memo(function MessageRowView({
   onOpenLightbox: (attachment: MessageAttachmentItem) => void
   onOpenDocument: (attachment: MessageAttachmentItem) => void
   onRevoke?: (messageId: string) => void
+  onDeleteForMe?: (messageId: string) => void
+  onEdit?: (messageId: string, body: string) => Promise<boolean>
   onReact?: (messageId: string, emoji: string) => void
   onForward?: (message: ChatMessage) => void
   onReply?: (message: ChatMessage) => void
@@ -204,7 +212,25 @@ const MessageRowView = memo(function MessageRowView({
 
   const [isHeld, setIsHeld] = useState(false)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+  const [editDraft, setEditDraft] = useState('')
+  const [isSavingEdit, setIsSavingEdit] = useState(false)
   const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const saveEdit = async () => {
+    if (isSavingEdit || !onEdit) return
+    if (!editDraft.trim() || editDraft.length > 4000) return
+    if (editDraft === msg.text) {
+      setIsEditing(false)
+      return
+    }
+    setIsSavingEdit(true)
+    try {
+      if (await onEdit(msg.id, editDraft)) setIsEditing(false)
+    } finally {
+      setIsSavingEdit(false)
+    }
+  }
 
   const handleTouchStart = () => {
     holdTimerRef.current = setTimeout(() => {
@@ -229,30 +255,51 @@ const MessageRowView = memo(function MessageRowView({
 
   // Floating 3-button Action Bar on hover/hold (Messenger-style: Emoji, Forward, 3-dots)
   const showActions = isHeld || isMenuOpen
-  const actionBar = !msg.deletedAt ? (
-    <div
-      className={cn(
-        'flex items-center gap-1 transition-opacity duration-150 self-center shrink-0',
-        isMe ? 'mr-1.5' : 'ml-1.5',
-        showActions
-          ? 'opacity-100 pointer-events-auto'
-          : 'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto',
-      )}
-    >
-      <MessageActionPill
-        message={msg}
-        attachment={firstAttachment}
-        isMe={isMe}
-        onPreview={handleQuickPreview}
-        onRevoke={onRevoke}
-        onReact={onReact}
-        onForward={onForward}
-        onReply={msg.status === 'sending' || msg.status === 'uncertain' ? undefined : onReply}
-        align={isMe ? 'end' : 'start'}
-        onOpenChange={setIsMenuOpen}
-      />
-    </div>
-  ) : null
+  const actionBar =
+    msg.deletedAt && onDeleteForMe ? (
+      <button
+        type="button"
+        onClick={() => onDeleteForMe(msg.id)}
+        aria-label={t('chat.deleteMessage')}
+        title={t('chat.deleteMessage')}
+        className="grid size-8 shrink-0 place-items-center rounded-full border border-border bg-card text-destructive hover:bg-muted"
+      >
+        <DeleteIcon className="size-4" aria-hidden="true" />
+      </button>
+    ) : !msg.deletedAt ? (
+      <div
+        className={cn(
+          'flex items-center gap-1 transition-opacity duration-150 self-center shrink-0',
+          isMe ? 'mr-1.5' : 'ml-1.5',
+          showActions
+            ? 'opacity-100 pointer-events-auto'
+            : 'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto',
+        )}
+      >
+        <MessageActionPill
+          message={msg}
+          attachment={firstAttachment}
+          isMe={isMe}
+          onPreview={handleQuickPreview}
+          onRevoke={onRevoke}
+          onDeleteForMe={onDeleteForMe}
+          onEdit={
+            onEdit
+              ? (message) => {
+                  setEditDraft(message.text ?? '')
+                  setIsEditing(true)
+                  setIsHeld(false)
+                }
+              : undefined
+          }
+          onReact={onReact}
+          onForward={onForward}
+          onReply={msg.status === 'sending' || msg.status === 'uncertain' ? undefined : onReply}
+          align={isMe ? 'end' : 'start'}
+          onOpenChange={setIsMenuOpen}
+        />
+      </div>
+    ) : null
 
   const isPureMedia =
     hasAttachments &&
@@ -289,12 +336,13 @@ const MessageRowView = memo(function MessageRowView({
       {!isMe && !isLast && <span aria-hidden="true" className="size-7 shrink-0" />}
 
       {/* 3 action buttons on the left of bubble for isMe */}
-      {isMe && actionBar}
+      {isMe && !isEditing && actionBar}
 
       {/* Single Message Box */}
       <div
         className={cn(
           'flex max-w-[78%] flex-col sm:max-w-[65%]',
+          isEditing && 'w-[78%] sm:w-[min(65%,28rem)]',
           isMe ? 'items-end' : 'items-start',
           msg.status === 'sending' && 'opacity-80',
         )}
@@ -302,6 +350,7 @@ const MessageRowView = memo(function MessageRowView({
         <div
           className={cn(
             'w-fit max-w-full text-sm leading-relaxed wrap-break-word whitespace-pre-wrap',
+            isEditing && 'w-full',
             isPureMedia
               ? 'p-0 bg-transparent border-0 shadow-none'
               : isMediaWithCaption
@@ -352,7 +401,7 @@ const MessageRowView = memo(function MessageRowView({
 
           {msg.deletedAt ? (
             <span className="italic text-muted-foreground text-xs">
-              {msg.text || t('chat.messageRevokedText', 'Tin nhắn đã bị thu hồi')}
+              {t('chat.messageRevokedText')}
             </span>
           ) : (
             <>
@@ -371,10 +420,47 @@ const MessageRowView = memo(function MessageRowView({
                 </div>
               )}
 
-              {/* Render Text / Caption if present */}
-              {msg.text && (
+              {isEditing ? (
+                <div className="flex flex-col gap-2">
+                  <textarea
+                    autoFocus
+                    value={editDraft}
+                    onChange={(event) => setEditDraft(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Escape' && !isSavingEdit) setIsEditing(false)
+                      if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+                        event.preventDefault()
+                        void saveEdit()
+                      }
+                    }}
+                    disabled={isSavingEdit}
+                    maxLength={4000}
+                    rows={3}
+                    aria-label={t('chat.editMessage')}
+                    className="min-h-20 w-full resize-y rounded-lg border border-border bg-background px-2.5 py-2 text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  />
+                  <div className="flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsEditing(false)}
+                      disabled={isSavingEdit}
+                      className="rounded-md px-3 py-1 text-xs hover:bg-muted disabled:opacity-50"
+                    >
+                      {t('chat.cancelEdit')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void saveEdit()}
+                      disabled={isSavingEdit || !editDraft.trim() || editDraft === msg.text}
+                      className="rounded-md bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+                    >
+                      {t('chat.saveEdit')}
+                    </button>
+                  </div>
+                </div>
+              ) : msg.text ? (
                 <div className={cn(isMediaWithCaption && 'px-3.5 py-2 text-sm')}>{msg.text}</div>
-              )}
+              ) : null}
 
               {/* Legacy fallback for media without attachments */}
               {!hasAttachments && !msg.storyPreview && msg.kind !== 'text' && (
@@ -386,6 +472,12 @@ const MessageRowView = memo(function MessageRowView({
             </>
           )}
         </div>
+
+        {msg.editedAt && !msg.deletedAt && !isEditing && (
+          <span className="mt-1 px-1 text-[11px] text-muted-foreground">
+            {t('chat.messageEditedLabel')}
+          </span>
+        )}
 
         {/* Reactions floating independently outside the bubble, matching image 2 & Messenger */}
         {msg.reactions && msg.reactions.length > 0 && (
@@ -539,8 +631,12 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
   const [forwardingMessage, setForwardingMessage] = useState<ChatMessage | null>(null)
 
   const revokeMutation = useRevokeMessageMutation(conversationId ?? null)
+  const editMutation = useEditMessageMutation(conversationId ?? null)
+  const deleteForMeMutation = useDeleteMessageForMeMutation(conversationId ?? null)
   const reactMutation = useReactMessageMutation(conversationId ?? null)
   const revokeMessage = revokeMutation.mutate
+  const editMessage = editMutation.mutateAsync
+  const deleteForMe = deleteForMeMutation.mutate
   const reactMessage = reactMutation.mutate
 
   // Callback ổn định để memo của từng row không bị phá khi list re-render lúc cuộn.
@@ -548,14 +644,28 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
     (messageId: string) => {
       revokeMessage(messageId, {
         onSuccess: () => {
-          toast.success(t('chat.messageRevoked', 'Đã gỡ tin nhắn'))
+          toast.success(t('chat.messageRevoked'))
         },
         onError: () => {
-          toast.error(t('chat.messageRevokeFailed', 'Không thể gỡ tin nhắn'))
+          toast.error(t('chat.messageRevokeFailed'))
         },
       })
     },
     [revokeMessage, t],
+  )
+
+  const handleEditMessage = useCallback(
+    async (messageId: string, body: string) => {
+      try {
+        await editMessage({ messageId, body })
+        toast.success(t('chat.messageEdited'))
+        return true
+      } catch {
+        toast.error(t('chat.messageEditFailed'))
+        return false
+      }
+    },
+    [editMessage, t],
   )
 
   const handleReactMessage = useCallback(
@@ -563,6 +673,16 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
       reactMessage({ messageId, emoji })
     },
     [reactMessage],
+  )
+
+  const handleDeleteForMe = useCallback(
+    (messageId: string) => {
+      deleteForMe(messageId, {
+        onSuccess: () => toast.success(t('chat.messageDeletedForMe')),
+        onError: () => toast.error(t('chat.messageDeleteFailed')),
+      })
+    },
+    [deleteForMe, t],
   )
 
   const handleForwardMessage = useCallback((message: ChatMessage) => {
@@ -752,6 +872,8 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
         onOpenLightbox={setLightboxAttachment}
         onOpenDocument={setDocumentAttachment}
         onRevoke={handleRevokeMessage}
+        onDeleteForMe={handleDeleteForMe}
+        onEdit={handleEditMessage}
         onReact={handleReactMessage}
         onForward={handleForwardMessage}
         onReply={onReply}

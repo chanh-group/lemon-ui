@@ -274,8 +274,14 @@ export function mapMessageResponse(raw: MessageResponse, currentUserId?: string)
     id: raw.id,
     fromMe: isMe,
     sender: undefined,
-    text: isRevoked ? 'Tin nhắn đã bị thu hồi' : raw.body || '',
+    text: isRevoked ? '' : raw.body || '',
     kind: uiKind,
+    canEdit:
+      isMe &&
+      raw.kind === 'TEXT' &&
+      !isRevoked &&
+      !raw.id.startsWith('temp-') &&
+      raw.sendState !== 'uncertain',
     attachments: raw.attachments,
     photoLabel: raw.attachments?.[0]?.fileName,
     time: formatTimeHHmm(raw.createdAt),

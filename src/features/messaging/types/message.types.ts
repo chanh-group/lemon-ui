@@ -25,6 +25,7 @@ export interface ChatMessage {
   sender?: string
   text?: string
   kind: 'text' | 'photo' | 'video' | 'audio' | 'file' | 'gif' | 'sticker'
+  canEdit?: boolean
   photoLabel?: string
   attachments?: MessageAttachmentItem[]
   time: string
