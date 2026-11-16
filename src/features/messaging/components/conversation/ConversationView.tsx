@@ -329,10 +329,12 @@ export function ConversationView({
                 ✓
               </span>
               <h2 className="text-base font-semibold text-foreground">
-                {t('chat.newConnectionTitle', { name: conversation.name })}
+                {conversation.isGroup
+                  ? t('chat.emptyGroupTitle')
+                  : t('chat.newConnectionTitle', { name: conversation.name })}
               </h2>
               <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-                {t('chat.newConnectionPrompt')}
+                {conversation.isGroup ? t('chat.emptyGroupPrompt') : t('chat.newConnectionPrompt')}
               </p>
             </div>
           ) : (

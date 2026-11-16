@@ -11,7 +11,7 @@ export interface Conversation {
   isGroup: boolean
   avatarUrl?: string | null
   memberCount?: number
-  myRole?: 'OWNER' | 'ADMIN' | 'MEMBER'
+  myRole?: 'ADMIN' | 'MEMBER'
   members?: string
   lastActive?: string
   partnerId?: string
@@ -37,7 +37,7 @@ export interface ConversationResponse {
   title?: string | null
   avatarUrl?: string | null
   memberCount?: number
-  myRole?: 'OWNER' | 'ADMIN' | 'MEMBER'
+  myRole?: 'ADMIN' | 'MEMBER'
   partner?: ConversationPartnerResponse
   lastMessagePreview: string | null
   lastMessageSenderId?: string | null
@@ -54,6 +54,6 @@ export interface ConversationMemberResponse {
   username: string
   fullName: string
   avatarUrl: string | null
-  role: 'OWNER' | 'ADMIN' | 'MEMBER'
+  role: 'ADMIN' | 'MEMBER'
   joinedAt: string
 }

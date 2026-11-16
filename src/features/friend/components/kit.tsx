@@ -39,10 +39,14 @@ export function SearchBox({
   value,
   onChange,
   hint,
+  maxLength,
+  disabled,
 }: {
   value: string
   onChange: (v: string) => void
   hint: string
+  maxLength?: number
+  disabled?: boolean
 }) {
   return (
     <label className="chat-search group flex items-center gap-2 rounded-full border border-border bg-muted px-3.5 py-2 transition-all duration-150 focus-within:border-ring focus-within:bg-card">
@@ -55,6 +59,8 @@ export function SearchBox({
         onChange={(e) => onChange(e.target.value)}
         placeholder={hint}
         aria-label={hint}
+        maxLength={maxLength}
+        disabled={disabled}
         className="w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
       />
     </label>

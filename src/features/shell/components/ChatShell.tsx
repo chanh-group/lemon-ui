@@ -86,8 +86,7 @@ export function ChatShell() {
   }, [legacySelect, navigate, selectedId, tab])
 
   // Realtime Socket.IO sync
-  const { isPartnerTyping, typingUserCount, typingUserIds, connectionStatus } =
-    useChatRealtime(selectedId)
+  const { isPartnerTyping, typingUserCount, typingUserIds } = useChatRealtime(selectedId)
 
   // API Queries & Mutations
   const conversationsQuery = useConversationsQuery()
@@ -329,17 +328,6 @@ export function ChatShell() {
         !selectedId && 'pb-16',
       )}
     >
-      {connectionStatus !== 'connected' && (
-        <div
-          className="fixed right-3 top-3 z-50 rounded-lg border border-border bg-card px-3 py-2 text-xs text-muted-foreground shadow-md"
-          role="status"
-          aria-live="polite"
-        >
-          {connectionStatus === 'connecting'
-            ? t('chat.realtimeConnecting')
-            : t('chat.realtimeOffline')}
-        </div>
-      )}
       <SideNav
         active={tab}
         onChange={(nextTab) => {

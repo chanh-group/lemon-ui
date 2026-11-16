@@ -35,6 +35,20 @@ export async function createGroup(payload: {
   return res.data
 }
 
+export async function uploadGroupAvatar(
+  conversationId: string,
+  file: File,
+): Promise<ConversationResponse> {
+  const formData = new FormData()
+  formData.append('file', file)
+  const res = await api.post<ConversationResponse>(
+    `/files/group-avatars/${conversationId}/upload`,
+    formData,
+    { headers: { 'Content-Type': 'multipart/form-data' } },
+  )
+  return res.data
+}
+
 export async function getGroupMembers(
   conversationId: string,
 ): Promise<ConversationMemberResponse[]> {
@@ -74,14 +88,11 @@ export async function updateGroupMemberRole(
   await api.patch(`/conversations/${conversationId}/members/${userId}/role`, { role })
 }
 
-export async function transferGroupOwnership(
-  conversationId: string,
-  userId: string,
-): Promise<void> {
-  await api.post(`/conversations/${conversationId}/transfer-ownership`, { userId })
-}
-
 export async function leaveGroup(conversationId: string): Promise<{ closed: boolean }> {
   const res = await api.post<{ closed: boolean }>(`/conversations/${conversationId}/leave`)
   return res.data
+}
+
+export async function disbandGroup(conversationId: string): Promise<void> {
+  await api.delete(`/conversations/${conversationId}`)
 }

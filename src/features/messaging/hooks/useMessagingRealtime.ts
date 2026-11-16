@@ -444,6 +444,14 @@ export function useChatRealtime(activeConversationId: string | null) {
         })
       }
     }
+    const clearRemovedConversation = (conversationId: string) => {
+      queryClient.removeQueries({ queryKey: CHAT_QUERY_KEYS.messages(conversationId) })
+      queryClient.removeQueries({ queryKey: CHAT_QUERY_KEYS.liveMessages(conversationId) })
+      queryClient.removeQueries({ queryKey: CHAT_QUERY_KEYS.mediaArchive(conversationId) })
+      queryClient.removeQueries({ queryKey: queryKeys.chat.conversation(conversationId) })
+      queryClient.removeQueries({ queryKey: queryKeys.chat.groupMembers(conversationId) })
+      if (activeConversationId === conversationId) navigate(ROUTES.messages)
+    }
     const handleMemberRemoved = (event: { conversationId: string; userId: string }) => {
       handleConversationChanged(event)
       setPartnerTypingMap((current) => {
@@ -451,14 +459,16 @@ export function useChatRealtime(activeConversationId: string | null) {
         delete next[event.conversationId]
         return next
       })
-      if (event.userId === userId) {
-        queryClient.removeQueries({ queryKey: CHAT_QUERY_KEYS.messages(event.conversationId) })
-        queryClient.removeQueries({ queryKey: CHAT_QUERY_KEYS.liveMessages(event.conversationId) })
-        queryClient.removeQueries({ queryKey: CHAT_QUERY_KEYS.mediaArchive(event.conversationId) })
-        queryClient.removeQueries({ queryKey: queryKeys.chat.conversation(event.conversationId) })
-        queryClient.removeQueries({ queryKey: queryKeys.chat.groupMembers(event.conversationId) })
-        if (activeConversationId === event.conversationId) navigate(ROUTES.messages)
-      }
+      if (event.userId === userId) clearRemovedConversation(event.conversationId)
+    }
+    const handleConversationDisbanded = (event: { conversationId: string }) => {
+      handleConversationChanged(event)
+      setPartnerTypingMap((current) => {
+        const next = { ...current }
+        delete next[event.conversationId]
+        return next
+      })
+      clearRemovedConversation(event.conversationId)
     }
 
     // F. Cập nhật cảm xúc tin nhắn (Điểm A)
@@ -497,6 +507,7 @@ export function useChatRealtime(activeConversationId: string | null) {
     socket.on('member:added', handleConversationChanged)
     socket.on('member:role-changed', handleConversationChanged)
     socket.on('member:removed', handleMemberRemoved)
+    socket.on('conversation:disbanded', handleConversationDisbanded)
 
     return () => {
       timersForEffect.forEach((timer) => clearTimeout(timer))
@@ -519,6 +530,7 @@ export function useChatRealtime(activeConversationId: string | null) {
       socket.off('member:added', handleConversationChanged)
       socket.off('member:role-changed', handleConversationChanged)
       socket.off('member:removed', handleMemberRemoved)
+      socket.off('conversation:disbanded', handleConversationDisbanded)
     }
   }, [status, activeConversationId, userId, queryClient, t, navigate])
 

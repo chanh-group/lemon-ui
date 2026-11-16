@@ -5,6 +5,7 @@ import {
   getConversations,
   getOrCreateDirectConversation,
   createGroup,
+  uploadGroupAvatar,
 } from '../api/conversation.api'
 import { getGroupMembers } from '../api/conversation.api'
 import { mapConversationResponse } from '../utils/chat.mapper'
@@ -80,6 +81,21 @@ export function useCreateGroupMutation() {
         current ? [group, ...current.filter((item) => item.id !== group.id)] : [group],
       )
       queryClient.setQueryData(conversationKeys.conversation(group.id), group)
+      void queryClient.invalidateQueries({ queryKey: conversationKeys.conversations })
+    },
+  })
+}
+
+export function useUploadGroupAvatarMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ conversationId, file }: { conversationId: string; file: File }) =>
+      uploadGroupAvatar(conversationId, file),
+    onSuccess: (group) => {
+      queryClient.setQueryData(conversationKeys.conversation(group.id), group)
+      queryClient.setQueryData<ConversationResponse[]>(conversationKeys.conversations, (current) =>
+        current?.map((item) => (item.id === group.id ? group : item)),
+      )
       void queryClient.invalidateQueries({ queryKey: conversationKeys.conversations })
     },
   })
