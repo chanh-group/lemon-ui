@@ -1,0 +1,4 @@
+export const STORY_MAX_MEDIA_BYTES = 25 * 1024 * 1024
+export const STORY_MAX_VIDEO_INPUT_BYTES = 100 * 1024 * 1024
+export const STORY_MAX_VIDEO_SECONDS = 60
+export const STORY_MAX_TRIM_SECONDS = 59.9
