@@ -82,6 +82,34 @@ describe('story API contract', () => {
       path: '/stories',
       body: { kind: 'IMAGE', objectKey: 'stories/u/key.jpg', caption: 'hello' },
     })
+    expect(calls[1]?.body).not.toMatchObject({ durationMs: expect.any(Number) })
+  })
+
+  it('includes video duration when creating a media story', async () => {
+    const calls: Array<{ path: string; body: unknown }> = []
+    api.post = vi.fn((path: string, body: unknown) => {
+      calls.push({ path, body })
+      return Promise.resolve({
+        data:
+          path === '/files/presign'
+            ? { uploadUrl: 'https://example.test/upload', objectKey: 'stories/u/video.mp4' }
+            : { id: 's', userId: 'u', kind: 'VIDEO', createdAt: new Date().toISOString() },
+      })
+    }) as unknown as typeof api.post
+    globalThis.fetch = vi.fn(() =>
+      Promise.resolve(new Response(null, { status: 200 })),
+    ) as unknown as typeof fetch
+
+    await createMediaStory({
+      file: new File(['video'], 'video.mp4', { type: 'video/mp4' }),
+      captionText: '',
+      durationMs: 59_900,
+    })
+
+    expect(calls.at(-1)).toMatchObject({
+      path: '/stories',
+      body: { kind: 'VIDEO', durationMs: 59_900 },
+    })
   })
 
   it('uses the fallback object key after direct upload fails', async () => {

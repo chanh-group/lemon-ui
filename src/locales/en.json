@@ -467,7 +467,10 @@
     "allowStoryReplies": "Allow replies",
     "allowStoryReactions": "Allow reactions",
     "replyPlaceholder": "Reply to story...",
-    "storyFileInvalid": "Choose a JPEG, PNG, WebP or GIF image up to 10 MB, or an MP4, WebM or MOV video up to 50 MB.",
+    "storyFileInvalid": "Choose a JPEG, PNG, WebP or GIF image up to 25 MB, or an MP4, WebM or MOV video up to 100 MB.",
+    "storyVideoTooLarge": "This video is larger than 100 MB and cannot be processed. Choose a smaller video.",
+    "storyProcessing": "Processing video… {{progress}}%",
+    "storyVideoProcessFailed": "Could not process the video. Try another file.",
     "loadMore": "Load more",
     "muteVideo": "Mute video",
     "unmuteVideo": "Unmute video",
@@ -536,7 +539,10 @@
     "leaveGroupConfirmTitle": "Leave group {{name}}?",
     "leaveGroupConfirmDesc": "You will no longer receive messages from this group.",
     "leaveGroupAction": "Leave group",
-    "defaultPartnerName": "this user"
+    "defaultPartnerName": "this user",
+    "storyTrimHint": "Video exceeds 1 minute. Choose the segment to share (up to 1 minute).",
+    "storyTrimRange": "Selected: {{start}}s – {{end}}s",
+    "storyVideoInvalid": "Cannot read this video. Choose another file."
   },
   "theme": {
     "toLight": "Switch to light mode",

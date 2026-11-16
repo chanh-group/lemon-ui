@@ -466,7 +466,10 @@
     "allowStoryReplies": "Cho phép trả lời",
     "allowStoryReactions": "Cho phép bày tỏ cảm xúc",
     "replyPlaceholder": "Trả lời tin...",
-    "storyFileInvalid": "Chọn ảnh JPEG, PNG, WebP, GIF tối đa 10 MB hoặc video MP4, WebM, MOV tối đa 50 MB.",
+    "storyFileInvalid": "Chọn ảnh JPEG, PNG, WebP, GIF tối đa 25 MB hoặc video MP4, WebM, MOV tối đa 100 MB.",
+    "storyVideoTooLarge": "Video lớn hơn 100 MB nên không thể xử lý. Hãy chọn video nhỏ hơn.",
+    "storyProcessing": "Đang xử lý video… {{progress}}%",
+    "storyVideoProcessFailed": "Không thể xử lý video này. Hãy thử tệp khác.",
     "loadMore": "Xem thêm",
     "muteVideo": "Tắt âm thanh",
     "unmuteVideo": "Bật âm thanh",
@@ -535,7 +538,10 @@
     "leaveGroupConfirmTitle": "Rời khỏi nhóm {{name}}?",
     "leaveGroupConfirmDesc": "Bạn sẽ không còn nhận được tin nhắn từ nhóm này nữa.",
     "leaveGroupAction": "Rời nhóm",
-    "defaultPartnerName": "người dùng này"
+    "defaultPartnerName": "người dùng này",
+    "storyTrimHint": "Video dài hơn 1 phút. Chọn đoạn muốn đăng (tối đa 1 phút).",
+    "storyTrimRange": "Đoạn chọn: {{start}}s – {{end}}s",
+    "storyVideoInvalid": "Không đọc được video này. Hãy chọn tệp khác."
   },
   "theme": {
     "toLight": "Chuyển sang chế độ sáng",

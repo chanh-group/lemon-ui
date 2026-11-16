@@ -2,12 +2,27 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ImagePlusIcon as MediaData } from '@hugeicons/core-free-icons'
 import { createIcon } from '@/components/icons/hugeIcon'
+import {
+  STORY_MAX_MEDIA_BYTES,
+  STORY_MAX_TRIM_SECONDS,
+  STORY_MAX_VIDEO_INPUT_BYTES,
+  STORY_MAX_VIDEO_SECONDS,
+} from '../constants'
+import {
+  clampTrimStart,
+  isVideoDurationKnown,
+  maxTrimStartSeconds,
+  planStoryVideo,
+  toStoryDurationMs,
+} from '../utils/storyVideo'
+import { processStoryVideo } from '../utils/storyVideoProcessor'
+import { readVideoDuration } from '../utils/readVideoDuration'
 const Media = createIcon(MediaData)
 
 interface MediaStoryActorProps {
   onDiscard: () => void
   /** Nhận kèm captionText để gửi API. */
-  onShare: (file: File, captionText: string) => void
+  onShare: (file: File, captionText: string, durationMs?: number) => void
   isSharing: boolean
 }
 
@@ -15,10 +30,25 @@ interface MediaStoryActorProps {
 export function MediaStoryEditor({ onDiscard, onShare, isSharing }: MediaStoryActorProps) {
   const { t } = useTranslation()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const activeRef = useRef(true)
+  const controllerRef = useRef<AbortController>(null)
   const [file, setFile] = useState<File | null>(null)
   const [objectUrl, setObjectUrl] = useState<string | null>(null)
   const [caption, setCaption] = useState('')
   const [fileError, setFileError] = useState('')
+  const [duration, setDuration] = useState<number | null>(null)
+  const [trimStart, setTrimStart] = useState(0)
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const [unreadable, setUnreadable] = useState(false)
+  useEffect(() => {
+    activeRef.current = true
+    return () => {
+      activeRef.current = false
+      controllerRef.current?.abort()
+    }
+  }, [])
 
   const handleFile = (selected: File | undefined | null) => {
     if (!selected) return
@@ -31,9 +61,21 @@ export function MediaStoryEditor({ onDiscard, onShare, isSharing }: MediaStoryAc
       'video/webm',
       'video/quicktime',
     ]
-    const max = (selected.type.startsWith('video/') ? 50 : 10) * 1024 * 1024
-    if (!allowed.includes(selected.type) || selected.size === 0 || selected.size > max) {
+    const video = selected.type.startsWith('video/')
+    const max = video ? STORY_MAX_VIDEO_INPUT_BYTES : STORY_MAX_MEDIA_BYTES
+    setDuration(null)
+    setTrimStart(0)
+    setProgress(0)
+    setUnreadable(false)
+    if (!allowed.includes(selected.type) || selected.size === 0) {
       setFileError(t('chat.storyFileInvalid'))
+      setFile(null)
+      setObjectUrl(null)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      return
+    }
+    if (selected.size > max) {
+      setFileError(t(video ? 'chat.storyVideoTooLarge' : 'chat.storyFileInvalid'))
       setFile(null)
       setObjectUrl(null)
       if (fileInputRef.current) fileInputRef.current.value = ''
@@ -52,11 +94,51 @@ export function MediaStoryEditor({ onDiscard, onShare, isSharing }: MediaStoryAc
   )
 
   const isVideo = file?.type.startsWith('video') ?? false
-  const canShare = Boolean(file)
+  const canShare = Boolean(file) && !unreadable
 
-  const share = () => {
-    if (!file) return
-    onShare(file, caption.trim())
+  const share = async () => {
+    if (!file || !canShare || isProcessing || isSharing) return
+    const plan = isVideo
+      ? planStoryVideo({ sizeBytes: file.size, durationSeconds: duration })
+      : 'share'
+    if (plan === 'share') {
+      onShare(
+        file,
+        caption.trim(),
+        isVideo && isVideoDurationKnown(duration) ? toStoryDurationMs(duration) : undefined,
+      )
+      return
+    }
+    setIsProcessing(true)
+    setProgress(0)
+    setFileError('')
+    const controller = new AbortController()
+    controllerRef.current = controller
+    try {
+      const startSeconds = plan === 'trim' ? clampTrimStart(duration!, trimStart) : 0
+      const output = await processStoryVideo({
+        file,
+        startSeconds,
+        signal: controller.signal,
+        onProgress: (ratio) => {
+          if (activeRef.current) setProgress(Math.round(ratio * 100))
+        },
+      })
+      const outputDuration = await readVideoDuration(output, controller.signal)
+      if (!isVideoDurationKnown(outputDuration) || outputDuration > STORY_MAX_VIDEO_SECONDS) {
+        throw new Error('invalid duration')
+      }
+      if (activeRef.current) onShare(output, caption.trim(), toStoryDurationMs(outputDuration))
+    } catch (error) {
+      const aborted = error instanceof DOMException && error.name === 'AbortError'
+      if (!aborted && activeRef.current) setFileError(t('chat.storyVideoProcessFailed'))
+    } finally {
+      controllerRef.current = null
+      if (activeRef.current) {
+        setIsProcessing(false)
+        setProgress(0)
+      }
+    }
   }
 
   return (
@@ -86,6 +168,7 @@ export function MediaStoryEditor({ onDiscard, onShare, isSharing }: MediaStoryAc
               type="file"
               accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime"
               className="sr-only"
+              disabled={isProcessing || isSharing}
               onChange={(e) => handleFile(e.target.files?.[0])}
             />
           </label>
@@ -94,6 +177,34 @@ export function MediaStoryEditor({ onDiscard, onShare, isSharing }: MediaStoryAc
             <p role="alert" className="text-sm text-red-500">
               {fileError}
             </p>
+          )}
+          {isVideo && isVideoDurationKnown(duration) && duration > STORY_MAX_VIDEO_SECONDS && (
+            <div className="space-y-2 text-sm text-foreground">
+              <label htmlFor="story-trim-start" className="block font-semibold">
+                {t('chat.storyTrimHint')}
+              </label>
+              <input
+                id="story-trim-start"
+                type="range"
+                min={0}
+                max={maxTrimStartSeconds(duration)}
+                step={0.1}
+                value={trimStart}
+                disabled={isProcessing || isSharing}
+                onChange={(event) => {
+                  const start = Number(event.target.value)
+                  setTrimStart(start)
+                  if (videoRef.current) videoRef.current.currentTime = start
+                }}
+                className="w-full accent-primary"
+              />
+              <p>
+                {t('chat.storyTrimRange', {
+                  start: trimStart.toFixed(1),
+                  end: Math.min(duration, trimStart + STORY_MAX_TRIM_SECONDS).toFixed(1),
+                })}
+              </p>
+            </div>
           )}
           <input
             maxLength={500}
@@ -116,7 +227,27 @@ export function MediaStoryEditor({ onDiscard, onShare, isSharing }: MediaStoryAc
           )}
           {objectUrl && isVideo && (
             <video
+              ref={videoRef}
               src={objectUrl}
+              onLoadedMetadata={(event) => {
+                const value = event.currentTarget.duration
+                setDuration(isVideoDurationKnown(value) ? value : null)
+              }}
+              onError={() => {
+                setDuration(null)
+                setUnreadable(true)
+                setFileError(t('chat.storyVideoInvalid'))
+              }}
+              onTimeUpdate={(event) => {
+                if (
+                  isVideoDurationKnown(duration) &&
+                  duration > STORY_MAX_VIDEO_SECONDS &&
+                  event.currentTarget.currentTime >= trimStart + STORY_MAX_TRIM_SECONDS
+                ) {
+                  event.currentTarget.pause()
+                  event.currentTarget.currentTime = trimStart
+                }
+              }}
               className="aspect-[9/16] w-[min(100%,460px,calc(56.25dvh-90px))] shrink-0 rounded-2xl object-cover shadow-xl"
               playsInline
               controls
@@ -139,17 +270,31 @@ export function MediaStoryEditor({ onDiscard, onShare, isSharing }: MediaStoryAc
             <button
               type="button"
               onClick={onDiscard}
+              disabled={isSharing}
               className="rounded-xl bg-muted px-4 py-2 text-sm font-semibold text-muted-foreground transition-colors hover:bg-border hover:text-foreground"
             >
               {t('chat.discard')}
             </button>
+            {isProcessing && (
+              <button
+                type="button"
+                onClick={() => controllerRef.current?.abort()}
+                className="rounded-xl bg-muted px-4 py-2 text-sm font-semibold text-muted-foreground transition-colors hover:bg-border hover:text-foreground"
+              >
+                {t('chat.cancel')}
+              </button>
+            )}
             <button
               type="button"
               onClick={share}
-              disabled={!canShare || isSharing}
+              disabled={!canShare || isSharing || isProcessing}
               className="flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground shadow-sm transition-all hover:opacity-90 active:scale-95 disabled:cursor-not-allowed disabled:opacity-45"
             >
-              {isSharing ? t('chat.pending') : t('chat.shareStory')}
+              {isSharing
+                ? t('chat.pending')
+                : isProcessing
+                  ? t('chat.storyProcessing', { progress })
+                  : t('chat.shareStory')}
             </button>
           </div>
         </div>
