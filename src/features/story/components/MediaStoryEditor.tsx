@@ -16,6 +16,7 @@ import {
   toStoryDurationMs,
 } from '../utils/storyVideo'
 import { processStoryVideo } from '../utils/storyVideoProcessor'
+import { readVideoDuration } from '../utils/readVideoDuration'
 const Media = createIcon(MediaData)
 
 interface MediaStoryActorProps {
@@ -23,27 +24,6 @@ interface MediaStoryActorProps {
   /** Nhận kèm captionText để gửi API. */
   onShare: (file: File, captionText: string, durationMs?: number) => void
   isSharing: boolean
-}
-
-function readVideoDuration(file: File): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file)
-    const video = document.createElement('video')
-    const timeout = window.setTimeout(() => reject(new Error('Video metadata timeout')), 15000)
-    const cleanup = () => {
-      window.clearTimeout(timeout)
-      URL.revokeObjectURL(url)
-    }
-    video.onloadedmetadata = () => {
-      cleanup()
-      resolve(video.duration)
-    }
-    video.onerror = () => {
-      cleanup()
-      reject(new Error('Invalid video'))
-    }
-    video.src = url
-  })
 }
 
 /** Editor tin ảnh/video: chọn file (object URL), caption, xem trước 9:16. */
@@ -144,7 +124,7 @@ export function MediaStoryEditor({ onDiscard, onShare, isSharing }: MediaStoryAc
           if (activeRef.current) setProgress(Math.round(ratio * 100))
         },
       })
-      const outputDuration = await readVideoDuration(output)
+      const outputDuration = await readVideoDuration(output, controller.signal)
       if (!isVideoDurationKnown(outputDuration) || outputDuration > STORY_MAX_VIDEO_SECONDS) {
         throw new Error('invalid duration')
       }
