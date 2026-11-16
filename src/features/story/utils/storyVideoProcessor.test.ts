@@ -103,6 +103,22 @@ describe('processStoryVideo', () => {
     expect(ffmpegMock.instance.terminate).toHaveBeenCalledTimes(1)
   })
 
+  it('aborts while the core is loading', async () => {
+    ffmpegMock.instance.load.mockReturnValue(new Promise(() => {}))
+    const controller = new AbortController()
+
+    const promise = processStoryVideo({
+      file: inputFile(),
+      startSeconds: 0,
+      signal: controller.signal,
+    })
+    await vi.waitFor(() => expect(ffmpegMock.instance.load).toHaveBeenCalled())
+    controller.abort()
+
+    await expect(promise).rejects.toMatchObject({ name: 'AbortError' })
+    expect(ffmpegMock.instance.terminate).toHaveBeenCalledTimes(1)
+  })
+
   it('clamps reported progress into 0..1', async () => {
     const seen: number[] = []
 

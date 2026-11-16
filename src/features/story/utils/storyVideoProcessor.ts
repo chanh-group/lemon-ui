@@ -46,18 +46,23 @@ export async function processStoryVideo({
   }
   signal?.addEventListener('abort', onAbort, { once: true })
 
+  const withAbort = <T>(promise: Promise<T>) => {
+    void promise.catch(() => {}) // terminate() rejects the abandoned call
+    return Promise.race([promise, aborted])
+  }
+
   try {
     ffmpeg.on('progress', ({ progress }) => {
       onProgress?.(Math.min(1, Math.max(0, progress)))
     })
-    await ffmpeg.load({ coreURL, wasmURL })
-    await ffmpeg.writeFile('input', new Uint8Array(await file.arrayBuffer()))
+    await withAbort(ffmpeg.load({ coreURL, wasmURL }))
+    await withAbort(ffmpeg.writeFile('input', new Uint8Array(await file.arrayBuffer())))
     if (signal?.aborted) throw abortError()
 
-    const exitCode = await Promise.race([ffmpeg.exec(buildStoryVideoArgs(startSeconds)), aborted])
+    const exitCode = await withAbort(ffmpeg.exec(buildStoryVideoArgs(startSeconds)))
     if (exitCode !== 0) throw new Error(`ffmpeg exited with code ${exitCode}`)
 
-    const data = await ffmpeg.readFile('output.mp4')
+    const data = await withAbort(ffmpeg.readFile('output.mp4'))
     if (typeof data === 'string' || data.byteLength === 0) {
       throw new Error('ffmpeg produced no video output')
     }
