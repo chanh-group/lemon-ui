@@ -117,7 +117,7 @@ describe('buildStoryVideoArgs', () => {
       '-map',
       '0:a:0?',
       '-vf',
-      "scale='min(1080,iw)':-2",
+      "scale='trunc(min(1080,iw)/2)*2':-2",
       '-c:v',
       'libx264',
       '-preset',
