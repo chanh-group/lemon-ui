@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'bun:test'
+import { describe, expect, it } from 'vitest'
 import { createInstance } from 'i18next'
 import en from './en.json'
 import vi from './vi.json'

@@ -14,7 +14,7 @@ import { SettingsPage } from '@/pages/SettingsPage'
 import { StoriesCreatePage } from '@/pages/StoriesCreatePage'
 import { StoriesArchivePage } from '@/pages/StoriesArchivePage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
-import { CallWindowHost } from '@/features/chat/components/call/CallWindowProvider'
+import { CallWindowHost } from '@/features/call/components/CallScreen/CallWindowProvider'
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const { status } = useAuth()

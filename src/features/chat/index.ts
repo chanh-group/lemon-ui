@@ -1,22 +1,22 @@
-export { ChatShell } from './components/ChatShell'
-export { CallsView } from './components/CallsView'
-export { CallScreen } from './components/call'
-export { NewCallView } from './components/NewCallView'
-export { NewChatView } from './components/new-chat'
-export { StoriesCreateView } from './components/stories'
-export { SettingsView } from './components/settings'
-export { ConversationView } from './components/conversation'
-export { MiddlePanel } from './components/MiddlePanel'
-export { SideNav } from './components/SideNav'
-export { MOCK_CALLS, MOCK_STORIES, avatarColor, initials } from './data/mockData'
-export type { CallEndReason, CallMedia, CallPhase, CallRouteState } from './components/call'
+export { ChatShell, MiddlePanel, SideNav } from '@/features/shell'
+export { CallsView, CallScreen, NewCallView } from '@/features/call'
+export { NewChatView } from '@/features/friend'
+export { StoriesCreateView } from '@/features/story'
+export { SettingsView } from '@/features/settings'
+export { ConversationView } from '@/features/messaging'
+export { MOCK_CALLS } from '@/features/call'
+export { MOCK_STORIES } from '@/features/story'
+export { avatarColor, initials } from '@/lib/avatar'
 export type {
-  CallEntry,
-  ChatMessage,
-  ChatTab,
-  Conversation,
-  DayGroup,
-  StoryEntry,
-} from './types/chat.types'
-export type { SettingsSection } from './types/settings.types'
-export type { NewChatPane } from './types/new-chat.types'
+  CallEndReason,
+  CallMedia,
+  CallPhase,
+  CallRouteState,
+} from '@/features/call/components/CallScreen'
+export type { ChatMessage, DayGroup } from '@/features/messaging/types/message.types'
+export type { CallEntry } from '@/features/call/types/call.types'
+export type { ChatTab } from '@/types/common'
+export type { Conversation } from '@/features/conversation/types/conversation.types'
+export type { StoryEntry } from '@/features/story/types/story.types'
+export type { SettingsSection } from '@/features/settings/types/settings.types'
+export type { NewChatPane } from '@/features/friend/types/friend.types'

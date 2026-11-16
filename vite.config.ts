@@ -1,11 +1,17 @@
 import react, { reactCompilerPreset } from '@vitejs/plugin-react'
 import babel from '@rolldown/plugin-babel'
 import tailwindcss from '@tailwindcss/vite'
-import { defineConfig } from 'vite'
+import { compression } from 'vite-plugin-compression2'
+import { defineConfig } from 'vitest/config'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), babel({ presets: [reactCompilerPreset()] }), tailwindcss()],
+  plugins: [
+    react(),
+    babel({ presets: [reactCompilerPreset()] }),
+    tailwindcss(),
+    compression({ algorithms: ['gzip'], threshold: 1024 }),
+  ],
   server: {
     host: '0.0.0.0',
     port: 5173,
@@ -24,6 +30,10 @@ export default defineConfig({
     alias: {
       '@': import.meta.dirname + '/src',
     },
+  },
+  test: {
+    environment: 'node',
+    include: ['src/**/*.test.{ts,tsx}'],
   },
   build: {
     rolldownOptions: {

@@ -1,4 +1,4 @@
-import { SettingsView } from '@/features/chat'
+import { SettingsView } from '@/features/settings'
 
 /**
  * Trang Cài đặt (route /settings).

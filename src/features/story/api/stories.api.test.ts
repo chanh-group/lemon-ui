@@ -1,0 +1,173 @@
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { api } from '@/infrastructure/api/client'
+import {
+  createMediaStory,
+  getArchivedStories,
+  getStoryReactions,
+  getStoryViews,
+  listStories,
+  replyStory,
+} from './stories.api'
+
+const originalGet = api.get
+const originalPost = api.post
+const originalFetch = globalThis.fetch
+
+afterEach(() => {
+  api.get = originalGet
+  api.post = originalPost
+  globalThis.fetch = originalFetch
+  vi.restoreAllMocks()
+})
+
+describe('story API contract', () => {
+  it('maps the grouped feed with owner, video, view and reaction state', async () => {
+    api.get = vi.fn(() =>
+      Promise.resolve({
+        data: [
+          {
+            user: { id: 'u', fullName: 'Alice', avatarUrl: null },
+            stories: [
+              {
+                id: 's',
+                userId: 'u',
+                kind: 'VIDEO',
+                caption: 'hello',
+                createdAt: new Date().toISOString(),
+                hasViewed: true,
+                myReaction: '👍',
+                myReactionKind: 'REACTION',
+              },
+            ],
+          },
+        ],
+      }),
+    ) as unknown as typeof api.get
+    const [story] = await listStories('u')
+    expect(story).toMatchObject({
+      id: 's',
+      mine: true,
+      name: 'Alice',
+      kind: 'MEDIA',
+      mediaType: 'video',
+      viewed: true,
+      viewerReaction: '👍',
+    })
+  })
+
+  it('uploads the selected bytes before creating a media story', async () => {
+    const calls: Array<{ path: string; body: unknown }> = []
+    api.post = vi.fn((path: string, body: unknown) => {
+      calls.push({ path, body })
+      return Promise.resolve({
+        data:
+          path === '/files/presign'
+            ? { uploadUrl: 'https://example.test/upload', objectKey: 'stories/u/key.jpg' }
+            : { id: 's', userId: 'u', kind: 'IMAGE', createdAt: new Date().toISOString() },
+      })
+    }) as unknown as typeof api.post
+    const put = vi.fn(() => Promise.resolve(new Response(null, { status: 200 })))
+    globalThis.fetch = put as unknown as typeof fetch
+    const file = new File(['image'], 'photo.jpg', { type: 'image/jpeg' })
+    await createMediaStory({ file, captionText: 'hello' })
+    expect(calls[0]).toMatchObject({
+      path: '/files/presign',
+      body: { kind: 'STORY_IMAGE', sizeBytes: file.size, mimeType: file.type },
+    })
+    expect(put).toHaveBeenCalledWith(
+      'https://example.test/upload',
+      expect.objectContaining({ method: 'PUT', body: file }),
+    )
+    expect(calls[1]).toMatchObject({
+      path: '/stories',
+      body: { kind: 'IMAGE', objectKey: 'stories/u/key.jpg', caption: 'hello' },
+    })
+  })
+
+  it('uses the fallback object key after direct upload fails', async () => {
+    const calls: Array<{ path: string; body: unknown }> = []
+    api.post = vi.fn((path: string, body: unknown) => {
+      calls.push({ path, body })
+      return Promise.resolve({
+        data:
+          path === '/files/presign'
+            ? { uploadUrl: 'https://example.test/upload', objectKey: 'old' }
+            : path === '/files/upload'
+              ? { objectKey: 'fallback' }
+              : { id: 's', userId: 'u', kind: 'VIDEO', createdAt: new Date().toISOString() },
+      })
+    }) as unknown as typeof api.post
+    globalThis.fetch = vi.fn(() => Promise.reject(new Error('CORS'))) as unknown as typeof fetch
+    await createMediaStory({
+      file: new File(['video'], 'video.mp4', { type: 'video/mp4' }),
+      captionText: '',
+    })
+    expect(calls.map((call) => call.path)).toEqual(['/files/presign', '/files/upload', '/stories'])
+    expect(calls.at(-1)).toMatchObject({ path: '/stories', body: { objectKey: 'fallback' } })
+  })
+
+  it('preserves reaction identities, kinds and pagination from the backend', async () => {
+    const get = vi.fn(() =>
+      Promise.resolve({
+        data: {
+          items: [
+            {
+              user: { id: 'u', fullName: 'Alice', avatarUrl: null },
+              emoji: '❤️',
+              kind: 'LIKE',
+              createdAt: '2026-01-01T00:00:00Z',
+            },
+          ],
+          nextCursor: 'next',
+          hasMore: true,
+          totalCount: 3,
+          summary: [{ emoji: '❤️', count: 3 }],
+        },
+      }),
+    )
+    api.get = get as unknown as typeof api.get
+    const result = await getStoryReactions('s', 'cursor')
+    expect(get).toHaveBeenCalledWith('/stories/s/reactions', { params: { cursor: 'cursor' } })
+    expect(result).toMatchObject({
+      items: [{ userId: 'u', reaction: '❤️', kind: 'LIKE', user: { fullName: 'Alice' } }],
+      nextCursor: 'next',
+      hasMore: true,
+      totalCount: 3,
+      summary: [{ emoji: '❤️', count: 3 }],
+    })
+  })
+
+  it('maps archived stories and tolerates a response without items', async () => {
+    const item = {
+      id: 's',
+      userId: 'u',
+      kind: 'TEXT',
+      caption: 'archived',
+      createdAt: '2026-01-01T00:00:00Z',
+    }
+    api.get = vi.fn(() =>
+      Promise.resolve({ data: { items: [item], nextCursor: null } }),
+    ) as unknown as typeof api.get
+    expect(await getArchivedStories()).toMatchObject({
+      items: [{ id: 's', mine: true, archived: true, createdAt: '2026-01-01T00:00:00Z' }],
+      nextCursor: null,
+    })
+    api.get = vi.fn(() => Promise.resolve({ data: {} })) as unknown as typeof api.get
+    expect((await getArchivedStories()).items).toEqual([])
+  })
+
+  it('uses backend view pagination and reply body', async () => {
+    const get = vi.fn(() =>
+      Promise.resolve({
+        data: { items: [], totalViewsCount: 3, nextCursor: 'next', hasMore: true },
+      }),
+    )
+    const post = vi.fn(() => Promise.resolve({ data: {} }))
+    api.get = get as unknown as typeof api.get
+    api.post = post as unknown as typeof api.post
+    expect((await getStoryViews('s', 'cursor')).totalViewsCount).toBe(3)
+    expect(get).toHaveBeenCalledWith('/stories/s/views', { params: { cursor: 'cursor' } })
+    await replyStory('s', { content: 'hi' })
+    expect(post).toHaveBeenCalledWith('/stories/s/reply', { body: 'hi' })
+  })
+})
