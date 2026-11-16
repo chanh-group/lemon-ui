@@ -5,14 +5,19 @@ import type { Conversation } from '@/features/conversation/types/conversation.ty
 interface TypingIndicatorProps {
   conversation: Conversation
   userCount: number
+  names?: string[]
 }
 
-export function TypingIndicator({ conversation, userCount }: TypingIndicatorProps) {
+export function TypingIndicator({ conversation, userCount, names = [] }: TypingIndicatorProps) {
   const { t } = useTranslation()
   if (userCount <= 0) return null
 
   const label = conversation.isGroup
-    ? t('chat.peopleTyping', { count: userCount })
+    ? names.length > 0
+      ? userCount > 2
+        ? t('chat.groupTypingMany', { names: names.slice(0, 2).join(', '), count: userCount - 2 })
+        : t('chat.groupTypingNames', { names: names.slice(0, 2).join(', ') })
+      : t('chat.peopleTyping', { count: userCount })
     : t('chat.someoneTyping')
 
   return (
@@ -36,7 +41,7 @@ export function TypingIndicator({ conversation, userCount }: TypingIndicatorProp
             style={{ animationDelay: `${delay}s` }}
           />
         ))}
-        <span className="sr-only">{label}</span>
+        <span className="ml-1 text-xs text-muted-foreground">{label}</span>
       </span>
     </div>
   )

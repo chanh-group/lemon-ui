@@ -47,6 +47,7 @@ interface ConversationViewProps {
   onBack?: () => void
   showBack: boolean
   typingUserCount?: number
+  typingNames?: string[]
   onTypingStart?: () => void
   onTypingStop?: () => void
   onVoiceCall?: () => void
@@ -79,6 +80,7 @@ export function ConversationView({
   onBack,
   showBack,
   typingUserCount = 0,
+  typingNames,
   onTypingStart,
   onTypingStop,
   onVoiceCall,
@@ -338,7 +340,9 @@ export function ConversationView({
               ref={messageListRef}
               groups={groups}
               senderLabel={conversation.name}
-              senderAvatarUrl={conversation.partnerAvatar}
+              senderAvatarUrl={
+                conversation.isGroup ? conversation.avatarUrl : conversation.partnerAvatar
+              }
               scrollRef={scrollRef}
               scrollElement={scrollElement}
               isVisible={isVisible}
@@ -390,7 +394,11 @@ export function ConversationView({
             </button>
           </div>
         )}
-        <TypingIndicator conversation={conversation} userCount={atBottom ? typingUserCount : 0} />
+        <TypingIndicator
+          conversation={conversation}
+          userCount={atBottom ? typingUserCount : 0}
+          names={typingNames}
+        />
         <MessageComposer
           draft={draft}
           onDraftChange={setDraft}

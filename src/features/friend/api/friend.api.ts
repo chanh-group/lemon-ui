@@ -73,12 +73,3 @@ export async function removeFriend(friendId: string): Promise<void> {
 export async function blockUser(userId: string): Promise<void> {
   await api.post(`/friends/${userId}/block`)
 }
-
-/** Tạo nhóm từ danh sách bạn bè đã chọn. */
-export async function createGroup(payload: {
-  name: string
-  memberIds: string[]
-}): Promise<{ id: string; name: string }> {
-  const res = await api.post<{ id: string; name: string }>('/groups', payload)
-  return res.data
-}

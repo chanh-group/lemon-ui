@@ -1,7 +1,7 @@
 import { isAuthBypass } from '@/config/env'
 import { api } from '@/infrastructure/api/client'
 import type { CursorPage } from '@/types/common'
-import type { ConversationResponse } from '../types/conversation.types'
+import type { ConversationMemberResponse, ConversationResponse } from '../types/conversation.types'
 
 /** Lấy danh sách hội thoại Inbox. */
 export async function getConversations(limit = 20): Promise<ConversationResponse[]> {
@@ -23,5 +23,65 @@ export async function getOrCreateDirectConversation(
   targetUserId: string,
 ): Promise<ConversationResponse> {
   const res = await api.post<ConversationResponse>('/conversations/direct', { targetUserId })
+  return res.data
+}
+
+export async function createGroup(payload: {
+  title: string
+  memberIds: string[]
+  clientRequestId: string
+}): Promise<ConversationResponse> {
+  const res = await api.post<ConversationResponse>('/conversations/groups', payload)
+  return res.data
+}
+
+export async function getGroupMembers(
+  conversationId: string,
+): Promise<ConversationMemberResponse[]> {
+  const res = await api.get<ConversationMemberResponse[]>(
+    `/conversations/${conversationId}/members`,
+  )
+  return res.data
+}
+
+export async function updateGroup(
+  conversationId: string,
+  title: string,
+): Promise<ConversationResponse> {
+  const res = await api.patch<ConversationResponse>(`/conversations/${conversationId}`, { title })
+  return res.data
+}
+
+export async function addGroupMembers(
+  conversationId: string,
+  memberIds: string[],
+): Promise<ConversationResponse> {
+  const res = await api.post<ConversationResponse>(`/conversations/${conversationId}/members`, {
+    memberIds,
+  })
+  return res.data
+}
+
+export async function removeGroupMember(conversationId: string, userId: string): Promise<void> {
+  await api.delete(`/conversations/${conversationId}/members/${userId}`)
+}
+
+export async function updateGroupMemberRole(
+  conversationId: string,
+  userId: string,
+  role: 'ADMIN' | 'MEMBER',
+): Promise<void> {
+  await api.patch(`/conversations/${conversationId}/members/${userId}/role`, { role })
+}
+
+export async function transferGroupOwnership(
+  conversationId: string,
+  userId: string,
+): Promise<void> {
+  await api.post(`/conversations/${conversationId}/transfer-ownership`, { userId })
+}
+
+export async function leaveGroup(conversationId: string): Promise<{ closed: boolean }> {
+  const res = await api.post<{ closed: boolean }>(`/conversations/${conversationId}/leave`)
   return res.data
 }

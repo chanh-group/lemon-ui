@@ -62,6 +62,7 @@ const GROUP_GAP_MIN = 5
 export interface MessageGroup {
   fromMe: boolean
   sender?: string
+  senderId?: string
   messages: ChatMessage[]
 }
 
@@ -94,12 +95,14 @@ export function buildMessageGroups(messages: ChatMessage[]): MessageGroup[] {
     if (
       prev &&
       prev.fromMe === msg.fromMe &&
-      (msg.fromMe || prev.sender === msg.sender) &&
+      (msg.fromMe ||
+        (msg.senderId && prev.senderId === msg.senderId) ||
+        (!msg.senderId && !prev.senderId && prev.sender === msg.sender)) &&
       toMinutes(msg.time) - toMinutes(prev.messages[prev.messages.length - 1].time) <= GROUP_GAP_MIN
     ) {
       prev.messages.push(msg)
     } else {
-      out.push({ fromMe: msg.fromMe, sender: msg.sender, messages: [msg] })
+      out.push({ fromMe: msg.fromMe, sender: msg.sender, senderId: msg.senderId, messages: [msg] })
     }
   }
   return out
@@ -328,7 +331,7 @@ const MessageRowView = memo(function MessageRowView({
       {!isMe && isLast && (
         <UserAvatar
           name={authorName}
-          src={senderAvatarUrl}
+          src={msg.senderAvatarUrl ?? senderAvatarUrl}
           className="mt-auto mb-4 size-7"
           fallbackClassName="text-[10px]"
         />

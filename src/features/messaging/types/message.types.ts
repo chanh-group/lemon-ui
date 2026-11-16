@@ -23,6 +23,8 @@ export interface ChatMessage {
   id: string
   fromMe: boolean
   sender?: string
+  senderId?: string
+  senderAvatarUrl?: string | null
   text?: string
   kind: 'text' | 'photo' | 'video' | 'audio' | 'file' | 'gif' | 'sticker'
   canEdit?: boolean
@@ -50,6 +52,7 @@ export interface MessageResponse {
   id: string
   conversationId: string
   senderId: string
+  sender?: { id: string; username: string; fullName: string; avatarUrl: string | null }
   kind: 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE' | 'SYSTEM' | 'STORY_REPLY' | 'STORY_REACTION'
   body: string | null
   replyToId: string | null

@@ -66,6 +66,7 @@ export function updateConversationLastMessage(
     ...conversation,
     lastMessageAt: message.createdAt,
     lastMessageSenderId: message.senderId,
+    lastMessageSender: message.sender,
     lastMessageDetail: message,
     lastMessagePreview: message.deletedAt
       ? '[message-revoked]'
@@ -84,7 +85,7 @@ export function mapConversationResponse(raw: ConversationResponse): Conversation
   const isGroup = raw.kind === 'GROUP'
   const partner = raw.partner
   const name = isGroup
-    ? 'Nhóm trò chuyện'
+    ? raw.title?.trim() || 'Nhóm trò chuyện'
     : partner?.fullName || partner?.username || 'Người dùng Lemon'
 
   const dateToUse = raw.lastMessageAt || raw.createdAt
@@ -98,11 +99,15 @@ export function mapConversationResponse(raw: ConversationResponse): Conversation
     unread: raw.unreadCount || 0,
     online: partner?.isOnline ?? false,
     isGroup,
+    avatarUrl: raw.avatarUrl ?? null,
+    memberCount: raw.memberCount,
+    myRole: raw.myRole,
     partnerId: partner?.id,
     partnerUsername: partner?.username,
     partnerBio: partner?.bio ?? null,
-    partnerAvatar: partner?.avatarUrl,
+    partnerAvatar: isGroup ? (raw.avatarUrl ?? null) : partner?.avatarUrl,
     lastMessageSenderId: raw.lastMessageSenderId ?? null,
+    lastMessageSenderName: raw.lastMessageSender?.fullName || raw.lastMessageSender?.username,
   }
 }
 
@@ -196,7 +201,7 @@ export function getConversationPreview({
     preview.startsWith('You: '),
   )
 
-  const shortName = getShortName(name, lang)
+  const shortName = getShortName(isGroup ? conversation.lastMessageSenderName : name, lang)
 
   // 4. Tin nhắn bày tỏ cảm xúc Story
   if (preview === '[story-reaction]') {
@@ -242,7 +247,11 @@ export function getConversationPreview({
   }
 
   const youPrefix = t('chat.youPrefix')
-  const text = isMe ? `${youPrefix}${cleanBody}` : cleanBody
+  const text = isMe
+    ? `${youPrefix}${cleanBody}`
+    : isGroup && shortName
+      ? t('chat.groupMessagePreview', { name: shortName, message: cleanBody })
+      : cleanBody
 
   return {
     text,
@@ -273,7 +282,9 @@ export function mapMessageResponse(raw: MessageResponse, currentUserId?: string)
   return {
     id: raw.id,
     fromMe: isMe,
-    sender: undefined,
+    sender: raw.sender?.fullName || raw.sender?.username,
+    senderId: raw.senderId,
+    senderAvatarUrl: raw.sender?.avatarUrl,
     text: isRevoked ? '' : raw.body || '',
     kind: uiKind,
     canEdit:

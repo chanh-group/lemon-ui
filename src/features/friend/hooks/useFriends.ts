@@ -5,7 +5,6 @@ import {
   acceptFriendRequest,
   blockUser,
   cancelFriendRequest,
-  createGroup,
   declineFriendRequest,
   findUserByEmail,
   findUserByUsername,
@@ -80,10 +79,6 @@ export function useRemoveFriend() {
 export function useBlockUser() {
   const invalidate = useInvalidateFriendData()
   return useMutation({ mutationFn: blockUser, onSuccess: invalidate })
-}
-
-export function useCreateGroup() {
-  return useMutation({ mutationFn: createGroup })
 }
 
 export function useFindUserByUsername(query: string) {

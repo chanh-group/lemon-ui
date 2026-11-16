@@ -101,6 +101,30 @@ describe('MessageList buildMessageGroups & interaction data', () => {
     expect(groups[1].fromMe).toBe(true)
   })
 
+  it('keeps different group members in separate message groups even when names match', () => {
+    const messages = [
+      {
+        id: '1',
+        fromMe: false,
+        sender: 'Same name',
+        senderId: 'member-a',
+        text: 'Hi',
+        kind: 'text' as const,
+        time: '10:00',
+      },
+      {
+        id: '2',
+        fromMe: false,
+        sender: 'Same name',
+        senderId: 'member-b',
+        text: 'Hello',
+        kind: 'text' as const,
+        time: '10:01',
+      },
+    ]
+    expect(buildMessageGroups(messages)).toHaveLength(2)
+  })
+
   it('preserves isForwarded flag and reactions in grouped messages', () => {
     const messages: ChatMessage[] = [
       {

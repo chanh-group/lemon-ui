@@ -1,21 +1,33 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { CheckIcon as CheckData } from '@hugeicons/core-free-icons'
 import { createIcon } from '@/components/icons/hugeIcon'
 const Check = createIcon(CheckData)
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import { useCreateGroup, useFriends } from '@/features/friend/hooks/useFriends'
+import { useFriends } from '@/features/friend/hooks/useFriends'
+import { useCreateGroupMutation } from '@/features/conversation/hooks/useConversations'
+import {
+  GROUP_MAX_INVITED_MEMBERS,
+  GROUP_MIN_INVITED_MEMBERS,
+} from '@/features/conversation/constants'
 import { Avatar, PaneHeader, SearchBox } from './kit'
 
 /** Wizard tạo nhóm 2 bước: chọn thành viên (chỉ bạn bè) → đặt tên nhóm. */
-export function GroupWizard({ onBack, onDone }: { onBack: () => void; onDone: () => void }) {
+export function GroupWizard({
+  onBack,
+  onDone,
+}: {
+  onBack: () => void
+  onDone: (conversationId?: string) => void
+}) {
   const { t } = useTranslation()
   const [step, setStep] = useState<'members' | 'name'>('members')
   const [selected, setSelected] = useState<string[]>([])
   const [query, setQuery] = useState('')
   const [groupName, setGroupName] = useState('')
-  const createGroup = useCreateGroup()
+  const requestId = useRef<{ signature: string; id: string } | null>(null)
+  const createGroup = useCreateGroupMutation()
   const friendsQuery = useFriends()
 
   const friends = useMemo(() => {
@@ -31,13 +43,23 @@ export function GroupWizard({ onBack, onDone }: { onBack: () => void; onDone: ()
 
   const handleCreate = () => {
     const name = groupName.trim()
-    if (!name || selected.length === 0) return
+    if (
+      !name ||
+      selected.length < GROUP_MIN_INVITED_MEMBERS ||
+      selected.length > GROUP_MAX_INVITED_MEMBERS
+    )
+      return
+    const signature = JSON.stringify({ title: name, memberIds: [...selected].sort() })
+    if (requestId.current?.signature !== signature) {
+      requestId.current = { signature, id: crypto.randomUUID() }
+    }
     createGroup.mutate(
-      { name, memberIds: selected },
+      { title: name, memberIds: selected, clientRequestId: requestId.current.id },
       {
         onSuccess: (group) => {
-          toast.success(t('chat.groupCreated', { name: group.name }))
-          onDone()
+          toast.success(t('chat.groupCreated', { name: group.title ?? name }))
+          requestId.current = null
+          onDone(group.id)
         },
         onError: (error) => toast.error(error instanceof Error ? error.message : t('common.error')),
       },
@@ -115,15 +137,19 @@ export function GroupWizard({ onBack, onDone }: { onBack: () => void; onDone: ()
             <div className="sticky bottom-0 flex justify-end gap-2 bg-linear-to-t from-card via-card/95 to-transparent px-3 pt-6 pb-2">
               <button
                 type="button"
-                onClick={onDone}
+                onClick={() => onDone()}
                 className="rounded-xl px-4 py-2 text-sm font-semibold text-muted-foreground transition-colors hover:bg-muted"
               >
                 {t('chat.skip')}
               </button>
               <button
                 type="button"
-                onClick={() => selected.length > 0 && setStep('name')}
-                disabled={selected.length === 0 || friendsQuery.isPending || friendsQuery.isError}
+                onClick={() => selected.length >= GROUP_MIN_INVITED_MEMBERS && setStep('name')}
+                disabled={
+                  selected.length < GROUP_MIN_INVITED_MEMBERS ||
+                  friendsQuery.isPending ||
+                  friendsQuery.isError
+                }
                 className="rounded-xl bg-primary px-5 py-2 text-sm font-bold text-primary-foreground shadow-sm transition-all hover:opacity-90 active:scale-95 disabled:opacity-40"
               >
                 {t('chat.next')}
@@ -135,7 +161,12 @@ export function GroupWizard({ onBack, onDone }: { onBack: () => void; onDone: ()
             <button
               type="button"
               onClick={handleCreate}
-              disabled={!groupName.trim() || selected.length === 0 || createGroup.isPending}
+              disabled={
+                !groupName.trim() ||
+                selected.length < GROUP_MIN_INVITED_MEMBERS ||
+                selected.length > GROUP_MAX_INVITED_MEMBERS ||
+                createGroup.isPending
+              }
               className="rounded-xl bg-primary px-5 py-2 text-sm font-bold text-primary-foreground shadow-sm transition-all hover:opacity-90 active:scale-95 disabled:opacity-40"
             >
               {createGroup.isPending ? t('chat.pending') : t('chat.createGroup')}

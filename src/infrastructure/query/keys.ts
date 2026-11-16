@@ -14,6 +14,7 @@ export const queryKeys = {
     stories: ['chat', 'stories'] as const,
     friendRequests: ['chat', 'friend-requests'] as const,
     friends: ['chat', 'friends'] as const,
+    groupMembers: (conversationId: string) => ['chat', 'group-members', conversationId] as const,
     userSearch: (field: 'username' | 'email', query: string) =>
       ['chat', 'user-search', field, query] as const,
   },

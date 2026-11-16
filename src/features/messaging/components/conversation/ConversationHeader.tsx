@@ -63,14 +63,14 @@ export function ConversationHeader({
           >
             <UserAvatar
               name={conversation.name}
-              src={conversation.partnerAvatar}
+              src={conversation.isGroup ? conversation.avatarUrl : conversation.partnerAvatar}
               className="size-10 ring-2 ring-primary ring-offset-2 ring-offset-card"
             />
           </button>
         ) : (
           <UserAvatar
             name={conversation.name}
-            src={conversation.partnerAvatar}
+            src={conversation.isGroup ? conversation.avatarUrl : conversation.partnerAvatar}
             square={conversation.isGroup}
             className="size-10"
           />
@@ -87,31 +87,35 @@ export function ConversationHeader({
         <h2 className="truncate text-[15px] font-bold text-foreground">{conversation.name}</h2>
         <p className="truncate text-xs text-muted-foreground">
           {conversation.isGroup
-            ? conversation.members
+            ? t('chat.groupMemberCount', { count: conversation.memberCount ?? 0 })
             : conversation.online
               ? t('chat.online')
               : (conversation.lastActive ?? t('chat.offline'))}
         </p>
       </div>
       <div className="flex shrink-0 items-center gap-0.5">
-        <button
-          type="button"
-          aria-label={t('chat.voiceCall')}
-          title={t('chat.voiceCall')}
-          onClick={onVoiceCall}
-          className="chat-icon-btn grid size-11 min-h-11 min-w-11 place-items-center rounded-xl text-brand-ink transition-all duration-150 hover:bg-muted active:scale-95"
-        >
-          <Phone className="size-5" aria-hidden="true" />
-        </button>
-        <button
-          type="button"
-          aria-label={t('chat.videoCall')}
-          title={t('chat.videoCall')}
-          onClick={onVideoCall}
-          className="chat-icon-btn grid size-11 min-h-11 min-w-11 place-items-center rounded-xl text-brand-ink transition-all duration-150 hover:bg-muted active:scale-95"
-        >
-          <Video className="size-5" aria-hidden="true" />
-        </button>
+        {!conversation.isGroup && (
+          <button
+            type="button"
+            aria-label={t('chat.voiceCall')}
+            title={t('chat.voiceCall')}
+            onClick={onVoiceCall}
+            className="chat-icon-btn grid size-11 min-h-11 min-w-11 place-items-center rounded-xl text-brand-ink transition-all duration-150 hover:bg-muted active:scale-95"
+          >
+            <Phone className="size-5" aria-hidden="true" />
+          </button>
+        )}
+        {!conversation.isGroup && (
+          <button
+            type="button"
+            aria-label={t('chat.videoCall')}
+            title={t('chat.videoCall')}
+            onClick={onVideoCall}
+            className="chat-icon-btn grid size-11 min-h-11 min-w-11 place-items-center rounded-xl text-brand-ink transition-all duration-150 hover:bg-muted active:scale-95"
+          >
+            <Video className="size-5" aria-hidden="true" />
+          </button>
+        )}
         <button
           type="button"
           onClick={onToggleInfo}

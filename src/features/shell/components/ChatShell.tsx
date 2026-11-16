@@ -23,6 +23,7 @@ import {
 import {
   useConversationsQuery,
   useConversationQuery,
+  useGroupMembersQuery,
 } from '@/features/conversation/hooks/useConversations'
 import { useChatRealtime } from '@/features/messaging/hooks/useMessagingRealtime'
 import { useStoriesList } from '@/features/story/hooks/useStories'
@@ -85,7 +86,8 @@ export function ChatShell() {
   }, [legacySelect, navigate, selectedId, tab])
 
   // Realtime Socket.IO sync
-  const { isPartnerTyping, typingUserCount, connectionStatus } = useChatRealtime(selectedId)
+  const { isPartnerTyping, typingUserCount, typingUserIds, connectionStatus } =
+    useChatRealtime(selectedId)
 
   // API Queries & Mutations
   const conversationsQuery = useConversationsQuery()
@@ -145,6 +147,14 @@ export function ChatShell() {
     Boolean(selectedId) && !selectedFromList && !conversationsQuery.isPending
   const conversationDetailQuery = useConversationQuery(selectedId, needsConversationDetail)
   const selected = selectedFromList ?? conversationDetailQuery.data ?? null
+  const groupMembersQuery = useGroupMembersQuery(
+    selected?.isGroup ? selected.id : null,
+    Boolean(selected?.isGroup),
+  )
+  const typingNames = typingUserIds.flatMap((id) => {
+    const member = groupMembersQuery.data?.find((item) => item.id === id)
+    return member ? [member.fullName || member.username] : []
+  })
   const partnerStories =
     selected && !selected.isGroup && selected.partnerId
       ? allStories.filter((story) => story.authorId === selected.partnerId && !story.mine)
@@ -215,7 +225,7 @@ export function ChatShell() {
   }
 
   const startCall = (media: CallMedia) => {
-    if (!selected) return
+    if (!selected || selected.isGroup) return
     const fallback = () =>
       navigate(callPath(selected.id, { media, state: 'ringing' }), {
         state: {
@@ -455,6 +465,7 @@ export function ChatShell() {
             showBack
             onBack={() => navigate(ROUTES.messages, { state: { tab } })}
             typingUserCount={isPartnerTyping ? typingUserCount : 0}
+            typingNames={typingNames}
             onTypingStart={handleTypingStart}
             onTypingStop={handleTypingStop}
             onVoiceCall={() => startCall('voice')}

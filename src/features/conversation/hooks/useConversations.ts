@@ -4,7 +4,9 @@ import {
   getConversationById,
   getConversations,
   getOrCreateDirectConversation,
+  createGroup,
 } from '../api/conversation.api'
+import { getGroupMembers } from '../api/conversation.api'
 import { mapConversationResponse } from '../utils/chat.mapper'
 import type { Conversation, ConversationResponse } from '../types/conversation.types'
 
@@ -34,6 +36,18 @@ export function useConversationQuery(conversationId: string | null, enabled = tr
   })
 }
 
+export function useGroupMembersQuery(conversationId: string | null, enabled = true) {
+  return useQuery({
+    queryKey: conversationKeys.groupMembers(conversationId ?? 'none'),
+    queryFn: () => {
+      if (!conversationId) throw new Error('No group selected')
+      return getGroupMembers(conversationId)
+    },
+    enabled: Boolean(conversationId) && enabled,
+    staleTime: 30_000,
+  })
+}
+
 /** Hook tạo hoặc mở phòng chat 1-1 với user. */
 export function useCreateDirectChatMutation() {
   const queryClient = useQueryClient()
@@ -53,6 +67,20 @@ export function useCreateDirectChatMutation() {
           return [newConversation, ...current]
         },
       )
+    },
+  })
+}
+
+export function useCreateGroupMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: createGroup,
+    onSuccess: (group) => {
+      queryClient.setQueryData<ConversationResponse[]>(conversationKeys.conversations, (current) =>
+        current ? [group, ...current.filter((item) => item.id !== group.id)] : [group],
+      )
+      queryClient.setQueryData(conversationKeys.conversation(group.id), group)
+      void queryClient.invalidateQueries({ queryKey: conversationKeys.conversations })
     },
   })
 }

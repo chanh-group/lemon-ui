@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import {
   ArrowDown01Icon as ChevronDownData,
@@ -35,6 +36,17 @@ import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { cn } from '@/lib/utils'
 import { useConversationMediaArchiveQuery } from '@/features/messaging/hooks/useMessages'
 import { useBlockUser, useFriends, useRemoveFriend } from '@/features/friend/hooks/useFriends'
+import { queryKeys } from '@/infrastructure/query/keys'
+import { GROUP_MAX_MEMBERS, GROUP_MAX_NAME_LENGTH } from '@/features/conversation/constants'
+import {
+  addGroupMembers,
+  getGroupMembers,
+  leaveGroup,
+  removeGroupMember,
+  transferGroupOwnership,
+  updateGroup,
+  updateGroupMemberRole,
+} from '@/features/conversation/api/conversation.api'
 import type { DayGroup, MessageAttachmentItem } from '@/features/messaging/types/message.types'
 import type { Conversation } from '@/features/conversation/types/conversation.types'
 import { formatBytes, isImage, isVideo } from '@/features/file/utils/fileTypes'
@@ -250,6 +262,20 @@ export function ConversationInfoPanel({
   const removeFriend = useRemoveFriend()
   const blockUser = useBlockUser()
   const friendsQuery = useFriends()
+  const queryClient = useQueryClient()
+  const membersQuery = useQuery({
+    queryKey: queryKeys.chat.groupMembers(conversation.id),
+    queryFn: () => getGroupMembers(conversation.id),
+    enabled: conversation.isGroup,
+  })
+  const [groupTitleDraft, setGroupTitleDraft] = useState(conversation.name)
+  const [groupTitleEditing, setGroupTitleEditing] = useState(false)
+  const [leaveGroupOpen, setLeaveGroupOpen] = useState(false)
+  const [pendingGroupAction, setPendingGroupAction] = useState<{
+    description: string
+    successKey: string
+    action: () => Promise<unknown>
+  } | null>(null)
 
   const friendData = useMemo(() => {
     if (!conversation.partnerId || !friendsQuery.data) return null
@@ -292,6 +318,30 @@ export function ConversationInfoPanel({
   })
 
   const [isResizing, setIsResizing] = useState(false)
+
+  const refreshGroup = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: queryKeys.chat.groupMembers(conversation.id) }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.chat.conversations }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.chat.conversation(conversation.id) }),
+    ])
+  }
+  const runGroupAction = async (action: () => Promise<unknown>, successKey: string) => {
+    try {
+      await action()
+      toast.success(t(successKey))
+      await refreshGroup()
+      return true
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t('common.error'))
+      return false
+    }
+  }
+
+  const activeMembers = membersQuery.data ?? []
+  const activeMemberIds = new Set(activeMembers.map((member) => member.id))
+  const canManageGroup = conversation.myRole === 'OWNER' || conversation.myRole === 'ADMIN'
+  const isGroupOwner = conversation.myRole === 'OWNER'
 
   // Xử lý kéo ra kéo vào (resize ngang) trên Desktop
   const startResizing = useCallback(
@@ -799,6 +849,150 @@ export function ConversationInfoPanel({
           )}
         </div>
 
+        {conversation.isGroup && (
+          <section className="border-b border-border py-3" aria-label={t('chat.groupMembersTitle')}>
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-foreground">
+                {t('chat.groupMembersTitle')} ({activeMembers.length})
+              </h3>
+              {canManageGroup && !groupTitleEditing && (
+                <button
+                  type="button"
+                  onClick={() => setGroupTitleEditing(true)}
+                  className="text-xs font-medium text-primary hover:underline"
+                >
+                  {t('chat.editGroupName')}
+                </button>
+              )}
+            </div>
+            {groupTitleEditing && (
+              <form
+                className="mb-3 flex gap-2"
+                onSubmit={(event) => {
+                  event.preventDefault()
+                  const title = groupTitleDraft.trim()
+                  if (title && title.length <= GROUP_MAX_NAME_LENGTH)
+                    void runGroupAction(
+                      () => updateGroup(conversation.id, title),
+                      'chat.groupUpdated',
+                    ).then((success) => success && setGroupTitleEditing(false))
+                }}
+              >
+                <input
+                  autoFocus
+                  maxLength={GROUP_MAX_NAME_LENGTH}
+                  value={groupTitleDraft}
+                  onChange={(event) => setGroupTitleDraft(event.target.value)}
+                  className="min-w-0 flex-1 rounded-lg border border-border bg-background px-2 py-1.5 text-sm"
+                  aria-label={t('chat.groupName')}
+                />
+                <Button size="sm" type="submit" disabled={!groupTitleDraft.trim()}>
+                  {t('chat.save')}
+                </Button>
+              </form>
+            )}
+            {membersQuery.isPending ? (
+              <p className="py-2 text-xs text-muted-foreground">{t('common.loading')}</p>
+            ) : (
+              <ul className="space-y-1">
+                {activeMembers.map((member) => (
+                  <li key={member.id} className="flex items-center gap-2 rounded-lg px-1 py-1.5">
+                    <UserAvatar
+                      name={member.fullName || member.username}
+                      src={member.avatarUrl}
+                      className="size-8"
+                    />
+                    <span className="min-w-0 flex-1 truncate text-sm">
+                      {member.fullName || member.username}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">
+                      {t(`chat.groupRole${member.role}`)}
+                    </span>
+                    {isGroupOwner && member.role !== 'OWNER' && (
+                      <div className="flex shrink-0 gap-1">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void runGroupAction(
+                              () =>
+                                updateGroupMemberRole(
+                                  conversation.id,
+                                  member.id,
+                                  member.role === 'ADMIN' ? 'MEMBER' : 'ADMIN',
+                                ),
+                              'chat.groupUpdated',
+                            )
+                          }
+                          className="rounded px-1 text-[10px] text-primary hover:bg-muted"
+                        >
+                          {member.role === 'ADMIN' ? t('chat.groupDemote') : t('chat.groupPromote')}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setPendingGroupAction({
+                              description: t('chat.groupTransferConfirm', {
+                                name: member.fullName || member.username,
+                              }),
+                              successKey: 'chat.groupUpdated',
+                              action: () => transferGroupOwnership(conversation.id, member.id),
+                            })
+                          }
+                          className="rounded px-1 text-[10px] text-primary hover:bg-muted"
+                        >
+                          {t('chat.groupTransfer')}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setPendingGroupAction({
+                              description: t('chat.groupRemoveConfirm', {
+                                name: member.fullName || member.username,
+                              }),
+                              successKey: 'chat.groupMemberRemoved',
+                              action: () => removeGroupMember(conversation.id, member.id),
+                            })
+                          }
+                          className="rounded px-1 text-[10px] text-destructive hover:bg-destructive/10"
+                        >
+                          {t('chat.groupRemove')}
+                        </button>
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {canManageGroup &&
+              (conversation.memberCount ?? activeMembers.length) < GROUP_MAX_MEMBERS && (
+                <div className="mt-3 border-t border-border/70 pt-2">
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">
+                    {t('chat.groupAddMembers')}
+                  </p>
+                  {friendsQuery.data
+                    ?.filter((friend) => !activeMemberIds.has(friend.id))
+                    .map((friend) => (
+                      <button
+                        key={friend.id}
+                        type="button"
+                        onClick={() =>
+                          void runGroupAction(
+                            () => addGroupMembers(conversation.id, [friend.id]),
+                            'chat.groupMembersAdded',
+                          )
+                        }
+                        className="flex w-full items-center gap-2 rounded-lg px-1 py-1.5 text-left text-sm hover:bg-muted"
+                      >
+                        <UserAvatar name={friend.name} className="size-7" />
+                        <span className="truncate">{friend.name}</span>
+                        <span className="ml-auto text-xs text-primary">{t('chat.add')}</span>
+                      </button>
+                    ))}
+                </div>
+              )}
+          </section>
+        )}
+
         {/* 5. Accordion 2: Quyền riêng tư & Quản lý (Mặc định đóng) */}
         <div className="py-3">
           <button
@@ -844,7 +1038,7 @@ export function ConversationInfoPanel({
               {conversation.isGroup && (
                 <button
                   type="button"
-                  onClick={() => toast.info(t('chat.featureComingSoon'))}
+                  onClick={() => setLeaveGroupOpen(true)}
                   className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium text-destructive transition-colors hover:bg-destructive/10 dark:hover:bg-destructive/20"
                 >
                   <LeaveIcon className="size-4" aria-hidden="true" />
@@ -924,6 +1118,67 @@ export function ConversationInfoPanel({
               disabled={blockUser.isPending}
             >
               {blockUser.isPending ? t('common.loading') : t('chat.blockAction')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={leaveGroupOpen} onOpenChange={setLeaveGroupOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {t('chat.leaveGroupConfirmTitle', { name: conversation.name })}
+            </DialogTitle>
+            <DialogDescription>{t('chat.leaveGroupConfirmDesc')}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLeaveGroupOpen(false)}>
+              {t('chat.cancel')}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() =>
+                void runGroupAction(() => leaveGroup(conversation.id), 'chat.groupLeft').then(
+                  (success) => {
+                    if (!success) return
+                    setLeaveGroupOpen(false)
+                    onClose()
+                    navigate(ROUTES.messages)
+                  },
+                )
+              }
+            >
+              {t('chat.leaveGroupAction')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(pendingGroupAction)}
+        onOpenChange={(open) => !open && setPendingGroupAction(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('chat.confirmGroupActionTitle')}</DialogTitle>
+            <DialogDescription>{pendingGroupAction?.description}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPendingGroupAction(null)}>
+              {t('chat.cancel')}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (!pendingGroupAction) return
+                void runGroupAction(pendingGroupAction.action, pendingGroupAction.successKey).then(
+                  (success) => {
+                    if (success) setPendingGroupAction(null)
+                  },
+                )
+              }}
+            >
+              {t('chat.confirm')}
             </Button>
           </DialogFooter>
         </DialogContent>

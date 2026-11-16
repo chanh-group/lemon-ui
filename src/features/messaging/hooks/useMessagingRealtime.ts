@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQueryClient, type InfiniteData } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -21,6 +22,8 @@ import type {
   TypingEventPayload,
 } from '@/features/messaging/types/message.types'
 import type { ConversationResponse } from '@/features/conversation/types/conversation.types'
+import { queryKeys } from '@/infrastructure/query/keys'
+import { ROUTES } from '@/config/constants'
 
 const TYPING_STALE_TIMEOUT_MS = 4_500
 
@@ -99,6 +102,7 @@ export function useChatRealtime(activeConversationId: string | null) {
   const { user, status } = useAuth()
   const { t } = useTranslation()
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const [partnerTypingMap, setPartnerTypingMap] = useState<PartnerTypingMap>({})
   const typingExpiryTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>())
   const refreshedInboxOnConnection = useRef(false)
@@ -429,6 +433,34 @@ export function useChatRealtime(activeConversationId: string | null) {
       }
     }
 
+    const handleConversationChanged = (event: { conversationId?: string }) => {
+      void queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.conversations })
+      if (event.conversationId) {
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.chat.conversation(event.conversationId),
+        })
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.chat.groupMembers(event.conversationId),
+        })
+      }
+    }
+    const handleMemberRemoved = (event: { conversationId: string; userId: string }) => {
+      handleConversationChanged(event)
+      setPartnerTypingMap((current) => {
+        const next = { ...current }
+        delete next[event.conversationId]
+        return next
+      })
+      if (event.userId === userId) {
+        queryClient.removeQueries({ queryKey: CHAT_QUERY_KEYS.messages(event.conversationId) })
+        queryClient.removeQueries({ queryKey: CHAT_QUERY_KEYS.liveMessages(event.conversationId) })
+        queryClient.removeQueries({ queryKey: CHAT_QUERY_KEYS.mediaArchive(event.conversationId) })
+        queryClient.removeQueries({ queryKey: queryKeys.chat.conversation(event.conversationId) })
+        queryClient.removeQueries({ queryKey: queryKeys.chat.groupMembers(event.conversationId) })
+        if (activeConversationId === event.conversationId) navigate(ROUTES.messages)
+      }
+    }
+
     // F. Cập nhật cảm xúc tin nhắn (Điểm A)
     const handleMessageReaction = (payload: MessageReactionPayload) => {
       const convId = payload.conversationId
@@ -460,6 +492,11 @@ export function useChatRealtime(activeConversationId: string | null) {
     socket.on('message:hidden', handleMessageHidden)
     socket.on('typing', handleTyping)
     socket.on('message:reaction', handleMessageReaction)
+    socket.on('conversation:created', handleConversationChanged)
+    socket.on('conversation:updated', handleConversationChanged)
+    socket.on('member:added', handleConversationChanged)
+    socket.on('member:role-changed', handleConversationChanged)
+    socket.on('member:removed', handleMemberRemoved)
 
     return () => {
       timersForEffect.forEach((timer) => clearTimeout(timer))
@@ -477,8 +514,13 @@ export function useChatRealtime(activeConversationId: string | null) {
       socket.off('message:hidden', handleMessageHidden)
       socket.off('typing', handleTyping)
       socket.off('message:reaction', handleMessageReaction)
+      socket.off('conversation:created', handleConversationChanged)
+      socket.off('conversation:updated', handleConversationChanged)
+      socket.off('member:added', handleConversationChanged)
+      socket.off('member:role-changed', handleConversationChanged)
+      socket.off('member:removed', handleMemberRemoved)
     }
-  }, [status, activeConversationId, userId, queryClient, t])
+  }, [status, activeConversationId, userId, queryClient, t, navigate])
 
   const typingUserCount = activeConversationId
     ? (partnerTypingMap[activeConversationId]?.length ?? 0)
@@ -488,6 +530,7 @@ export function useChatRealtime(activeConversationId: string | null) {
   return {
     isPartnerTyping,
     typingUserCount,
+    typingUserIds: activeConversationId ? (partnerTypingMap[activeConversationId] ?? []) : [],
     connectionStatus,
   }
 }
