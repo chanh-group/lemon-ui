@@ -321,7 +321,7 @@ export function ConversationView({
                 {t('common.retry')}
               </button>
             </div>
-          ) : groups.length === 0 && !isTyping ? (
+          ) : groups.length === 0 && typingUserCount === 0 ? (
             <div className="flex h-full flex-col items-center justify-center px-6 text-center">
               <span
                 className="mb-4 grid size-14 place-items-center rounded-full bg-primary/10 text-brand-ink"
@@ -351,7 +351,7 @@ export function ConversationView({
               isVisible={isVisible}
               conversationId={conversation.id}
               isGroup={conversation.isGroup}
-              isTyping={isTyping && hasLatest}
+              isTyping={typingUserCount > 0 && hasLatest}
               onReply={setReplyingTo}
               followBottom={atBottom && hasLatest}
               onVisibleMessage={onVisibleMessage}
