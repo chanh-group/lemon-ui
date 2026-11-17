@@ -18,7 +18,6 @@ interface ConversationHeaderProps {
   conversation: Conversation
   showBack: boolean
   onBack?: () => void
-  isTyping?: boolean
   onToggleInfo?: () => void
   isInfoOpen?: boolean
   onVoiceCall?: () => void
@@ -26,34 +25,10 @@ interface ConversationHeaderProps {
   onOpenStory?: () => void
 }
 
-/** Pill "..." gọn thay cho chữ “Typing…” — vẫn có nhãn cho screen reader. */
-function TypingIndicator() {
-  const { t } = useTranslation()
-  return (
-    <span
-      role="status"
-      aria-label={t('chat.typing')}
-      title={t('chat.typing')}
-      className="inline-flex w-fit items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5"
-    >
-      {[0, 0.15, 0.3].map((delay) => (
-        <span
-          key={delay}
-          aria-hidden="true"
-          className="size-1.5 rounded-full bg-brand-ink animate-typing-dot"
-          style={{ animationDelay: `${delay}s` }}
-        />
-      ))}
-      <span className="sr-only">{t('chat.typing')}</span>
-    </span>
-  )
-}
-
 export function ConversationHeader({
   conversation,
   showBack,
   onBack,
-  isTyping,
   onToggleInfo,
   isInfoOpen,
   onVoiceCall,
@@ -110,19 +85,13 @@ export function ConversationHeader({
       </span>
       <div className="min-w-0 flex-1">
         <h2 className="truncate text-[15px] font-bold text-foreground">{conversation.name}</h2>
-        {isTyping ? (
-          <span className="mt-0.5 block">
-            <TypingIndicator />
-          </span>
-        ) : (
-          <p className={cn('truncate text-xs text-muted-foreground')}>
-            {conversation.isGroup
-              ? conversation.members
-              : conversation.online
-                ? t('chat.online')
-                : (conversation.lastActive ?? t('chat.offline'))}
-          </p>
-        )}
+        <p className="truncate text-xs text-muted-foreground">
+          {conversation.isGroup
+            ? conversation.members
+            : conversation.online
+              ? t('chat.online')
+              : (conversation.lastActive ?? t('chat.offline'))}
+        </p>
       </div>
       <div className="flex shrink-0 items-center gap-0.5">
         <button

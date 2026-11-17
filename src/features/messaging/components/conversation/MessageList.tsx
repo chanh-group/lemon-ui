@@ -471,6 +471,7 @@ interface MessageListProps {
   isVisible: boolean
   conversationId?: string
   isGroup?: boolean
+  isTyping?: boolean
   /** Còn đang ở cuối danh sách thì tự bám tin mới nhất; cuộn lên thì thôi. */
   followBottom?: boolean
   onReply?: (message: ChatMessage) => void
@@ -486,12 +487,14 @@ export interface MessageListHandle {
 
 type MessageListRow =
   | { kind: 'date'; key: string; date: string }
+  | { kind: 'typing'; key: string }
   | { kind: 'message'; key: string; group: MessageGroup; messageIndex: number }
 
 /** Ước lượng chiều cao theo loại tin để scrollbar và anchor ổn định khi cuộn lịch sử. */
 function estimateRowHeight(row: MessageListRow | undefined): number {
   if (!row) return 80
   if (row.kind === 'date') return 48
+  if (row.kind === 'typing') return 48
   const msg = row.group.messages[row.messageIndex]
   if (!msg) return 80
   if (msg.deletedAt) return 64
@@ -516,6 +519,7 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
     isVisible,
     conversationId,
     isGroup,
+    isTyping,
     followBottom = true,
     onVisibleMessage,
     onRetryMessage,
@@ -581,8 +585,9 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
         })
       }
     }
+    if (isTyping) result.push({ kind: 'typing', key: 'typing-indicator' })
     return result
-  }, [groups])
+  }, [groups, isTyping])
 
   // TanStack Virtual exposes an imperative instance; this component opts out of compiler memoization above.
   // eslint-disable-next-line react/incompatible-library
@@ -714,6 +719,27 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
           {row.date}
         </span>
         <span className="h-px flex-1 bg-border" aria-hidden="true" />
+      </div>
+    ) : row.kind === 'typing' ? (
+      <div className="flex items-end gap-2.5 pb-2" role="status" aria-label={t('chat.typing')}>
+        {!isGroup && (
+          <UserAvatar
+            name={senderLabel}
+            src={senderAvatarUrl}
+            className="size-7"
+            fallbackClassName="text-[10px]"
+          />
+        )}
+        <span className="inline-flex h-10 items-center gap-1 rounded-2xl rounded-bl-md border border-border bg-card px-3.5 shadow-sm">
+          {[0, 0.15, 0.3].map((delay) => (
+            <span
+              key={delay}
+              aria-hidden="true"
+              className="size-1.5 rounded-full bg-muted-foreground animate-typing-dot motion-reduce:animate-none"
+              style={{ animationDelay: `${delay}s` }}
+            />
+          ))}
+        </span>
       </div>
     ) : (
       <MessageRowView

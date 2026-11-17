@@ -122,6 +122,7 @@ export function useChatRealtime(activeConversationId: string | null) {
     }
     const handleDisconnect = () => {
       refreshedInboxOnConnection.current = false
+      setPartnerTypingMap({})
       setConnectionStatus('disconnected')
     }
     const handleConnectError = () => setConnectionStatus('error')
@@ -158,6 +159,9 @@ export function useChatRealtime(activeConversationId: string | null) {
     // A. Nhận tin nhắn mới
     const handleNewMessage = (msg: MessageResponse) => {
       const convId = msg.conversationId
+      if (msg.senderId !== userId) {
+        setPartnerTypingMap((prev) => (prev[convId] ? { ...prev, [convId]: false } : prev))
+      }
 
       // Cập nhật messages cache nếu đang có dữ liệu trong cache
       if (
