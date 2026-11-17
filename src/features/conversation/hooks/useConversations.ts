@@ -27,9 +27,9 @@ export function useConversationsQuery() {
 export function useConversationQuery(conversationId: string | null, enabled = true) {
   return useQuery<ConversationResponse, Error, Conversation>({
     queryKey: conversationKeys.conversation(conversationId ?? 'none'),
-    queryFn: () => {
+    queryFn: ({ signal }) => {
       if (!conversationId) throw new Error('No conversation selected')
-      return getConversationById(conversationId)
+      return getConversationById(conversationId, signal)
     },
     select: mapConversationResponse,
     enabled: Boolean(conversationId) && enabled,
@@ -40,9 +40,9 @@ export function useConversationQuery(conversationId: string | null, enabled = tr
 export function useGroupMembersQuery(conversationId: string | null, enabled = true) {
   return useQuery({
     queryKey: conversationKeys.groupMembers(conversationId ?? 'none'),
-    queryFn: () => {
+    queryFn: ({ signal }) => {
       if (!conversationId) throw new Error('No group selected')
-      return getGroupMembers(conversationId)
+      return getGroupMembers(conversationId, signal)
     },
     enabled: Boolean(conversationId) && enabled,
     staleTime: 30_000,

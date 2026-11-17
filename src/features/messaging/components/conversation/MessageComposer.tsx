@@ -33,20 +33,34 @@ export interface PendingFile {
 }
 
 interface MessageComposerProps {
+  conversationId: string
   draft: string
   onDraftChange: (v: string) => void
   onSubmit: (
     text: string,
     attachments?: MessageAttachmentInput[],
     pendingFiles?: PendingFile[],
+    replyToId?: string,
+    clientMsgId?: string,
   ) => boolean | void | Promise<boolean | void>
+  replyToId?: string
   disabled?: boolean
   isSending?: boolean
   onTypingStart?: () => void
   onTypingStop?: () => void
 }
 
+interface FailedAttempt {
+  text: string
+  files: PendingFile[]
+  replyToId?: string
+  clientMsgId: string
+}
+
+const failedAttemptStore = new Map<string, FailedAttempt>()
+
 export function MessageComposer({
+  conversationId,
   draft,
   onDraftChange,
   onSubmit,
@@ -54,6 +68,7 @@ export function MessageComposer({
   isSending = false,
   onTypingStart,
   onTypingStop,
+  replyToId,
 }: MessageComposerProps) {
   const { t } = useTranslation()
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -63,6 +78,10 @@ export function MessageComposer({
   const pendingFilesRef = useRef(pendingFiles)
   const draftRef = useRef(draft)
   const submittingRef = useRef(false)
+  const [failedAttempt, setFailedAttemptState] = useState<FailedAttempt | null>(
+    () => failedAttemptStore.get(conversationId) ?? null,
+  )
+  const failedAttemptRef = useRef<FailedAttempt | null>(null)
   const [isRecording, setIsRecording] = useState(false)
   const [recordingSeconds, setRecordingSeconds] = useState(0)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
@@ -73,6 +92,16 @@ export function MessageComposer({
   useEffect(() => {
     pendingFilesRef.current = pendingFiles
   }, [pendingFiles])
+
+  useEffect(() => {
+    failedAttemptRef.current = failedAttempt
+  }, [failedAttempt])
+
+  const setFailedAttempt = (next: FailedAttempt | null) => {
+    if (next) failedAttemptStore.set(conversationId, next)
+    else failedAttemptStore.delete(conversationId)
+    setFailedAttemptState(next)
+  }
 
   useEffect(() => {
     draftRef.current = draft
@@ -298,6 +327,7 @@ export function MessageComposer({
     if (disabled || isSending || submittingRef.current) return
 
     submittingRef.current = true
+    const clientMsgId = generateUUID()
 
     if (typingTimer.current) {
       clearTimeout(typingTimer.current)
@@ -312,15 +342,20 @@ export function MessageComposer({
     draftRef.current = ''
     onDraftChange('')
 
+    const keepFailedAttempt = () => {
+      setFailedAttempt({ text: textToSend, files: filesToSend, replyToId, clientMsgId })
+    }
+
     try {
       const sent = await onSubmit(
         textToSend,
         undefined,
         filesToSend.length > 0 ? filesToSend : undefined,
+        replyToId,
+        clientMsgId,
       )
       if (sent === false) {
-        setPendingFiles((current) => [...filesToSend, ...current])
-        if (!draftRef.current) onDraftChange(textToSend)
+        keepFailedAttempt()
         return
       }
 
@@ -329,8 +364,30 @@ export function MessageComposer({
       })
       requestAnimationFrame(() => inputRef.current?.focus())
     } catch {
-      setPendingFiles((current) => [...filesToSend, ...current])
-      if (!draftRef.current) onDraftChange(textToSend)
+      keepFailedAttempt()
+    } finally {
+      submittingRef.current = false
+    }
+  }
+
+  const handleRetryFailedAttempt = async () => {
+    const attempt = failedAttempt
+    if (!attempt || submittingRef.current || disabled || isSending) return
+    submittingRef.current = true
+    try {
+      const sent = await onSubmit(
+        attempt.text,
+        undefined,
+        attempt.files,
+        attempt.replyToId,
+        attempt.clientMsgId,
+      )
+      if (sent !== false) {
+        attempt.files.forEach((file) => {
+          if (file.previewUrl) URL.revokeObjectURL(file.previewUrl)
+        })
+        setFailedAttempt(null)
+      }
     } finally {
       submittingRef.current = false
     }
@@ -345,6 +402,36 @@ export function MessageComposer({
       className="shrink-0 border-t border-border bg-card px-3 py-2.5 sm:px-5"
     >
       {/* Pending Files Preview Tray */}
+      {failedAttempt && (
+        <div className="mb-2 flex items-center justify-between gap-3 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs">
+          <span className="min-w-0 truncate text-destructive">
+            {t('chat.failedMessage', 'Tin chưa gửi được')}
+            {failedAttempt.text ? `: ${failedAttempt.text}` : ''}
+          </span>
+          <span className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              className="font-semibold text-primary hover:underline"
+              onClick={() => void handleRetryFailedAttempt()}
+            >
+              {t('common.retry', 'Thử lại')}
+            </button>
+            <button
+              type="button"
+              className="text-muted-foreground hover:text-foreground"
+              onClick={() => {
+                failedAttempt.files.forEach((file) => {
+                  if (file.previewUrl) URL.revokeObjectURL(file.previewUrl)
+                })
+                setFailedAttempt(null)
+              }}
+              aria-label={t('common.close', 'Đóng')}
+            >
+              <CancelIcon className="size-4" />
+            </button>
+          </span>
+        </div>
+      )}
       {pendingFiles.length > 0 && (
         <div className="mb-2.5 flex flex-wrap gap-2 overflow-x-auto p-1.5 rounded-xl bg-muted/60 border border-border">
           {pendingFiles.map((p) => (
@@ -434,7 +521,7 @@ export function MessageComposer({
             <input
               ref={inputRef}
               value={draft}
-              disabled={disabled || isSending}
+              disabled={disabled}
               onChange={(e) => handleChange(e.target.value)}
               onPaste={handlePaste}
               onKeyDown={(e) => {

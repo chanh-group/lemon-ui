@@ -177,6 +177,7 @@
     "relationshipLoadError": "Không thể tải trạng thái kết bạn",
     "conversationsLoadError": "Không thể tải danh sách cuộc trò chuyện",
     "messagesLoadError": "Không thể tải tin nhắn",
+    "failedMessage": "Không thể gửi tin nhắn",
     "searchUsersError": "Không thể tìm người dùng",
     "sent": "Đã gửi",
     "read": "Đã đọc",

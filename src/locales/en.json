@@ -178,6 +178,7 @@
     "relationshipLoadError": "Friend status unavailable",
     "conversationsLoadError": "Conversations could not be loaded",
     "messagesLoadError": "Messages could not be loaded",
+    "failedMessage": "Message could not be sent",
     "searchUsersError": "Users could not be searched",
     "sent": "Sent",
     "read": "Read",

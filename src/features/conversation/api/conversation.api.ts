@@ -13,8 +13,11 @@ export async function getConversations(limit = 20): Promise<ConversationResponse
 }
 
 /** Lấy thông tin chi tiết một cuộc hội thoại. */
-export async function getConversationById(id: string): Promise<ConversationResponse> {
-  const res = await api.get<ConversationResponse>(`/conversations/${id}`)
+export async function getConversationById(
+  id: string,
+  signal?: AbortSignal,
+): Promise<ConversationResponse> {
+  const res = await api.get<ConversationResponse>(`/conversations/${id}`, { signal })
   return res.data
 }
 
@@ -51,9 +54,11 @@ export async function uploadGroupAvatar(
 
 export async function getGroupMembers(
   conversationId: string,
+  signal?: AbortSignal,
 ): Promise<ConversationMemberResponse[]> {
   const res = await api.get<ConversationMemberResponse[]>(
     `/conversations/${conversationId}/members`,
+    { signal },
   )
   return res.data
 }

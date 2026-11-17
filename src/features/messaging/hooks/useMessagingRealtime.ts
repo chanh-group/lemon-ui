@@ -12,6 +12,7 @@ import {
 } from '@/lib/socket'
 import { CHAT_QUERY_KEYS, type MessagePageParam } from '@/features/messaging/hooks/useMessages'
 import { getConversationMessages } from '@/features/messaging/api/message.api'
+import { getConversationById, getGroupMembers } from '@/features/conversation/api/conversation.api'
 import { updateConversationLastMessage } from '@/features/conversation/utils/chat.mapper'
 import { fetchMissedMessages } from '@/features/messaging/utils/messageSync'
 import type {
@@ -24,6 +25,7 @@ import type {
 import type { ConversationResponse } from '@/features/conversation/types/conversation.types'
 import { queryKeys } from '@/infrastructure/query/keys'
 import { ROUTES } from '@/config/constants'
+import { ApiError } from '@/infrastructure/api/errors'
 
 const TYPING_STALE_TIMEOUT_MS = 4_500
 
@@ -106,12 +108,27 @@ export function useChatRealtime(activeConversationId: string | null) {
   const [partnerTypingMap, setPartnerTypingMap] = useState<PartnerTypingMap>({})
   const typingExpiryTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>())
   const refreshedInboxOnConnection = useRef(false)
+  const verificationGeneration = useRef(0)
+  const verificationAbort = useRef<AbortController | null>(null)
+  const retryVerification = useRef<(() => void) | null>(null)
+  const revokedConversationIds = useRef(new Set<string>())
+  const [conversationAccess, setConversationAccess] = useState<
+    'verifying' | 'allowed' | 'revoked' | 'retryable-error'
+  >(activeConversationId ? 'verifying' : 'allowed')
+  const [verifiedConversationId, setVerifiedConversationId] = useState<string | null>(null)
   const [connectionStatus, setConnectionStatus] = useState<SocketConnectionStatus | null>(() => {
     if (status !== 'authenticated') return null
     const socket = getChatSocket()
     return socket.connected ? 'connected' : socket.active ? 'connecting' : 'disconnected'
   })
   const userId = user?.id
+
+  useEffect(() => {
+    if (!activeConversationId) {
+      // oxlint-disable-next-line react/set-state-in-effect
+      setVerifiedConversationId(null)
+    }
+  }, [activeConversationId])
 
   // 1. Quản lý kết nối socket theo trạng thái đăng nhập
   useEffect(() => {
@@ -157,19 +174,81 @@ export function useChatRealtime(activeConversationId: string | null) {
       // Không invalidate timeline: missed đã nằm trong liveMessages, còn refetch
       // infinite query sẽ tải lại mọi trang đã load và presign lại toàn bộ media.
     }
+
+    const clearRemovedConversation = (conversationId: string) => {
+      revokedConversationIds.current.add(conversationId)
+      queryClient.removeQueries({ queryKey: CHAT_QUERY_KEYS.messages(conversationId) })
+      queryClient.removeQueries({ queryKey: CHAT_QUERY_KEYS.liveMessages(conversationId) })
+      queryClient.removeQueries({ queryKey: CHAT_QUERY_KEYS.mediaArchive(conversationId) })
+      queryClient.removeQueries({ queryKey: queryKeys.chat.conversation(conversationId) })
+      queryClient.removeQueries({ queryKey: queryKeys.chat.groupMembers(conversationId) })
+      queryClient.setQueryData<ConversationResponse[]>(CHAT_QUERY_KEYS.conversations, (old) =>
+        old?.filter((conversation) => conversation.id !== conversationId),
+      )
+      if (activeConversationId === conversationId) {
+        setConversationAccess('revoked')
+        navigate(ROUTES.messages)
+      }
+    }
+
+    const verifyConversation = async (conversationId: string) => {
+      const generation = ++verificationGeneration.current
+      verificationAbort.current?.abort()
+      const abortController = new AbortController()
+      verificationAbort.current = abortController
+      setConversationAccess('verifying')
+      try {
+        await queryClient.cancelQueries({ queryKey: CHAT_QUERY_KEYS.messages(conversationId) })
+        await queryClient.cancelQueries({ queryKey: queryKeys.chat.groupMembers(conversationId) })
+        const conversation = await getConversationById(conversationId, abortController.signal)
+        if (generation !== verificationGeneration.current) return
+
+        revokedConversationIds.current.delete(conversationId)
+
+        queryClient.setQueryData(queryKeys.chat.conversation(conversationId), conversation)
+        if (conversation.kind === 'GROUP') {
+          const members = await getGroupMembers(conversationId, abortController.signal)
+          if (generation !== verificationGeneration.current) return
+          queryClient.setQueryData(queryKeys.chat.groupMembers(conversationId), members)
+        }
+        await queryClient.refetchQueries({
+          queryKey: CHAT_QUERY_KEYS.conversations,
+          type: 'active',
+        })
+        if (generation !== verificationGeneration.current) return
+        setVerifiedConversationId(conversationId)
+        setConversationAccess('allowed')
+        await syncMissedMessages(conversationId)
+      } catch (error: unknown) {
+        if (generation !== verificationGeneration.current) return
+        if (abortController.signal.aborted) return
+        if (error instanceof ApiError && (error.status === 403 || error.status === 404)) {
+          clearRemovedConversation(conversationId)
+          return
+        }
+        setConversationAccess('retryable-error')
+        toast.error(t('chat.messagesLoadError'))
+      } finally {
+        if (verificationAbort.current === abortController) verificationAbort.current = null
+      }
+    }
+    retryVerification.current = () => {
+      if (activeConversationId) void verifyConversation(activeConversationId)
+    }
+
     const handleConnect = () => {
       setConnectionStatus('connected')
       refreshInbox()
       if (activeConversationId) {
-        void syncMissedMessages(activeConversationId).catch(() =>
-          toast.error(t('chat.messagesLoadError')),
-        )
+        void verifyConversation(activeConversationId)
+      } else {
+        setConversationAccess('allowed')
       }
     }
     const handleDisconnect = () => {
       refreshedInboxOnConnection.current = false
-      setPartnerTypingMap({})
       setConnectionStatus('disconnected')
+      if (activeConversationId) setConversationAccess('verifying')
       timersForEffect.forEach((timer) => clearTimeout(timer))
       timersForEffect.clear()
       setPartnerTypingMap({})
@@ -183,9 +262,7 @@ export function useChatRealtime(activeConversationId: string | null) {
     socket.io.on('reconnect_attempt', handleReconnectAttempt)
     if (socket.connected && activeConversationId) {
       refreshInbox()
-      void syncMissedMessages(activeConversationId).catch(() =>
-        toast.error(t('chat.messagesLoadError')),
-      )
+      void verifyConversation(activeConversationId)
     } else if (socket.connected) {
       refreshInbox()
     }
@@ -209,8 +286,14 @@ export function useChatRealtime(activeConversationId: string | null) {
     const handleNewMessage = (msg: MessageResponse) => {
       const convId = msg.conversationId
       if (msg.senderId !== userId) {
-        setPartnerTypingMap((prev) => (prev[convId] ? { ...prev, [convId]: false } : prev))
+        setPartnerTypingMap((prev) => {
+          if (!prev[convId]) return prev
+          const next = { ...prev }
+          delete next[convId]
+          return next
+        })
       }
+      if (revokedConversationIds.current.has(convId)) return
 
       // Cập nhật messages cache nếu đang có dữ liệu trong cache
       if (
@@ -444,14 +527,6 @@ export function useChatRealtime(activeConversationId: string | null) {
         })
       }
     }
-    const clearRemovedConversation = (conversationId: string) => {
-      queryClient.removeQueries({ queryKey: CHAT_QUERY_KEYS.messages(conversationId) })
-      queryClient.removeQueries({ queryKey: CHAT_QUERY_KEYS.liveMessages(conversationId) })
-      queryClient.removeQueries({ queryKey: CHAT_QUERY_KEYS.mediaArchive(conversationId) })
-      queryClient.removeQueries({ queryKey: queryKeys.chat.conversation(conversationId) })
-      queryClient.removeQueries({ queryKey: queryKeys.chat.groupMembers(conversationId) })
-      if (activeConversationId === conversationId) navigate(ROUTES.messages)
-    }
     const handleMemberRemoved = (event: { conversationId: string; userId: string }) => {
       handleConversationChanged(event)
       setPartnerTypingMap((current) => {
@@ -510,6 +585,10 @@ export function useChatRealtime(activeConversationId: string | null) {
     socket.on('conversation:disbanded', handleConversationDisbanded)
 
     return () => {
+      verificationGeneration.current += 1
+      verificationAbort.current?.abort()
+      verificationAbort.current = null
+      retryVerification.current = null
       timersForEffect.forEach((timer) => clearTimeout(timer))
       timersForEffect.clear()
       setPartnerTypingMap({})
@@ -538,11 +617,19 @@ export function useChatRealtime(activeConversationId: string | null) {
     ? (partnerTypingMap[activeConversationId]?.length ?? 0)
     : 0
   const isPartnerTyping = typingUserCount > 0
+  const effectiveConversationAccess =
+    conversationAccess === 'allowed' &&
+    activeConversationId &&
+    verifiedConversationId !== activeConversationId
+      ? 'verifying'
+      : conversationAccess
 
   return {
     isPartnerTyping,
     typingUserCount,
     typingUserIds: activeConversationId ? (partnerTypingMap[activeConversationId] ?? []) : [],
     connectionStatus,
+    conversationAccess: effectiveConversationAccess,
+    retryConversationAccess: () => retryVerification.current?.(),
   }
 }

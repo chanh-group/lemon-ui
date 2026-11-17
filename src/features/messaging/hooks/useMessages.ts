@@ -104,14 +104,14 @@ export function windowHasLatest(
 }
 
 /** Giữ cửa sổ 3 trang (-1, 0, +1) quanh vùng đang đọc và tải sẵn 2 trang cũ. */
-export function useConversationMessagesQuery(conversationId: string | null) {
+export function useConversationMessagesQuery(conversationId: string | null, enabled = true) {
   const queryClient = useQueryClient()
   const { t } = useTranslation()
   const initialPrefetches = useRef(new Set<string>())
   const activeConversationId = useRef(conversationId)
   const query = useInfiniteQuery({
     queryKey: CHAT_QUERY_KEYS.messages(conversationId ?? 'none'),
-    queryFn: ({ pageParam }: { pageParam: MessagePageParam }) => {
+    queryFn: ({ pageParam, signal }: { pageParam: MessagePageParam; signal: AbortSignal }) => {
       if (!conversationId) {
         return Promise.resolve<MessageTimelineResponse>({ items: [], hasMore: false })
       }
@@ -120,6 +120,7 @@ export function useConversationMessagesQuery(conversationId: string | null) {
         pageParam.cursor,
         MESSAGE_PAGE_SIZE,
         pageParam.after,
+        signal,
       )
     },
     initialPageParam: {} as MessagePageParam,
@@ -135,13 +136,13 @@ export function useConversationMessagesQuery(conversationId: string | null) {
       return firstPage.items[0]?.id ? { after: firstPage.items[0].id } : undefined
     },
     maxPages: MAX_MESSAGE_PAGES,
-    enabled: Boolean(conversationId),
+    enabled: Boolean(conversationId) && enabled,
     staleTime: 1000 * 60, // 1 phút
   })
   const liveMessagesQuery = useQuery<MessageResponse[]>({
     queryKey: CHAT_QUERY_KEYS.liveMessages(conversationId ?? 'none'),
     queryFn: () => [],
-    enabled: Boolean(conversationId),
+    enabled: Boolean(conversationId) && enabled,
     initialData: [],
     staleTime: Infinity,
   })

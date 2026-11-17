@@ -42,6 +42,7 @@ interface ConversationViewProps {
     attachments?: MessageAttachmentInput[],
     pendingFiles?: PendingFile[],
     replyToId?: string,
+    clientMsgId?: string,
   ) => Promise<boolean>
   isSending: boolean
   onBack?: () => void
@@ -239,6 +240,8 @@ export function ConversationView({
     text: string,
     attachments?: MessageAttachmentInput[],
     pendingFiles?: PendingFile[],
+    replyToId = replyingTo?.id,
+    clientMsgId?: string,
   ) => {
     if (
       (!text &&
@@ -247,11 +250,9 @@ export function ConversationView({
       isSending
     )
       return false
-    const sent = await onSend(text, attachments, pendingFiles, replyingTo?.id)
+    const sent = await onSend(text, attachments, pendingFiles, replyToId, clientMsgId)
     if (!sent) return false
     setReplyingTo(null)
-    // Giữ text người dùng gõ thêm trong lúc tin trước đang gửi.
-    setDraft((current) => (current === text ? '' : current))
     await goToLatest()
     return true
   }
@@ -402,9 +403,11 @@ export function ConversationView({
           names={typingNames}
         />
         <MessageComposer
+          conversationId={conversation.id}
           draft={draft}
           onDraftChange={setDraft}
           onSubmit={submit}
+          replyToId={replyingTo?.id}
           disabled={messagesLoading || Boolean(messagesError)}
           isSending={isSending}
           onTypingStart={onTypingStart}

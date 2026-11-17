@@ -86,11 +86,20 @@ export function ChatShell() {
   }, [legacySelect, navigate, selectedId, tab])
 
   // Realtime Socket.IO sync
-  const { isPartnerTyping, typingUserCount, typingUserIds } = useChatRealtime(selectedId)
+  const {
+    isPartnerTyping,
+    typingUserCount,
+    typingUserIds,
+    conversationAccess,
+    retryConversationAccess,
+  } = useChatRealtime(selectedId)
 
   // API Queries & Mutations
   const conversationsQuery = useConversationsQuery()
-  const messagesQuery = useConversationMessagesQuery(selectedId)
+  const messagesQuery = useConversationMessagesQuery(
+    selectedId,
+    !selectedId || conversationAccess === 'allowed',
+  )
   const sendMessageMutation = useSendMessageMutation(selectedId)
   const markReadMutation = useMarkReadMutation()
   const callWindow = useCallWindow()
@@ -148,7 +157,7 @@ export function ChatShell() {
   const selected = selectedFromList ?? conversationDetailQuery.data ?? null
   const groupMembersQuery = useGroupMembersQuery(
     selected?.isGroup ? selected.id : null,
-    Boolean(selected?.isGroup),
+    Boolean(selected?.isGroup) && conversationAccess === 'allowed',
   )
   const typingNames = typingUserIds.flatMap((id) => {
     const member = groupMembersQuery.data?.find((item) => item.id === id)
@@ -162,8 +171,8 @@ export function ChatShell() {
 
   const restoringConversation =
     Boolean(selectedId) &&
-    !selected &&
-    (conversationsQuery.isPending || conversationDetailQuery.isPending)
+    (conversationAccess === 'verifying' ||
+      (!selected && (conversationsQuery.isPending || conversationDetailQuery.isPending)))
   const restoreFailed =
     Boolean(selectedId) &&
     !selected &&
@@ -268,6 +277,7 @@ export function ChatShell() {
     attachments?: MessageAttachmentInput[],
     pendingFiles?: SendMessagePendingFile[],
     replyToId?: string,
+    clientMsgId?: string,
   ): Promise<boolean> => {
     if (!selectedId) return false
     try {
@@ -277,6 +287,7 @@ export function ChatShell() {
         attachments,
         pendingFiles,
         replyToId,
+        clientMsgId,
       })
       return true
     } catch {
@@ -415,7 +426,7 @@ export function ChatShell() {
               </div>
             </section>
           )
-        ) : selected ? (
+        ) : selected && conversationAccess === 'allowed' ? (
           <ConversationView
             key={selected.id}
             conversation={selected}
@@ -462,10 +473,21 @@ export function ChatShell() {
         ) : selectedId ? (
           <section
             className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col items-center justify-center gap-3 bg-background p-8 text-center"
-            aria-busy={restoringConversation}
+            aria-busy={restoringConversation || conversationAccess === 'retryable-error'}
             aria-label={t('chat.loadingConversation')}
           >
-            {restoringConversation ? (
+            {conversationAccess === 'retryable-error' ? (
+              <>
+                <p className="text-sm text-muted-foreground">{t('chat.messagesLoadError')}</p>
+                <button
+                  type="button"
+                  className="rounded-lg bg-primary px-3 py-2 text-sm text-primary-foreground"
+                  onClick={retryConversationAccess}
+                >
+                  {t('common.retry', 'Thử lại')}
+                </button>
+              </>
+            ) : restoringConversation ? (
               <>
                 <span
                   className="size-8 animate-spin rounded-full border-2 border-border border-t-brand-ink"

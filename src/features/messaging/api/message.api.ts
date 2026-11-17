@@ -12,9 +12,11 @@ export async function getConversationMessages(
   cursor?: string,
   limit = 30,
   after?: string,
+  signal?: AbortSignal,
 ): Promise<MessageTimelineResponse> {
   const res = await api.get<MessageTimelineResponse>(`/conversations/${conversationId}/messages`, {
     params: { cursor, limit, after },
+    signal,
   })
   return res.data
 }
