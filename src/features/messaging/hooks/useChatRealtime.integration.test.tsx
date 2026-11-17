@@ -185,3 +185,45 @@ describe('useChatRealtime reconnect access', () => {
     expect(queryClient.getQueryData(CHAT_QUERY_KEYS.conversations)).toEqual([])
   })
 })
+
+describe('useChatRealtime group typing', () => {
+  it('keeps other members typing when one member sends a message', () => {
+    const { result } = renderHook(() => useChatRealtime(group.id), { wrapper })
+
+    act(() => {
+      socket.emit('typing', { conversationId: group.id, userId: 'member-a', isTyping: true })
+      socket.emit('typing', { conversationId: group.id, userId: 'member-b', isTyping: true })
+    })
+    expect(result.current.typingUserIds).toEqual(['member-a', 'member-b'])
+
+    act(() => {
+      socket.emit('message:new', {
+        id: 'message-a',
+        conversationId: group.id,
+        senderId: 'member-a',
+        kind: 'TEXT',
+        body: 'Sent',
+        replyToId: null,
+        createdAt: '2026-11-17T12:00:00.000Z',
+        editedAt: null,
+        deletedAt: null,
+      })
+    })
+
+    expect(result.current.typingUserIds).toEqual(['member-b'])
+  })
+
+  it('removes only a departed member and clears all typing after disconnect', () => {
+    const { result } = renderHook(() => useChatRealtime(group.id), { wrapper })
+
+    act(() => {
+      socket.emit('typing', { conversationId: group.id, userId: 'member-a', isTyping: true })
+      socket.emit('typing', { conversationId: group.id, userId: 'member-b', isTyping: true })
+      socket.emit('member:removed', { conversationId: group.id, userId: 'member-a' })
+    })
+    expect(result.current.typingUserIds).toEqual(['member-b'])
+
+    act(() => socket.emit('disconnect'))
+    expect(result.current.typingUserIds).toEqual([])
+  })
+})

@@ -14,7 +14,6 @@ import { ConversationHeader } from './ConversationHeader'
 import { ConversationInfoPanel } from './ConversationInfoPanel'
 import { MessageList, type MessageListHandle } from './MessageList'
 import { MessageComposer, type PendingFile } from './MessageComposer'
-import { TypingIndicator } from './TypingIndicator'
 import type { MessageScrollPosition } from '@/features/messaging/utils/messageScrollPosition'
 
 interface ConversationViewProps {
@@ -263,6 +262,7 @@ export function ConversationView({
       ? t('chat.you')
       : (replyingTo.sender ?? (conversation.isGroup ? null : conversation.name))
     : null
+  const displayedTypingUserCount = atBottom && hasLatest ? typingUserCount : 0
 
   return (
     <div className="relative flex h-full min-h-0 w-full min-w-0 flex-1 overflow-hidden">
@@ -321,7 +321,7 @@ export function ConversationView({
                 {t('common.retry')}
               </button>
             </div>
-          ) : groups.length === 0 && typingUserCount === 0 ? (
+          ) : groups.length === 0 && displayedTypingUserCount === 0 ? (
             <div className="flex h-full flex-col items-center justify-center px-6 text-center">
               <span
                 className="mb-4 grid size-14 place-items-center rounded-full bg-primary/10 text-brand-ink"
@@ -351,7 +351,8 @@ export function ConversationView({
               isVisible={isVisible}
               conversationId={conversation.id}
               isGroup={conversation.isGroup}
-              isTyping={typingUserCount > 0 && hasLatest}
+              typingUserCount={displayedTypingUserCount}
+              typingNames={typingNames}
               onReply={setReplyingTo}
               followBottom={atBottom && hasLatest}
               onVisibleMessage={onVisibleMessage}
@@ -397,11 +398,6 @@ export function ConversationView({
             </button>
           </div>
         )}
-        <TypingIndicator
-          conversation={conversation}
-          userCount={atBottom ? typingUserCount : 0}
-          names={typingNames}
-        />
         <MessageComposer
           conversationId={conversation.id}
           draft={draft}

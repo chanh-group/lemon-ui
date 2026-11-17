@@ -33,6 +33,7 @@ const Sticker = createIcon(StickerData)
 const ForwardIcon = createIcon(ForwardData)
 import { UserAvatar } from '@/components/common/UserAvatar'
 import { useAuth } from '@/features/auth/api'
+import { TypingIndicator } from './TypingIndicator'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import type {
@@ -566,7 +567,8 @@ interface MessageListProps {
   isVisible: boolean
   conversationId?: string
   isGroup?: boolean
-  isTyping?: boolean
+  typingUserCount?: number
+  typingNames?: string[]
   /** Còn đang ở cuối danh sách thì tự bám tin mới nhất; cuộn lên thì thôi. */
   followBottom?: boolean
   onReply?: (message: ChatMessage) => void
@@ -614,7 +616,8 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
     isVisible,
     conversationId,
     isGroup,
-    isTyping,
+    typingUserCount = 0,
+    typingNames,
     followBottom = true,
     onVisibleMessage,
     onRetryMessage,
@@ -708,9 +711,9 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
         })
       }
     }
-    if (isTyping) result.push({ kind: 'typing', key: 'typing-indicator' })
+    if (typingUserCount > 0) result.push({ kind: 'typing', key: 'typing-indicator' })
     return result
-  }, [groups, isTyping])
+  }, [groups, typingUserCount])
 
   // TanStack Virtual exposes an imperative instance; this component opts out of compiler memoization above.
   // eslint-disable-next-line react/incompatible-library
@@ -844,26 +847,13 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
         <span className="h-px flex-1 bg-border" aria-hidden="true" />
       </div>
     ) : row.kind === 'typing' ? (
-      <div className="flex items-end gap-2.5 pb-2" role="status" aria-label={t('chat.typing')}>
-        {!isGroup && (
-          <UserAvatar
-            name={senderLabel}
-            src={senderAvatarUrl}
-            className="size-7"
-            fallbackClassName="text-[10px]"
-          />
-        )}
-        <span className="inline-flex h-10 items-center gap-1 rounded-2xl rounded-bl-md border border-border bg-card px-3.5 shadow-sm">
-          {[0, 0.15, 0.3].map((delay) => (
-            <span
-              key={delay}
-              aria-hidden="true"
-              className="size-1.5 rounded-full bg-muted-foreground animate-typing-dot motion-reduce:animate-none"
-              style={{ animationDelay: `${delay}s` }}
-            />
-          ))}
-        </span>
-      </div>
+      <TypingIndicator
+        isGroup={isGroup}
+        senderLabel={senderLabel}
+        senderAvatarUrl={senderAvatarUrl}
+        userCount={typingUserCount}
+        names={typingNames}
+      />
     ) : (
       <MessageRowView
         group={row.group}

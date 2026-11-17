@@ -58,7 +58,10 @@ export function removeTypingUser(
   conversationId: string,
   userId: string,
 ): PartnerTypingMap {
-  const users = (current[conversationId] ?? []).filter((id) => id !== userId)
+  const currentUsers = current[conversationId]
+  if (!currentUsers?.includes(userId)) return current
+
+  const users = currentUsers.filter((id) => id !== userId)
   if (users.length === 0) {
     const next = { ...current }
     delete next[conversationId]
@@ -151,6 +154,27 @@ export function useChatRealtime(activeConversationId: string | null) {
       refreshedInboxOnConnection.current = true
       void queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.conversations })
     }
+    const removeTypingMember = (conversationId: string, typingUserId: string) => {
+      const timerKey = `${conversationId}:${typingUserId}`
+      const timer = timersForEffect.get(timerKey)
+      if (timer) clearTimeout(timer)
+      timersForEffect.delete(timerKey)
+      setPartnerTypingMap((current) => removeTypingUser(current, conversationId, typingUserId))
+    }
+    const clearConversationTyping = (conversationId: string) => {
+      const timerPrefix = `${conversationId}:`
+      for (const [timerKey, timer] of timersForEffect) {
+        if (!timerKey.startsWith(timerPrefix)) continue
+        clearTimeout(timer)
+        timersForEffect.delete(timerKey)
+      }
+      setPartnerTypingMap((current) => {
+        if (!current[conversationId]) return current
+        const next = { ...current }
+        delete next[conversationId]
+        return next
+      })
+    }
     const syncMissedMessages = async (conversationId: string) => {
       const timeline = queryClient.getQueryData<
         InfiniteData<MessageTimelineResponse, MessagePageParam>
@@ -177,6 +201,7 @@ export function useChatRealtime(activeConversationId: string | null) {
 
     const clearRemovedConversation = (conversationId: string) => {
       revokedConversationIds.current.add(conversationId)
+      clearConversationTyping(conversationId)
       queryClient.removeQueries({ queryKey: CHAT_QUERY_KEYS.messages(conversationId) })
       queryClient.removeQueries({ queryKey: CHAT_QUERY_KEYS.liveMessages(conversationId) })
       queryClient.removeQueries({ queryKey: CHAT_QUERY_KEYS.mediaArchive(conversationId) })
@@ -285,15 +310,8 @@ export function useChatRealtime(activeConversationId: string | null) {
     // A. Nhận tin nhắn mới
     const handleNewMessage = (msg: MessageResponse) => {
       const convId = msg.conversationId
-      if (msg.senderId !== userId) {
-        setPartnerTypingMap((prev) => {
-          if (!prev[convId]) return prev
-          const next = { ...prev }
-          delete next[convId]
-          return next
-        })
-      }
       if (revokedConversationIds.current.has(convId)) return
+      if (msg.senderId !== userId) removeTypingMember(convId, msg.senderId)
 
       // Cập nhật messages cache nếu đang có dữ liệu trong cache
       if (
@@ -495,18 +513,18 @@ export function useChatRealtime(activeConversationId: string | null) {
       if (data.userId === userId) return
 
       const timerKey = `${data.conversationId}:${data.userId}`
-      const oldTimer = typingExpiryTimers.current.get(timerKey)
+      const oldTimer = timersForEffect.get(timerKey)
       if (oldTimer) clearTimeout(oldTimer)
-      typingExpiryTimers.current.delete(timerKey)
+      timersForEffect.delete(timerKey)
 
       setPartnerTypingMap((prev) => updateTypingUsers(prev, data, userId))
 
       if (data.isTyping) {
         const timer = setTimeout(() => {
-          typingExpiryTimers.current.delete(timerKey)
+          timersForEffect.delete(timerKey)
           setPartnerTypingMap((prev) => removeTypingUser(prev, data.conversationId, data.userId))
         }, TYPING_STALE_TIMEOUT_MS)
-        typingExpiryTimers.current.set(timerKey, timer)
+        timersForEffect.set(timerKey, timer)
       }
     }
 
@@ -529,20 +547,11 @@ export function useChatRealtime(activeConversationId: string | null) {
     }
     const handleMemberRemoved = (event: { conversationId: string; userId: string }) => {
       handleConversationChanged(event)
-      setPartnerTypingMap((current) => {
-        const next = { ...current }
-        delete next[event.conversationId]
-        return next
-      })
       if (event.userId === userId) clearRemovedConversation(event.conversationId)
+      else removeTypingMember(event.conversationId, event.userId)
     }
     const handleConversationDisbanded = (event: { conversationId: string }) => {
       handleConversationChanged(event)
-      setPartnerTypingMap((current) => {
-        const next = { ...current }
-        delete next[event.conversationId]
-        return next
-      })
       clearRemovedConversation(event.conversationId)
     }
 

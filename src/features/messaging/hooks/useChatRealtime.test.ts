@@ -100,4 +100,9 @@ describe('typing state', () => {
     })
     expect(removeTypingUser({ conv: ['friend-b'] }, 'conv', 'friend-b')).toEqual({})
   })
+
+  it('keeps the same state reference when the user is not typing', () => {
+    const current = { conv: ['friend-b'] }
+    expect(removeTypingUser(current, 'conv', 'friend-a')).toBe(current)
+  })
 })
