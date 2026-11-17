@@ -40,7 +40,7 @@ interface ConversationViewProps {
     text: string,
     attachments?: MessageAttachmentInput[],
     pendingFiles?: PendingFile[],
-    replyToId?: string,
+    replyToId?: string | null,
     clientMsgId?: string,
   ) => Promise<boolean>
   isSending: boolean
@@ -239,7 +239,7 @@ export function ConversationView({
     text: string,
     attachments?: MessageAttachmentInput[],
     pendingFiles?: PendingFile[],
-    replyToId = replyingTo?.id,
+    replyToId?: string | null,
     clientMsgId?: string,
   ) => {
     if (
@@ -249,7 +249,7 @@ export function ConversationView({
       isSending
     )
       return false
-    const sent = await onSend(text, attachments, pendingFiles, replyToId, clientMsgId)
+    const sent = await onSend(text, attachments, pendingFiles, replyToId ?? null, clientMsgId)
     if (!sent) return false
     setReplyingTo(null)
     await goToLatest()

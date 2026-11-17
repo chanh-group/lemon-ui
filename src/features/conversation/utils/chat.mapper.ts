@@ -304,9 +304,9 @@ export function mapMessageResponse(raw: MessageResponse, currentUserId?: string)
           : isMe
             ? 'sent'
             : undefined,
-    reactions: raw.reactions,
-    isForwarded: raw.isForwarded,
-    storyId: raw.storyId,
+    reactions: isRevoked ? undefined : raw.reactions,
+    isForwarded: isRevoked ? undefined : raw.isForwarded,
+    storyId: isRevoked ? null : raw.storyId,
     storyPreview: isRevoked ? null : raw.storyPreview,
     replyToId: raw.replyToId,
     replyTarget: raw.replyTarget,

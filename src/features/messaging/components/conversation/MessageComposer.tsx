@@ -27,6 +27,7 @@ const MAX_FILE_SIZE = 25 * 1024 * 1024 // 25MB
 export interface PendingFile {
   id: string
   file: File
+  clientMsgId?: string
   previewUrl?: string
   isCompressing?: boolean
   uploadedAttachment?: MessageAttachmentInput
@@ -40,7 +41,7 @@ interface MessageComposerProps {
     text: string,
     attachments?: MessageAttachmentInput[],
     pendingFiles?: PendingFile[],
-    replyToId?: string,
+    replyToId?: string | null,
     clientMsgId?: string,
   ) => boolean | void | Promise<boolean | void>
   replyToId?: string
@@ -84,6 +85,7 @@ export function MessageComposer({
   const failedAttemptRef = useRef<FailedAttempt | null>(null)
   const [isRecording, setIsRecording] = useState(false)
   const [recordingSeconds, setRecordingSeconds] = useState(0)
+  const [isUploadingAttachment, setIsUploadingAttachment] = useState(false)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -163,7 +165,7 @@ export function MessageComposer({
       }, 1000)
     } catch {
       cleanupRecording()
-      toast.error(t('chat.micPermissionDenied', 'Không thể truy cập microphone'))
+      toast.error(t('chat.micPermissionDenied'))
     }
   }
 
@@ -186,7 +188,7 @@ export function MessageComposer({
       cleanupRecording()
 
       if (audioBlob.size < 100 || duration < 1) {
-        toast.error(t('chat.recordingTooShort', 'Bản ghi âm quá ngắn'))
+        toast.error(t('chat.recordingTooShort'))
         return
       }
 
@@ -194,14 +196,15 @@ export function MessageComposer({
       const file = new File([audioBlob], `voice-note-${Date.now()}.${ext}`, { type: mimeType })
       const previewUrl = URL.createObjectURL(file)
 
-      const pendingFile = { id: generateUUID(), file, previewUrl }
-      const sent = await onSubmit('', undefined, [pendingFile])
+      const clientMsgId = generateUUID()
+      const pendingFile = { id: generateUUID(), clientMsgId, file, previewUrl }
+      const sent = await onSubmit('', undefined, [pendingFile], null, clientMsgId)
       if (sent === false) {
         setPendingFiles((prev) => [...prev, pendingFile])
         return
       }
       URL.revokeObjectURL(previewUrl)
-      toast.success(t('chat.voiceNoteSent', 'Đã gửi tin nhắn thoại'))
+      toast.success(t('chat.voiceNoteSent'))
     }
 
     recorder.stop()
@@ -239,7 +242,7 @@ export function MessageComposer({
 
       // Kiểm tra file thực thi độc hại
       if (/\.(exe|bat|cmd|sh|msi|dll|scr|vbs)$/i.test(rawFile.name)) {
-        toast.error(`Tệp "${rawFile.name}" không được phép gửi vì lý do an toàn.`)
+        toast.error(t('chat.fileTypeNotAllowed', { fileName: rawFile.name }))
         continue
       }
 
@@ -247,19 +250,14 @@ export function MessageComposer({
       if (rawFile.type.startsWith('video/')) {
         try {
           if (rawFile.size > 15 * 1024 * 1024) {
-            toast.info(
-              t('chat.optimizingVideo', {
-                name: rawFile.name,
-                defaultValue: `Đang tối ưu dung lượng video "${rawFile.name}"...`,
-              }),
-            )
+            toast.info(t('chat.optimizingVideo', { name: rawFile.name }))
           }
           const compressed = await compressVideoIfNeeded(rawFile, { maxSizeBytes: MAX_FILE_SIZE })
           if (compressed instanceof File) {
             fileToUse = compressed
           }
         } catch (err) {
-          toast.error(err instanceof Error ? err.message : 'Lỗi khi nén video')
+          toast.error(err instanceof Error ? err.message : t('chat.videoCompressionFailed'))
           continue
         }
       }
@@ -269,7 +267,6 @@ export function MessageComposer({
           t('chat.fileTooLarge', {
             fileName: fileToUse.name,
             fileSize: formatBytes(fileToUse.size),
-            defaultValue: `Tệp "${fileToUse.name}" vượt quá giới hạn 25MB (${formatBytes(fileToUse.size)}).`,
           }),
         )
         continue
@@ -327,7 +324,6 @@ export function MessageComposer({
     if (disabled || isSending || submittingRef.current) return
 
     submittingRef.current = true
-    const clientMsgId = generateUUID()
 
     if (typingTimer.current) {
       clearTimeout(typingTimer.current)
@@ -337,8 +333,10 @@ export function MessageComposer({
 
     const textToSend = text
     const filesToSend = [...pendingFiles]
+    const clientMsgId = filesToSend.find((file) => file.clientMsgId)?.clientMsgId ?? generateUUID()
     const sentIds = new Set(filesToSend.map((file) => file.id))
     setPendingFiles((current) => current.filter((file) => !sentIds.has(file.id)))
+    setIsUploadingAttachment(filesToSend.length > 0)
     draftRef.current = ''
     onDraftChange('')
 
@@ -366,6 +364,7 @@ export function MessageComposer({
     } catch {
       keepFailedAttempt()
     } finally {
+      setIsUploadingAttachment(false)
       submittingRef.current = false
     }
   }
@@ -405,7 +404,7 @@ export function MessageComposer({
       {failedAttempt && (
         <div className="mb-2 flex items-center justify-between gap-3 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs">
           <span className="min-w-0 truncate text-destructive">
-            {t('chat.failedMessage', 'Tin chưa gửi được')}
+            {t('chat.failedMessage')}
             {failedAttempt.text ? `: ${failedAttempt.text}` : ''}
           </span>
           <span className="flex shrink-0 items-center gap-2">
@@ -414,7 +413,7 @@ export function MessageComposer({
               className="font-semibold text-primary hover:underline"
               onClick={() => void handleRetryFailedAttempt()}
             >
-              {t('common.retry', 'Thử lại')}
+              {t('common.retry')}
             </button>
             <button
               type="button"
@@ -425,7 +424,7 @@ export function MessageComposer({
                 })
                 setFailedAttempt(null)
               }}
-              aria-label={t('common.close', 'Đóng')}
+              aria-label={t('common.close')}
             >
               <CancelIcon className="size-4" />
             </button>
@@ -467,6 +466,11 @@ export function MessageComposer({
           ))}
         </div>
       )}
+      {isUploadingAttachment && (
+        <p className="mb-2 px-1 text-xs text-muted-foreground" role="status" aria-live="polite">
+          {t('chat.uploadingFiles')}
+        </p>
+      )}
 
       {/* Hidden File Input */}
       <input
@@ -488,7 +492,7 @@ export function MessageComposer({
               {formatTimer(recordingSeconds)}
             </span>
             <span className="text-xs text-muted-foreground hidden sm:inline">
-              {t('chat.recordingVoiceNote', 'Đang ghi âm tin nhắn thoại...')}
+              {t('chat.recordingVoiceNote')}
             </span>
           </div>
 
@@ -497,20 +501,20 @@ export function MessageComposer({
               type="button"
               onClick={handleCancelRecording}
               className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-              title={t('chat.cancelRecording', 'Hủy')}
+              title={t('chat.cancelRecording')}
             >
               <TrashIcon className="size-4" />
-              <span>{t('chat.cancel', 'Hủy')}</span>
+              <span>{t('chat.cancel')}</span>
             </button>
 
             <button
               type="button"
               onClick={handleStopAndSendRecording}
               className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium bg-primary text-primary-foreground shadow-sm hover:opacity-90 active:scale-95 transition-all"
-              title={t('chat.sendVoiceNote', 'Gửi tin nhắn thoại')}
+              title={t('chat.sendVoiceNote')}
             >
               <Send className="size-3.5" />
-              <span>{t('chat.send', 'Gửi')}</span>
+              <span>{t('chat.send')}</span>
             </button>
           </div>
         </div>
@@ -531,9 +535,7 @@ export function MessageComposer({
                 }
               }}
               placeholder={
-                pendingFiles.length > 0
-                  ? 'Thêm tin nhắn hoặc bấm gửi tệp...'
-                  : t('chat.composeHint')
+                pendingFiles.length > 0 ? t('chat.composeFilesHint') : t('chat.composeHint')
               }
               aria-label={t('chat.composeHint')}
               className="h-11 min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
@@ -543,7 +545,7 @@ export function MessageComposer({
               onClick={() => fileInputRef.current?.click()}
               disabled={disabled || isSending}
               aria-label={t('chat.attachFile')}
-              title="Đính kèm tệp tin / ảnh (< 25MB)"
+              title={t('chat.attachFile')}
               className="grid size-9 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-border hover:text-foreground disabled:opacity-50"
             >
               <Paperclip className="size-5" aria-hidden="true" />
@@ -554,8 +556,8 @@ export function MessageComposer({
               type="button"
               onClick={handleStartRecording}
               disabled={disabled || isSending}
-              aria-label={t('chat.recordVoiceNote', 'Ghi âm')}
-              title={t('chat.recordVoiceNote', 'Ghi âm tin nhắn thoại')}
+              aria-label={t('chat.recordVoiceNote')}
+              title={t('chat.recordVoiceNote')}
               className="grid size-9 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-border hover:text-foreground disabled:opacity-50"
             >
               <MicIcon className="size-5" aria-hidden="true" />

@@ -374,11 +374,11 @@ const MessageRowView = memo(function MessageRowView({
                   ),
           )}
         >
-          {isFirst && !isMe && group.sender && (
+          {isFirst && !isMe && isGroup && group.sender && (
             <span className="mb-1 block text-xs font-bold text-brand-ink">{group.sender}</span>
           )}
 
-          {msg.isForwarded && (
+          {!msg.deletedAt && msg.isForwarded && (
             <div className="mb-1 flex items-center gap-1 text-[11px] font-medium text-muted-foreground/80 italic select-none">
               <ForwardIcon className="size-3 text-primary" />
               <span>{t('chat.forwarded', 'Đã chuyển tiếp')}</span>
@@ -484,7 +484,7 @@ const MessageRowView = memo(function MessageRowView({
         )}
 
         {/* Reactions floating independently outside the bubble, matching image 2 & Messenger */}
-        {msg.reactions && msg.reactions.length > 0 && (
+        {!msg.deletedAt && msg.reactions && msg.reactions.length > 0 && (
           <div
             className="-mt-2.5 z-10 flex max-w-full flex-wrap justify-end gap-1 select-none self-end mr-1.5"
             aria-label={t('chat.reactions')}

@@ -311,6 +311,7 @@ export function useConversationMediaArchiveQuery(conversationId: string, enabled
 export interface SendMessagePendingFile {
   id: string
   file: File
+  clientMsgId?: string
   previewUrl?: string
   uploadedAttachment?: MessageAttachmentInput
 }
@@ -478,13 +479,17 @@ export function useSendMessageMutation(conversationId: string | null) {
             )
             objectKey = fallbackRes.objectKey
           }
-          finalAttachments.push({
+          const uploadedAttachment = {
             objectKey,
             fileName: file.name,
             mimeType,
             sizeBytes: file.size,
             kind: kind.replace('CHAT_', '') as 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE',
-          })
+          }
+          // Keep the completed upload on the attempt. If a later file or the
+          // message request fails, retry must reuse this object key.
+          item.uploadedAttachment = uploadedAttachment
+          finalAttachments.push(uploadedAttachment)
         }
       } else if (typeof arg !== 'string') {
         finalAttachments = arg.attachments
@@ -533,7 +538,7 @@ export function useSendMessageMutation(conversationId: string | null) {
             )
           : false
       if (confirmed) return
-      if ((context?.wasUncertain || isUncertainSendError(error)) && context?.targetConversationId) {
+      if (isUncertainSendError(error) && context?.targetConversationId) {
         queryClient.setQueryData<MessageResponse[]>(
           CHAT_QUERY_KEYS.liveMessages(context.targetConversationId),
           (old) =>

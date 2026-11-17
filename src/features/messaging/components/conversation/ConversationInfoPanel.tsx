@@ -302,6 +302,8 @@ export function ConversationInfoPanel({
     successKey: string
     action: () => Promise<unknown>
   } | null>(null)
+  const [isGroupActionPending, setIsGroupActionPending] = useState(false)
+  const groupActionPendingRef = useRef(false)
 
   const friendData = useMemo(() => {
     if (!conversation.partnerId || !friendsQuery.data) return null
@@ -353,6 +355,9 @@ export function ConversationInfoPanel({
     ])
   }
   const runGroupAction = async (action: () => Promise<unknown>, successKey: string) => {
+    if (groupActionPendingRef.current) return false
+    groupActionPendingRef.current = true
+    setIsGroupActionPending(true)
     try {
       await action()
       toast.success(t(successKey))
@@ -361,6 +366,9 @@ export function ConversationInfoPanel({
     } catch (error) {
       toast.error(error instanceof Error ? error.message : t('common.error'))
       return false
+    } finally {
+      groupActionPendingRef.current = false
+      setIsGroupActionPending(false)
     }
   }
 
@@ -728,7 +736,9 @@ export function ConversationInfoPanel({
 
           <p className="mt-0.5 truncate text-xs text-muted-foreground">
             {conversation.isGroup
-              ? conversation.members
+              ? t('chat.groupMemberCount', {
+                  count: conversation.memberCount ?? activeMembers.length,
+                })
               : conversation.online
                 ? t('chat.online')
                 : (conversation.lastActive ?? t('chat.offline'))}
@@ -1233,6 +1243,7 @@ export function ConversationInfoPanel({
                     key={friend.id}
                     type="button"
                     onClick={() =>
+                      !isGroupActionPending &&
                       void runGroupAction(
                         () => addGroupMembers(conversation.id, [friend.id]),
                         'chat.groupMembersAdded',
@@ -1386,6 +1397,7 @@ export function ConversationInfoPanel({
             </Button>
             <Button
               variant="destructive"
+              disabled={isGroupActionPending}
               onClick={() => {
                 if (!pendingGroupAction) return
                 void runGroupAction(pendingGroupAction.action, pendingGroupAction.successKey).then(

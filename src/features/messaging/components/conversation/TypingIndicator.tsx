@@ -26,7 +26,9 @@ export function TypingIndicator({
     : visibleNames.length === 0
       ? userCount === 1
         ? t('chat.unknownPersonTyping')
-        : t('chat.peopleTyping', { count: userCount })
+        : t(userCount === 1 ? 'chat.peopleTyping_one' : 'chat.peopleTyping_other', {
+            count: userCount,
+          })
       : visibleNames.length === 1 && hiddenCount === 0
         ? t('chat.groupTypingOne', { name: visibleNames[0] })
         : visibleNames.length === 2 && hiddenCount === 0

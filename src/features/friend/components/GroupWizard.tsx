@@ -7,10 +7,12 @@ const Camera = createIcon(CameraData)
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { useFriends } from '@/features/friend/hooks/useFriends'
+import { useAuth } from '@/features/auth/api'
 import {
   useCreateGroupMutation,
   useUploadGroupAvatarMutation,
 } from '@/features/conversation/hooks/useConversations'
+import { getConversationById } from '@/features/conversation/api/conversation.api'
 import { UserAvatar } from '@/components/common/UserAvatar'
 import type { ConversationResponse } from '@/features/conversation/types/conversation.types'
 import {
@@ -19,6 +21,58 @@ import {
   GROUP_MIN_INVITED_MEMBERS,
 } from '@/features/conversation/constants'
 import { Avatar, PaneHeader, SearchBox } from './kit'
+
+const GROUP_WIZARD_STORAGE_KEY = 'lemonchat.group-wizard.v1'
+const GROUP_WIZARD_TTL_MS = 10 * 60 * 1000
+
+interface StoredGroupWizardState {
+  userId: string
+  signature: string
+  clientRequestId: string
+  groupId?: string
+  title: string
+  memberIds: string[]
+  savedAt: number
+}
+
+function readStoredGroupWizardState(userId?: string): StoredGroupWizardState | null {
+  if (!userId || typeof sessionStorage === 'undefined') return null
+  try {
+    const parsed = JSON.parse(
+      sessionStorage.getItem(GROUP_WIZARD_STORAGE_KEY) ?? 'null',
+    ) as StoredGroupWizardState | null
+    if (
+      !parsed ||
+      parsed.userId !== userId ||
+      Date.now() - parsed.savedAt > GROUP_WIZARD_TTL_MS ||
+      !parsed.signature ||
+      !parsed.clientRequestId
+    ) {
+      sessionStorage.removeItem(GROUP_WIZARD_STORAGE_KEY)
+      return null
+    }
+    return parsed
+  } catch {
+    sessionStorage.removeItem(GROUP_WIZARD_STORAGE_KEY)
+    return null
+  }
+}
+
+function writeStoredGroupWizardState(state: StoredGroupWizardState): void {
+  try {
+    sessionStorage.setItem(GROUP_WIZARD_STORAGE_KEY, JSON.stringify(state))
+  } catch {
+    // Session storage is an enhancement; group creation remains functional if unavailable.
+  }
+}
+
+function clearStoredGroupWizardState(): void {
+  try {
+    sessionStorage.removeItem(GROUP_WIZARD_STORAGE_KEY)
+  } catch {
+    // Ignore storage cleanup failures.
+  }
+}
 
 /** Wizard tạo nhóm 2 bước: chọn thành viên (chỉ bạn bè) → đặt tên nhóm. */
 export function GroupWizard({
@@ -29,6 +83,7 @@ export function GroupWizard({
   onDone: (conversationId?: string) => void
 }) {
   const { t } = useTranslation()
+  const { user } = useAuth()
   const [step, setStep] = useState<'members' | 'name'>('members')
   const [selected, setSelected] = useState<string[]>([])
   const [query, setQuery] = useState('')
@@ -37,11 +92,41 @@ export function GroupWizard({
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [createdGroup, setCreatedGroup] = useState<ConversationResponse | null>(null)
+  const [isRestoring, setIsRestoring] = useState(false)
   const avatarInput = useRef<HTMLInputElement>(null)
   const requestId = useRef<{ signature: string; id: string } | null>(null)
   const createGroup = useCreateGroupMutation()
   const uploadAvatar = useUploadGroupAvatarMutation()
   const friendsQuery = useFriends()
+
+  useEffect(() => {
+    const stored = readStoredGroupWizardState(user?.id)
+    if (!stored) return
+    requestId.current = { signature: stored.signature, id: stored.clientRequestId }
+    // Restoring persisted wizard state is an intentional external-store synchronization.
+    // oxlint-disable-next-line react/set-state-in-effect
+    setGroupName(stored.title)
+    setSelected(stored.memberIds)
+    if (!stored.groupId) return
+
+    let cancelled = false
+    setIsRestoring(true)
+    void getConversationById(stored.groupId)
+      .then((group) => {
+        if (cancelled) return
+        setCreatedGroup(group)
+        setStep('name')
+      })
+      .catch(() => {
+        if (!cancelled) clearStoredGroupWizardState()
+      })
+      .finally(() => {
+        if (!cancelled) setIsRestoring(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [user?.id])
 
   useEffect(
     () => () => {
@@ -58,8 +143,13 @@ export function GroupWizard({
     )
   }, [friendsQuery.data, query])
 
-  const toggle = (id: string) =>
+  const toggle = (id: string) => {
+    if (!selected.includes(id) && selected.length >= GROUP_MAX_INVITED_MEMBERS) {
+      toast.error(t('chat.groupMemberLimit', { count: GROUP_MAX_INVITED_MEMBERS }))
+      return
+    }
     setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+  }
 
   const handleAvatarSelect = (file?: File) => {
     if (!file) return
@@ -79,14 +169,27 @@ export function GroupWizard({
   }
 
   const handleCreate = async () => {
-    if (isSubmitting) return
+    if (isSubmitting || isRestoring) return
     const name = groupName.trim() || t('chat.defaultGroupName')
     if (selected.length < GROUP_MIN_INVITED_MEMBERS || selected.length > GROUP_MAX_INVITED_MEMBERS)
       return
     const signature = JSON.stringify({ title: name, memberIds: [...selected].sort() })
+    const stored = readStoredGroupWizardState(user?.id)
     if (requestId.current?.signature !== signature) {
-      requestId.current = { signature, id: crypto.randomUUID() }
+      requestId.current = {
+        signature,
+        id: stored?.signature === signature ? stored.clientRequestId : crypto.randomUUID(),
+      }
     }
+    writeStoredGroupWizardState({
+      userId: user?.id ?? 'anonymous',
+      signature,
+      clientRequestId: requestId.current.id,
+      groupId: createdGroup?.id,
+      title: name,
+      memberIds: selected,
+      savedAt: Date.now(),
+    })
     setIsSubmitting(true)
     try {
       const group =
@@ -97,6 +200,15 @@ export function GroupWizard({
           clientRequestId: requestId.current.id,
         }))
       if (!createdGroup) setCreatedGroup(group)
+      writeStoredGroupWizardState({
+        userId: user?.id ?? 'anonymous',
+        signature,
+        clientRequestId: requestId.current.id,
+        groupId: group.id,
+        title: name,
+        memberIds: selected,
+        savedAt: Date.now(),
+      })
       if (avatarFile) {
         try {
           await uploadAvatar.mutateAsync({ conversationId: group.id, file: avatarFile })
@@ -106,6 +218,7 @@ export function GroupWizard({
         }
       }
       toast.success(t('chat.groupCreated', { name: group.title ?? name }))
+      clearStoredGroupWizardState()
       requestId.current = null
       onDone(group.id)
     } catch (error) {
@@ -121,9 +234,15 @@ export function GroupWizard({
         title={step === 'members' ? t('chat.chooseMembers') : t('chat.groupName')}
         onBack={
           step === 'members'
-            ? onBack
+            ? () => {
+                clearStoredGroupWizardState()
+                onBack()
+              }
             : createdGroup
-              ? () => onDone(createdGroup.id)
+              ? () => {
+                  clearStoredGroupWizardState()
+                  onDone(createdGroup.id)
+                }
               : () => setStep('members')
         }
       />
@@ -137,7 +256,10 @@ export function GroupWizard({
         />
         {step === 'name' && (
           <div className="px-2 pt-2 text-xs text-muted-foreground">
-            <p>{t('chat.selectedCount', { count: selected.length })}</p>
+            <p>
+              {t('chat.selectedCount', { count: selected.length })} / {GROUP_MAX_INVITED_MEMBERS}{' '}
+              {t('chat.groupInviteLimitLabel')}
+            </p>
             <p>{t('chat.groupNameOptional', { name: t('chat.defaultGroupName') })}</p>
           </div>
         )}
@@ -195,7 +317,10 @@ export function GroupWizard({
             <div className="sticky bottom-0 flex justify-end gap-2 bg-linear-to-t from-card via-card/95 to-transparent px-3 pt-6 pb-2">
               <button
                 type="button"
-                onClick={() => onDone()}
+                onClick={() => {
+                  clearStoredGroupWizardState()
+                  onDone()
+                }}
                 className="rounded-xl px-4 py-2 text-sm font-semibold text-muted-foreground transition-colors hover:bg-muted"
               >
                 {t('chat.skip')}
@@ -230,7 +355,7 @@ export function GroupWizard({
             <button
               type="button"
               onClick={() => avatarInput.current?.click()}
-              disabled={isSubmitting}
+              disabled={isSubmitting || isRestoring}
               aria-label={t('chat.chooseGroupAvatar')}
               className="relative rounded-2xl focus-visible:outline-2 focus-visible:outline-primary"
             >
@@ -252,7 +377,7 @@ export function GroupWizard({
                   setAvatarFile(null)
                   setAvatarPreview(null)
                 }}
-                disabled={isSubmitting}
+                disabled={isSubmitting || isRestoring}
                 className="text-xs font-medium text-destructive hover:underline"
               >
                 {t('chat.removeGroupAvatar')}
@@ -264,11 +389,12 @@ export function GroupWizard({
               disabled={
                 selected.length < GROUP_MIN_INVITED_MEMBERS ||
                 selected.length > GROUP_MAX_INVITED_MEMBERS ||
-                isSubmitting
+                isSubmitting ||
+                isRestoring
               }
               className="self-end rounded-xl bg-primary px-5 py-2 text-sm font-bold text-primary-foreground shadow-sm transition-all hover:opacity-90 active:scale-95 disabled:opacity-40"
             >
-              {isSubmitting
+              {isSubmitting || isRestoring
                 ? t('chat.pending')
                 : createdGroup
                   ? t(avatarFile ? 'chat.retryGroupAvatar' : 'chat.openGroup')

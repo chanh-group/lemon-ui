@@ -5,7 +5,16 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MessageComposer } from './MessageComposer'
 
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (_key: string, fallback?: string) => fallback ?? _key }),
+  useTranslation: () => ({
+    t: (key: string, fallback?: string) =>
+      ({
+        'chat.failedMessage': 'Tin chưa gửi được',
+        'common.retry': 'Thử lại',
+        'common.close': 'Đóng',
+      })[key] ??
+      fallback ??
+      key,
+  }),
 }))
 
 afterEach(() => {

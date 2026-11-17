@@ -276,7 +276,7 @@ export function ChatShell() {
     text: string,
     attachments?: MessageAttachmentInput[],
     pendingFiles?: SendMessagePendingFile[],
-    replyToId?: string,
+    replyToId?: string | null,
     clientMsgId?: string,
   ): Promise<boolean> => {
     if (!selectedId) return false
@@ -291,7 +291,15 @@ export function ChatShell() {
       })
       return true
     } catch {
-      return false
+      // A network error can arrive after the server committed the message and
+      // realtime reconciliation replaced the optimistic row. Treat that case
+      // as success so the composer does not create a false failed-attempt banner.
+      return Boolean(
+        clientMsgId &&
+        messagesQuery.liveMessages?.some(
+          (message) => message.clientMsgId === clientMsgId && !message.id.startsWith('temp-'),
+        ),
+      )
     }
   }
 
