@@ -15,6 +15,9 @@ const media = vi.hoisted(() => {
     init: vi.fn(),
     dispose: vi.fn(),
     outputCancel: vi.fn(),
+    getPrimaryAudioTrack: vi.fn(),
+    canEncodeAudio: vi.fn(),
+    registerAacEncoder: vi.fn(),
     target: { buffer: new ArrayBuffer(3) as ArrayBuffer | null },
   }
 })
@@ -27,6 +30,7 @@ vi.mock('mediabunny', () => ({
   Input: class {
     constructor(public options: unknown) {}
     dispose = media.dispose
+    getPrimaryAudioTrack = media.getPrimaryAudioTrack
   },
   BufferTarget: class {
     constructor() {
@@ -39,7 +43,10 @@ vi.mock('mediabunny', () => ({
     constructor(public options: unknown) {}
   },
   Conversion: { init: media.init },
+  canEncodeAudio: media.canEncodeAudio,
 }))
+
+vi.mock('@mediabunny/aac-encoder', () => ({ registerAacEncoder: media.registerAacEncoder }))
 
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -63,6 +70,8 @@ beforeEach(() => {
   media.conversion.cancel.mockReset().mockResolvedValue(undefined)
   media.outputCancel.mockReset().mockResolvedValue(undefined)
   media.init.mockReset().mockResolvedValue(media.conversion)
+  media.getPrimaryAudioTrack.mockReset().mockResolvedValue(null)
+  media.canEncodeAudio.mockReset().mockResolvedValue(true)
 })
 
 describe('processStoryVideo', () => {
@@ -88,6 +97,24 @@ describe('processStoryVideo', () => {
     expect(media.conversion.execute).toHaveBeenCalledOnce()
     expect(media.dispose).toHaveBeenCalledOnce()
   })
+
+  it.each([true, false])(
+    'checks AAC support and registers a fallback only when needed (%s)',
+    async (supported) => {
+      media.getPrimaryAudioTrack.mockResolvedValue({
+        getNumberOfChannels: async () => 2,
+        getSampleRate: async () => 44100,
+      })
+      media.canEncodeAudio.mockResolvedValue(supported)
+      await processStoryVideo({ file: file(), startSeconds: 0 })
+      expect(media.canEncodeAudio).toHaveBeenCalledWith('aac', {
+        numberOfChannels: 2,
+        sampleRate: 44100,
+        bitrate: 96000,
+      })
+      expect(media.registerAacEncoder).toHaveBeenCalledTimes(supported ? 0 : 1)
+    },
+  )
 
   it.each([
     [3840, 2160, 0, 1080, 608],

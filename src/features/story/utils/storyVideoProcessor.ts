@@ -38,11 +38,34 @@ export async function processStoryVideo({
   onProgress,
 }: ProcessStoryVideoInput): Promise<File> {
   if (signal?.aborted) throw abortError()
-  const { Input, BlobSource, ALL_FORMATS, Output, Mp4OutputFormat, BufferTarget, Conversion } =
-    await abortable(import('mediabunny'), signal)
+  const {
+    Input,
+    BlobSource,
+    ALL_FORMATS,
+    Output,
+    Mp4OutputFormat,
+    BufferTarget,
+    Conversion,
+    canEncodeAudio,
+  } = await abortable(import('mediabunny'), signal)
   if (signal?.aborted) throw abortError()
   const input = new Input({ source: new BlobSource(file), formats: ALL_FORMATS })
   try {
+    const audioTrack = await abortable(input.getPrimaryAudioTrack(), signal)
+    if (audioTrack) {
+      const [numberOfChannels, sampleRate] = await abortable(
+        Promise.all([audioTrack.getNumberOfChannels(), audioTrack.getSampleRate()]),
+        signal,
+      )
+      const supported = await abortable(
+        canEncodeAudio('aac', { numberOfChannels, sampleRate, bitrate: 96000 }),
+        signal,
+      )
+      if (!supported) {
+        const { registerAacEncoder } = await abortable(import('@mediabunny/aac-encoder'), signal)
+        registerAacEncoder()
+      }
+    }
     const target = new BufferTarget()
     const output = new Output({ format: new Mp4OutputFormat(), target })
     const conversion = await abortable(
