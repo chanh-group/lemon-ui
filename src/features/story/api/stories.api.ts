@@ -618,6 +618,14 @@ export async function getStoryMediaUrl(storyId: string): Promise<string> {
   return res.data.url
 }
 
+export async function getStorageUsage(): Promise<{ usedBytes: number; limitBytes: number }> {
+  if (isAuthBypass()) {
+    return { usedBytes: 0, limitBytes: 512 * 1024 * 1024 }
+  }
+  const res = await api.get<{ usedBytes: number; limitBytes: number }>('/stories/storage')
+  return res.data
+}
+
 export interface UpdateStoryPayload {
   caption?: string
   allowReplies?: boolean

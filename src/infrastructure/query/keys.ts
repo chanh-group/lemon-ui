@@ -12,6 +12,7 @@ export const queryKeys = {
     mediaArchive: (conversationId: string) => ['chat', 'media-archive', conversationId] as const,
     liveMessages: (conversationId: string) => ['chat', 'live-messages', conversationId] as const,
     stories: ['chat', 'stories'] as const,
+    storyStorage: ['stories', 'storage'] as const,
     friendRequests: ['chat', 'friend-requests'] as const,
     friends: ['chat', 'friends'] as const,
     userSearch: (field: 'username' | 'email', query: string) =>

@@ -58,6 +58,7 @@ export function useCreateMediaStory() {
     mutationFn: (payload: CreateMediaStoryPayload) => createMediaStory(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: STORIES_KEY })
+      queryClient.invalidateQueries({ queryKey: queryKeys.chat.storyStorage })
     },
   })
 }
@@ -240,7 +241,7 @@ export function useUpdateStory() {
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: STORIES_KEY })
       void client.invalidateQueries({ queryKey: STORY_ARCHIVE_KEY })
-      void client.invalidateQueries({ queryKey: ['stories', 'storage'] })
+      void client.refetchQueries({ queryKey: queryKeys.chat.storyStorage })
     },
   })
 }
@@ -252,7 +253,7 @@ export function useDeleteStory() {
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: STORIES_KEY })
       void client.invalidateQueries({ queryKey: STORY_ARCHIVE_KEY })
-      void client.invalidateQueries({ queryKey: ['stories', 'storage'] })
+      void client.refetchQueries({ queryKey: queryKeys.chat.storyStorage })
     },
   })
 }

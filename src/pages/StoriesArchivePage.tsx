@@ -13,7 +13,8 @@ import { TEXT_STORY_BG } from '@/features/story/data/storiesData'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/features/auth/api'
 import { useQuery } from '@tanstack/react-query'
-import { api } from '@/infrastructure/api/client'
+import { queryKeys } from '@/infrastructure/query/keys'
+import { getStorageUsage } from '@/features/story/api/stories.api'
 
 const ArrowLeft = createIcon(ArrowLeft01Icon)
 const Archive = createIcon(ArchiveIcon)
@@ -25,9 +26,8 @@ export function StoriesArchivePage() {
   const { data, isLoading, isError, refetch, hasNextPage, fetchNextPage, isFetchingNextPage } =
     useArchivedStories()
   const storage = useQuery({
-    queryKey: ['stories', 'storage'],
-    queryFn: async () =>
-      (await api.get<{ usedBytes: number; limitBytes: number }>('/stories/storage')).data,
+    queryKey: queryKeys.chat.storyStorage,
+    queryFn: getStorageUsage,
   })
   const [selectedStory, setSelectedStory] = useState<StoryEntry | null>(null)
 
@@ -99,9 +99,18 @@ export function StoriesArchivePage() {
                 </div>
               )}
               {storage.isError && (
-                <p role="alert" className="mt-2 text-sm text-destructive">
-                  {t('chat.storyStorageError')}
-                </p>
+                <div className="mt-2 flex items-center gap-2">
+                  <p role="alert" className="text-sm text-destructive">
+                    {t('chat.storyStorageError')}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => storage.refetch()}
+                    className="text-sm text-primary underline-offset-2 hover:underline"
+                  >
+                    {t('common.retry')}
+                  </button>
+                </div>
               )}
             </div>
 
