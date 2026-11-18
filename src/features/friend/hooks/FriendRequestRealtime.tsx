@@ -48,6 +48,7 @@ export function applyFriendRequestCreated(
   current: { incoming: FriendRequest[]; outgoing: FriendRequest[] } | undefined,
   event: FriendRequestCreatedEvent,
 ): { incoming: FriendRequest[]; outgoing: FriendRequest[] } {
+  if (!event.user) return current ?? { incoming: [], outgoing: [] }
   const newReq: FriendRequest = {
     id: event.id,
     user: {
@@ -100,9 +101,7 @@ export function applyFriendRequestAccepted(
   }
   return {
     ...current,
-    incoming: current.incoming.filter(
-      (r) => r.id !== event.requestId && r.user.id !== event.addresseeId,
-    ),
+    incoming: current.incoming.filter((r) => r.id !== event.requestId),
     outgoing: current.outgoing.filter(
       (r) => r.id !== event.requestId && r.user.id !== event.addresseeId,
     ),
@@ -121,9 +120,7 @@ export function applyFriendRequestDeclined(
   }
   return {
     ...current,
-    incoming: current.incoming.filter(
-      (r) => r.id !== event.requestId && r.user.id !== event.addresseeId,
-    ),
+    incoming: current.incoming.filter((r) => r.id !== event.requestId),
     outgoing: current.outgoing.filter(
       (r) => r.id !== event.requestId && r.user.id !== event.addresseeId,
     ),

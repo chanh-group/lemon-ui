@@ -48,7 +48,6 @@ export function useFriendRequests() {
     queryKey: FRIEND_REQUESTS_KEY,
     queryFn: getFriendRequests,
     staleTime: 30_000,
-    refetchOnWindowFocus: true,
   })
 }
 
@@ -57,7 +56,6 @@ export function useFriends() {
     queryKey: FRIENDS_KEY,
     queryFn: getFriends,
     staleTime: 30_000,
-    refetchOnWindowFocus: true,
   })
 }
 
@@ -113,7 +111,6 @@ export function useAcceptFriendRequest() {
             }
           },
         )
-        void invalidate()
         return
       }
       if (context?.previous) {
@@ -133,6 +130,7 @@ export function useAcceptFriendRequest() {
         qc.invalidateQueries({ queryKey: FRIENDS_KEY }),
       ])
     },
+    onSettled: () => void invalidate(),
   })
 }
 
@@ -173,7 +171,6 @@ export function useDeclineFriendRequest() {
             }
           },
         )
-        void invalidate()
         return
       }
       if (context?.previous) {
@@ -181,6 +178,7 @@ export function useDeclineFriendRequest() {
       }
     },
     onSuccess: invalidate,
+    onSettled: () => void invalidate(),
   })
 }
 
@@ -221,7 +219,6 @@ export function useCancelFriendRequest() {
             }
           },
         )
-        void invalidate()
         return
       }
       if (context?.previous) {
@@ -229,6 +226,7 @@ export function useCancelFriendRequest() {
       }
     },
     onSuccess: invalidate,
+    onSettled: () => void invalidate(),
   })
 }
 
