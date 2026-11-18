@@ -196,6 +196,7 @@ export async function listStories(currentUserId?: string): Promise<StoryEntry[]>
           id: item.id,
           name: group.user?.fullName || item.caption?.slice(0, 18) || 'Story',
           time: formatRelativeTime(item.createdAt),
+          createdAt: item.createdAt,
           viewed: Boolean(item.hasViewed),
           mine: currentUserId ? (item.userId ?? group.user?.id) === currentUserId : false,
           online: true,
@@ -615,6 +616,17 @@ export async function getArchivedStories(
 export async function getStoryMediaUrl(storyId: string): Promise<string> {
   const res = await api.get<{ url: string }>(`/stories/${storyId}/media`)
   return res.data.url
+}
+
+export async function getStorageUsage(): Promise<{ usedBytes: number; limitBytes: number }> {
+  if (isAuthBypass()) {
+    return { usedBytes: 0, limitBytes: 512 * 1024 * 1024 }
+  }
+  const res = await api.get<{ usedBytes?: number; limitBytes?: number }>('/stories/storage')
+  return {
+    usedBytes: res.data?.usedBytes ?? 0,
+    limitBytes: res.data?.limitBytes ?? 512 * 1024 * 1024,
+  }
 }
 
 export interface UpdateStoryPayload {

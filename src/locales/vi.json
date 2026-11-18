@@ -541,7 +541,10 @@
     "defaultPartnerName": "người dùng này",
     "storyTrimHint": "Video dài hơn 1 phút. Chọn đoạn muốn đăng (tối đa 1 phút).",
     "storyTrimRange": "Đoạn chọn: {{start}}s – {{end}}s",
-    "storyVideoInvalid": "Không đọc được video này. Hãy chọn tệp khác."
+    "storyVideoInvalid": "Không đọc được video này. Hãy chọn tệp khác.",
+    "storyStorage": "Dung lượng kho tin",
+    "storyStorageUsage": "Đã dùng {{used}} / {{limit}} MiB",
+    "storyStorageError": "Không thể tải dung lượng kho tin."
   },
   "theme": {
     "toLight": "Chuyển sang chế độ sáng",
