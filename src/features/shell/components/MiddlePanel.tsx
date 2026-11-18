@@ -183,14 +183,19 @@ export function MiddlePanel({
                   ? `${t('chat.newMessage')}, ${t('chat.friendRequestCount', { count: incomingRequests })}`
                   : t('chat.newMessage')
               }
-              title={t('chat.newMessage')}
+              title={
+                incomingRequests > 0
+                  ? `${t('chat.newMessage')} (${t('chat.friendRequestCount', { count: incomingRequests })})`
+                  : t('chat.newMessage')
+              }
               onClick={onNewChat}
               className="relative grid size-11 min-h-11 min-w-11 place-items-center rounded-xl text-brand-ink transition-colors duration-150 hover:bg-muted"
             >
               <SquarePen className="size-5.5" aria-hidden="true" />
               {incomingRequests > 0 && (
                 <span
-                  className="absolute -top-0.5 right-0 grid min-w-4.5 place-items-center rounded-full bg-primary px-1 text-[10px] leading-4 font-bold text-primary-foreground ring-2 ring-card"
+                  key={incomingRequests}
+                  className="animate-badge-pop absolute -top-0.5 right-0 grid min-w-4.5 place-items-center rounded-full bg-red-500 px-1 text-[10px] leading-4 font-bold text-white ring-2 ring-card shadow-xs transition-transform duration-200"
                   aria-hidden="true"
                 >
                   {incomingRequests > 9 ? '9+' : incomingRequests}
