@@ -2,9 +2,13 @@ import { describe, expect, it } from 'vitest'
 import {
   applyFriendRequestCreated,
   applyFriendRequestCancelled,
+  applyFriendRequestAccepted,
+  applyFriendRequestDeclined,
   applyFriendRemoved,
   type FriendRequestCreatedEvent,
   type FriendRequestCancelledEvent,
+  type FriendRequestAcceptedEvent,
+  type FriendRequestDeclinedEvent,
 } from './FriendRequestRealtime'
 import type { ChatUser, FriendRequest } from '../types/friend.types'
 
@@ -81,10 +85,15 @@ describe('applyFriendRequestCreated', () => {
 })
 
 describe('applyFriendRequestCancelled', () => {
-  it('removes the cancelled request from incoming list', () => {
+  it('removes the cancelled request from incoming list and outgoing list', () => {
+    const outgoingRequest: FriendRequest = {
+      ...baseFriendRequest,
+      id: 'req-outgoing-1',
+      direction: 'outgoing',
+    }
     const current = {
       incoming: [baseFriendRequest],
-      outgoing: [],
+      outgoing: [outgoingRequest],
     }
 
     const event: FriendRequestCancelledEvent = {
@@ -94,7 +103,14 @@ describe('applyFriendRequestCancelled', () => {
 
     const result = applyFriendRequestCancelled(current, event)
     expect(result).toBeDefined()
-    expect(result?.incoming).toHaveLength(0)
+    expect(result.incoming).toHaveLength(0)
+    expect(result.outgoing).toHaveLength(1)
+
+    const result2 = applyFriendRequestCancelled(current, {
+      requestId: 'req-outgoing-1',
+      requesterId: 'user-1',
+    })
+    expect(result2.outgoing).toHaveLength(0)
   })
 
   it('keeps current list if requestId is not found', () => {
@@ -110,6 +126,112 @@ describe('applyFriendRequestCancelled', () => {
 
     const result = applyFriendRequestCancelled(current, event)
     expect(result?.incoming).toHaveLength(1)
+  })
+})
+
+describe('applyFriendRequestAccepted', () => {
+  it('removes the recipient from outgoing list by requestId or addresseeId', () => {
+    const outgoingRequest: FriendRequest = {
+      id: 'req-out-1',
+      user: {
+        id: 'user-bob',
+        name: 'Bob',
+        username: 'bob.01',
+      },
+      direction: 'outgoing',
+      createdAt: '2026-11-18T10:00:00.000Z',
+    }
+    const current = {
+      incoming: [baseFriendRequest],
+      outgoing: [outgoingRequest],
+    }
+
+    const event: FriendRequestAcceptedEvent = {
+      requestId: 'req-out-1',
+      addresseeId: 'user-bob',
+    }
+
+    const result = applyFriendRequestAccepted(current, event)
+    expect(result.outgoing).toHaveLength(0)
+    // Incoming list is untouched if requestId is different
+    expect(result.incoming).toHaveLength(1)
+  })
+
+  it('cleans incoming request and badge if accepted request was in incoming', () => {
+    const current = {
+      incoming: [baseFriendRequest],
+      outgoing: [],
+    }
+
+    const event: FriendRequestAcceptedEvent = {
+      requestId: 'req-1',
+      addresseeId: 'user-other',
+    }
+
+    const result = applyFriendRequestAccepted(current, event)
+    expect(result.incoming).toHaveLength(0)
+  })
+
+  it('handles undefined cache gracefully', () => {
+    const event: FriendRequestAcceptedEvent = {
+      requestId: 'req-1',
+      addresseeId: 'user-bob',
+    }
+
+    const result = applyFriendRequestAccepted(undefined, event)
+    expect(result).toEqual({ incoming: [], outgoing: [] })
+  })
+})
+
+describe('applyFriendRequestDeclined', () => {
+  it('removes the recipient from outgoing list by requestId or addresseeId', () => {
+    const outgoingRequest: FriendRequest = {
+      id: 'req-out-1',
+      user: {
+        id: 'user-bob',
+        name: 'Bob',
+        username: 'bob.01',
+      },
+      direction: 'outgoing',
+      createdAt: '2026-11-18T10:00:00.000Z',
+    }
+    const current = {
+      incoming: [baseFriendRequest],
+      outgoing: [outgoingRequest],
+    }
+
+    const event: FriendRequestDeclinedEvent = {
+      requestId: 'req-out-1',
+      addresseeId: 'user-bob',
+    }
+
+    const result = applyFriendRequestDeclined(current, event)
+    expect(result.outgoing).toHaveLength(0)
+  })
+
+  it('cleans incoming request if declined request was in incoming', () => {
+    const current = {
+      incoming: [baseFriendRequest],
+      outgoing: [],
+    }
+
+    const event: FriendRequestDeclinedEvent = {
+      requestId: 'req-1',
+      addresseeId: 'user-other',
+    }
+
+    const result = applyFriendRequestDeclined(current, event)
+    expect(result.incoming).toHaveLength(0)
+  })
+
+  it('handles undefined cache gracefully', () => {
+    const event: FriendRequestDeclinedEvent = {
+      requestId: 'req-1',
+      addresseeId: 'user-bob',
+    }
+
+    const result = applyFriendRequestDeclined(undefined, event)
+    expect(result).toEqual({ incoming: [], outgoing: [] })
   })
 })
 

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@/infrastructure/query/keys'
 import type { ConversationResponse } from '@/features/conversation/types/conversation.types'
+import type { FriendRequest } from '../types/friend.types'
 import {
   acceptFriendRequest,
   blockUser,
@@ -46,6 +47,29 @@ export function useAcceptFriendRequest() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: acceptFriendRequest,
+    onMutate: async (requestId) => {
+      await qc.cancelQueries({ queryKey: FRIEND_REQUESTS_KEY })
+      const previous = qc.getQueryData<{ incoming: FriendRequest[]; outgoing: FriendRequest[] }>(
+        FRIEND_REQUESTS_KEY,
+      )
+      qc.setQueryData<{ incoming: FriendRequest[]; outgoing: FriendRequest[] }>(
+        FRIEND_REQUESTS_KEY,
+        (old) => {
+          if (!old) return old
+          return {
+            ...old,
+            incoming: old.incoming.filter((r) => r.id !== requestId),
+            outgoing: old.outgoing.filter((r) => r.id !== requestId),
+          }
+        },
+      )
+      return { previous }
+    },
+    onError: (_err, _requestId, context) => {
+      if (context?.previous) {
+        qc.setQueryData(FRIEND_REQUESTS_KEY, context.previous)
+      }
+    },
     onSuccess: async (conversation) => {
       qc.setQueryData<ConversationResponse[]>(queryKeys.chat.conversations, (current) => {
         if (!current) return [conversation]
@@ -63,13 +87,67 @@ export function useAcceptFriendRequest() {
 }
 
 export function useDeclineFriendRequest() {
+  const qc = useQueryClient()
   const invalidate = useInvalidateFriendData()
-  return useMutation({ mutationFn: declineFriendRequest, onSuccess: invalidate })
+  return useMutation({
+    mutationFn: declineFriendRequest,
+    onMutate: async (requestId) => {
+      await qc.cancelQueries({ queryKey: FRIEND_REQUESTS_KEY })
+      const previous = qc.getQueryData<{ incoming: FriendRequest[]; outgoing: FriendRequest[] }>(
+        FRIEND_REQUESTS_KEY,
+      )
+      qc.setQueryData<{ incoming: FriendRequest[]; outgoing: FriendRequest[] }>(
+        FRIEND_REQUESTS_KEY,
+        (old) => {
+          if (!old) return old
+          return {
+            ...old,
+            incoming: old.incoming.filter((r) => r.id !== requestId),
+            outgoing: old.outgoing.filter((r) => r.id !== requestId),
+          }
+        },
+      )
+      return { previous }
+    },
+    onError: (_err, _requestId, context) => {
+      if (context?.previous) {
+        qc.setQueryData(FRIEND_REQUESTS_KEY, context.previous)
+      }
+    },
+    onSuccess: invalidate,
+  })
 }
 
 export function useCancelFriendRequest() {
+  const qc = useQueryClient()
   const invalidate = useInvalidateFriendData()
-  return useMutation({ mutationFn: cancelFriendRequest, onSuccess: invalidate })
+  return useMutation({
+    mutationFn: cancelFriendRequest,
+    onMutate: async (requestId) => {
+      await qc.cancelQueries({ queryKey: FRIEND_REQUESTS_KEY })
+      const previous = qc.getQueryData<{ incoming: FriendRequest[]; outgoing: FriendRequest[] }>(
+        FRIEND_REQUESTS_KEY,
+      )
+      qc.setQueryData<{ incoming: FriendRequest[]; outgoing: FriendRequest[] }>(
+        FRIEND_REQUESTS_KEY,
+        (old) => {
+          if (!old) return old
+          return {
+            ...old,
+            incoming: old.incoming.filter((r) => r.id !== requestId),
+            outgoing: old.outgoing.filter((r) => r.id !== requestId),
+          }
+        },
+      )
+      return { previous }
+    },
+    onError: (_err, _requestId, context) => {
+      if (context?.previous) {
+        qc.setQueryData(FRIEND_REQUESTS_KEY, context.previous)
+      }
+    },
+    onSuccess: invalidate,
+  })
 }
 
 export function useRemoveFriend() {

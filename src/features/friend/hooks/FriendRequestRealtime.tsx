@@ -21,6 +21,16 @@ export interface FriendRequestCancelledEvent {
   requesterId: string
 }
 
+export interface FriendRequestAcceptedEvent {
+  requestId: string
+  addresseeId: string
+}
+
+export interface FriendRequestDeclinedEvent {
+  requestId: string
+  addresseeId: string
+}
+
 export interface FriendRemovedEvent {
   friendId: string
 }
@@ -65,6 +75,49 @@ export function applyFriendRequestCancelled(
   return {
     ...current,
     incoming: current.incoming.filter((r) => r.id !== event.requestId),
+    outgoing: current.outgoing.filter((r) => r.id !== event.requestId),
+  }
+}
+
+export function applyFriendRequestAccepted(
+  current: { incoming: FriendRequest[]; outgoing: FriendRequest[] } | undefined,
+  event: FriendRequestAcceptedEvent,
+): { incoming: FriendRequest[]; outgoing: FriendRequest[] } {
+  if (!current) {
+    return {
+      incoming: [],
+      outgoing: [],
+    }
+  }
+  return {
+    ...current,
+    incoming: current.incoming.filter(
+      (r) => r.id !== event.requestId && r.user.id !== event.addresseeId,
+    ),
+    outgoing: current.outgoing.filter(
+      (r) => r.id !== event.requestId && r.user.id !== event.addresseeId,
+    ),
+  }
+}
+
+export function applyFriendRequestDeclined(
+  current: { incoming: FriendRequest[]; outgoing: FriendRequest[] } | undefined,
+  event: FriendRequestDeclinedEvent,
+): { incoming: FriendRequest[]; outgoing: FriendRequest[] } {
+  if (!current) {
+    return {
+      incoming: [],
+      outgoing: [],
+    }
+  }
+  return {
+    ...current,
+    incoming: current.incoming.filter(
+      (r) => r.id !== event.requestId && r.user.id !== event.addresseeId,
+    ),
+    outgoing: current.outgoing.filter(
+      (r) => r.id !== event.requestId && r.user.id !== event.addresseeId,
+    ),
   }
 }
 
@@ -124,10 +177,38 @@ export function FriendRequestRealtime() {
       void queryClient.invalidateQueries({ queryKey: queryKeys.chat.friendRequests })
     }
 
-    const handleFriendRequestAccepted = () => {
+    const handleFriendRequestAccepted = (event: FriendRequestAcceptedEvent) => {
+      let acceptedUser: ChatUser | undefined
+      queryClient.setQueryData<{ incoming: FriendRequest[]; outgoing: FriendRequest[] }>(
+        queryKeys.chat.friendRequests,
+        (old) => {
+          acceptedUser = old?.outgoing.find(
+            (r) => r.id === event.requestId || r.user.id === event.addresseeId,
+          )?.user
+          return applyFriendRequestAccepted(old, event)
+        },
+      )
+      if (acceptedUser) {
+        queryClient.setQueryData<ChatUser[]>(queryKeys.chat.friends, (old) => {
+          if (!old) return [acceptedUser]
+          if (old.some((f) => f.id === acceptedUser.id)) return old
+          return [...old, acceptedUser]
+        })
+      }
       void queryClient.invalidateQueries({ queryKey: queryKeys.chat.friendRequests })
       void queryClient.invalidateQueries({ queryKey: queryKeys.chat.friends })
       void queryClient.invalidateQueries({ queryKey: queryKeys.chat.conversations })
+      toast.success(t('chat.friendRequestAccepted'), {
+        id: `friend-request-accepted-${event.requestId}`,
+      })
+    }
+
+    const handleFriendRequestDeclined = (event: FriendRequestDeclinedEvent) => {
+      queryClient.setQueryData<{ incoming: FriendRequest[]; outgoing: FriendRequest[] }>(
+        queryKeys.chat.friendRequests,
+        (old) => applyFriendRequestDeclined(old, event),
+      )
+      void queryClient.invalidateQueries({ queryKey: queryKeys.chat.friendRequests })
     }
 
     const handleGenericNotification = () => {
@@ -141,8 +222,9 @@ export function FriendRequestRealtime() {
     socket.on('connect', handleConnect)
     socket.on('friend:request:new', handleFriendRequest)
     socket.on('friend:request:cancelled', handleFriendRequestCancelled)
-    socket.on('friend:removed', handleFriendRemoved)
     socket.on('friend:request:accepted', handleFriendRequestAccepted)
+    socket.on('friend:request:declined', handleFriendRequestDeclined)
+    socket.on('friend:removed', handleFriendRemoved)
     socket.on('notification', handleGenericNotification)
     socket.on('notification:new', handleGenericNotification)
 
@@ -156,8 +238,9 @@ export function FriendRequestRealtime() {
       socket.off('connect', handleConnect)
       socket.off('friend:request:new', handleFriendRequest)
       socket.off('friend:request:cancelled', handleFriendRequestCancelled)
-      socket.off('friend:removed', handleFriendRemoved)
       socket.off('friend:request:accepted', handleFriendRequestAccepted)
+      socket.off('friend:request:declined', handleFriendRequestDeclined)
+      socket.off('friend:removed', handleFriendRemoved)
       socket.off('notification', handleGenericNotification)
       socket.off('notification:new', handleGenericNotification)
     }
