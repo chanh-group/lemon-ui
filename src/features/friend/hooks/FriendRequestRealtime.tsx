@@ -189,10 +189,11 @@ export function FriendRequestRealtime() {
         },
       )
       if (acceptedUser) {
+        const friend = acceptedUser
         queryClient.setQueryData<ChatUser[]>(queryKeys.chat.friends, (old) => {
-          if (!old) return [acceptedUser]
-          if (old.some((f) => f.id === acceptedUser.id)) return old
-          return [...old, acceptedUser]
+          if (!old) return [friend]
+          if (old.some((f) => f.id === friend.id)) return old
+          return [...old, friend]
         })
       }
       void queryClient.invalidateQueries({ queryKey: queryKeys.chat.friendRequests })
