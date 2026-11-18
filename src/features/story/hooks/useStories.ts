@@ -241,7 +241,9 @@ export function useUpdateStory() {
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: STORIES_KEY })
       void client.invalidateQueries({ queryKey: STORY_ARCHIVE_KEY })
-      void client.refetchQueries({ queryKey: queryKeys.chat.storyStorage })
+      void client
+        .cancelQueries({ queryKey: queryKeys.chat.storyStorage })
+        .then(() => client.refetchQueries({ queryKey: queryKeys.chat.storyStorage }))
     },
   })
 }
@@ -253,7 +255,9 @@ export function useDeleteStory() {
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: STORIES_KEY })
       void client.invalidateQueries({ queryKey: STORY_ARCHIVE_KEY })
-      void client.refetchQueries({ queryKey: queryKeys.chat.storyStorage })
+      void client
+        .cancelQueries({ queryKey: queryKeys.chat.storyStorage })
+        .then(() => client.refetchQueries({ queryKey: queryKeys.chat.storyStorage }))
     },
   })
 }

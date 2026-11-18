@@ -622,8 +622,11 @@ export async function getStorageUsage(): Promise<{ usedBytes: number; limitBytes
   if (isAuthBypass()) {
     return { usedBytes: 0, limitBytes: 512 * 1024 * 1024 }
   }
-  const res = await api.get<{ usedBytes: number; limitBytes: number }>('/stories/storage')
-  return res.data
+  const res = await api.get<{ usedBytes?: number; limitBytes?: number }>('/stories/storage')
+  return {
+    usedBytes: res.data?.usedBytes ?? 0,
+    limitBytes: res.data?.limitBytes ?? 512 * 1024 * 1024,
+  }
 }
 
 export interface UpdateStoryPayload {
