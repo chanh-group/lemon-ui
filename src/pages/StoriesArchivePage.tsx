@@ -26,7 +26,8 @@ export function StoriesArchivePage() {
     useArchivedStories()
   const storage = useQuery({
     queryKey: ['stories', 'storage'],
-    queryFn: async () => (await api.get<{ usedBytes: number; limitBytes: number }>('/stories/storage')).data,
+    queryFn: async () =>
+      (await api.get<{ usedBytes: number; limitBytes: number }>('/stories/storage')).data,
   })
   const [selectedStory, setSelectedStory] = useState<StoryEntry | null>(null)
 
@@ -83,11 +84,25 @@ export function StoriesArchivePage() {
               <p className="text-sm text-muted-foreground">{t('chat.archiveDescription')}</p>
               {storage.data && (
                 <div className="mt-4 space-y-2" aria-label={t('chat.storyStorage')}>
-                  <p className="text-sm text-foreground">{t('chat.storyStorageUsage', { used: (storage.data.usedBytes / 1024 / 1024).toFixed(1), limit: (storage.data.limitBytes / 1024 / 1024).toFixed(0) })}</p>
-                  <progress className="w-full accent-primary" value={Math.min(storage.data.usedBytes, storage.data.limitBytes)} max={storage.data.limitBytes} aria-label={t('chat.storyStorage')} />
+                  <p className="text-sm text-foreground">
+                    {t('chat.storyStorageUsage', {
+                      used: (storage.data.usedBytes / 1024 / 1024).toFixed(1),
+                      limit: (storage.data.limitBytes / 1024 / 1024).toFixed(0),
+                    })}
+                  </p>
+                  <progress
+                    className="w-full accent-primary"
+                    value={Math.min(storage.data.usedBytes, storage.data.limitBytes)}
+                    max={storage.data.limitBytes}
+                    aria-label={t('chat.storyStorage')}
+                  />
                 </div>
               )}
-              {storage.isError && <p role="alert" className="mt-2 text-sm text-destructive">{t('chat.storyStorageError')}</p>}
+              {storage.isError && (
+                <p role="alert" className="mt-2 text-sm text-destructive">
+                  {t('chat.storyStorageError')}
+                </p>
+              )}
             </div>
 
             {isLoading ? (
