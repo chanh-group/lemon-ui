@@ -318,7 +318,7 @@ export function MessageComposer({
     onDraftChange('')
 
     try {
-      await onSubmit(
+      const submitted = await onSubmit(
         textToSend,
         undefined,
         filesToSend.length > 0 ? filesToSend : undefined,
@@ -326,10 +326,12 @@ export function MessageComposer({
         clientMsgId,
       )
 
-      filesToSend.forEach((file) => {
-        if (file.previewUrl) URL.revokeObjectURL(file.previewUrl)
-      })
-      requestAnimationFrame(() => inputRef.current?.focus())
+      if (submitted !== false) {
+        filesToSend.forEach((file) => {
+          if (file.previewUrl) URL.revokeObjectURL(file.previewUrl)
+        })
+        requestAnimationFrame(() => inputRef.current?.focus())
+      }
     } catch {
       // Failed attempts remain on the message timeline row where user can retry
     } finally {

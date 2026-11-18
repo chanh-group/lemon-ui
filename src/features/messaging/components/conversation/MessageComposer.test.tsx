@@ -100,4 +100,23 @@ describe('MessageComposer pending send', () => {
     await waitFor(() => expect(input.value).toBe('later'))
     expect(screen.queryByText(/Tin chưa gửi được/)).toBeNull()
   })
+
+  it('keeps an image preview alive when the send result is false', async () => {
+    const revoke = vi.fn()
+    Object.defineProperty(URL, 'createObjectURL', {
+      configurable: true,
+      value: vi.fn().mockReturnValue('blob:failed-image'),
+    })
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revoke })
+    const onSubmit = vi.fn().mockResolvedValue(false)
+    renderComposer('failed-image', onSubmit)
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement
+    fireEvent.change(fileInput, {
+      target: { files: [new File(['image'], 'photo.png', { type: 'image/png' })] },
+    })
+    await screen.findByText('photo.png')
+    fireEvent.click(screen.getByRole('button', { name: 'chat.sendMessage' }))
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledOnce())
+    expect(revoke).not.toHaveBeenCalledWith('blob:failed-image')
+  })
 })

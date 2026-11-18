@@ -7,8 +7,15 @@ interface CachedAvatar {
   refCount: number
 }
 
+interface PendingAvatar {
+  promise: Promise<string | null>
+  refCount: number
+  controller: AbortController
+}
+
 const avatarCache = new Map<string, CachedAvatar>()
-const pendingPromises = new Map<string, Promise<string | null>>()
+const pendingPromises = new Map<string, PendingAvatar>()
+let cacheGeneration = 0
 
 export function isGroupAvatarUrl(url?: string | null): boolean {
   if (!url) return false
@@ -22,34 +29,61 @@ export async function fetchGroupAvatarBlobUrl(url: string): Promise<string | nul
     return cached.objectUrl
   }
 
-  if (pendingPromises.has(url)) {
-    return pendingPromises.get(url)!
+  const existing = pendingPromises.get(url)
+  if (existing) {
+    existing.refCount++
+    return existing.promise
   }
 
-  const promise = (async () => {
+  const generation = cacheGeneration
+  const pending: PendingAvatar = {
+    promise: Promise.resolve(null),
+    refCount: 1,
+    controller: new AbortController(),
+  }
+  pendingPromises.set(url, pending)
+  pending.promise = (async () => {
     try {
       const match = url.match(/\/files\/group-avatars\/[^?#]+/)
       const requestPath = match ? match[0] : url
-      const response = await api.get<Blob>(requestPath, { responseType: 'blob' })
+      const response = await api.get<Blob>(requestPath, {
+        responseType: 'blob',
+        signal: pending.controller.signal,
+      })
       const blob = response.data
       if (!(blob instanceof Blob) || blob.size === 0) return null
       const objectUrl = typeof URL.createObjectURL === 'function' ? URL.createObjectURL(blob) : ''
-      avatarCache.set(url, { objectUrl, refCount: 1 })
+      if (
+        generation !== cacheGeneration ||
+        pendingPromises.get(url) !== pending ||
+        pending.refCount <= 0
+      ) {
+        if (objectUrl && typeof URL.revokeObjectURL === 'function') URL.revokeObjectURL(objectUrl)
+        return null
+      }
+      avatarCache.set(url, { objectUrl, refCount: pending.refCount })
       return objectUrl
     } catch {
       return null
     } finally {
-      pendingPromises.delete(url)
+      if (pendingPromises.get(url) === pending) pendingPromises.delete(url)
     }
   })()
-
-  pendingPromises.set(url, promise)
-  return promise
+  return pending.promise
 }
 
 export function releaseGroupAvatarBlobUrl(url: string): void {
   const cached = avatarCache.get(url)
-  if (!cached) return
+  if (!cached) {
+    const pending = pendingPromises.get(url)
+    if (!pending) return
+    pending.refCount--
+    if (pending.refCount <= 0) {
+      pendingPromises.delete(url)
+      pending.controller.abort()
+    }
+    return
+  }
   cached.refCount--
   if (cached.refCount <= 0) {
     if (typeof URL.revokeObjectURL === 'function' && cached.objectUrl) {
@@ -60,6 +94,8 @@ export function releaseGroupAvatarBlobUrl(url: string): void {
 }
 
 export function clearAllGroupAvatarBlobs(): void {
+  cacheGeneration++
+  for (const pending of pendingPromises.values()) pending.controller.abort()
   for (const [, cached] of avatarCache) {
     try {
       if (typeof URL.revokeObjectURL === 'function' && cached.objectUrl) {
@@ -75,21 +111,18 @@ export function clearAllGroupAvatarBlobs(): void {
 
 export function useAvatarSrc(src?: string | null): string | null {
   const isGroup = isGroupAvatarUrl(src)
-  const [blobUrl, setBlobUrl] = useState<string | null>(() => {
-    if (!src || !isGroup) return null
-    const cached = avatarCache.get(src)
-    return cached ? cached.objectUrl : null
-  })
-
   const accessToken = useAuthStore((s) => s.accessToken)
+  const [loaded, setLoaded] = useState<{ src: string; token: string; url: string | null } | null>(
+    null,
+  )
 
   useEffect(() => {
-    if (!src || !isGroup) return
+    if (!src || !isGroup || !accessToken) return
 
     let active = true
     void fetchGroupAvatarBlobUrl(src).then((url) => {
       if (active) {
-        setBlobUrl(url)
+        setLoaded({ src, token: accessToken, url })
       }
     })
 
@@ -101,5 +134,5 @@ export function useAvatarSrc(src?: string | null): string | null {
 
   if (!src) return null
   if (!isGroup) return src
-  return blobUrl
+  return loaded?.src === src && loaded.token === accessToken ? loaded.url : null
 }

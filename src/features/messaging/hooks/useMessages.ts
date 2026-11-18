@@ -12,6 +12,8 @@ import { toast } from 'sonner'
 import { generateUUID } from '@/lib/utils'
 import {
   isUncertainSendError,
+  registerPendingMessagePreviews,
+  releasePendingMessagePreviews,
   resolveSendMessageKind,
   retryUncertainSend,
 } from '@/features/messaging/utils/messageSend'
@@ -35,7 +37,9 @@ import type {
   MessageResponse,
   MessageTimelineResponse,
   SendMessageDto,
+  SendMessageArg,
 } from '@/features/messaging/types/message.types'
+export type { SendMessagePendingFile } from '@/features/messaging/types/message.types'
 import type { ConversationResponse } from '@/features/conversation/types/conversation.types'
 
 export const CHAT_QUERY_KEYS = queryKeys.chat
@@ -309,26 +313,6 @@ export function useConversationMediaArchiveQuery(conversationId: string, enabled
   })
 }
 
-export interface SendMessagePendingFile {
-  id: string
-  file: File
-  clientMsgId?: string
-  previewUrl?: string
-  uploadedAttachment?: MessageAttachmentInput
-}
-
-export interface SendMessageArg {
-  body?: string
-  kind?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE' | 'SYSTEM'
-  attachments?: MessageAttachmentInput[]
-  pendingFiles?: SendMessagePendingFile[]
-  isForwarded?: boolean
-  sourceMessageId?: string
-  replyToId?: string | null
-  targetConversationId?: string
-  clientMsgId?: string
-}
-
 export function isMessageConfirmed(
   queryClient: QueryClient,
   conversationId: string,
@@ -384,6 +368,7 @@ export function useSendMessageMutation(conversationId: string | null) {
           const kind = kindRaw.replace('CHAT_', '') as 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE'
           const previewUrl =
             pf.previewUrl || (isImage(mimeType, pf.file.name) ? URL.createObjectURL(pf.file) : '')
+          if (previewUrl && !pf.previewUrl) pf.previewUrl = previewUrl
           return {
             id: pf.id || generateUUID(),
             kind,
@@ -405,6 +390,7 @@ export function useSendMessageMutation(conversationId: string | null) {
           downloadUrl: '',
         }))
       }
+      registerPendingMessagePreviews(targetConversationId, clientMsgId, arg.pendingFiles ?? [])
 
       const bodyText = arg.body
       const kind = resolveSendMessageKind(
@@ -421,6 +407,7 @@ export function useSendMessageMutation(conversationId: string | null) {
         body: bodyText || null,
         replyToId: arg.replyToId ?? null,
         clientMsgId,
+        retryAttempt: arg,
         attachments:
           optimisticAttachments && optimisticAttachments.length > 0
             ? optimisticAttachments
@@ -531,7 +518,10 @@ export function useSendMessageMutation(conversationId: string | null) {
         context?.targetConversationId && context.clientMsgId
           ? isMessageConfirmed(queryClient, context.targetConversationId, context.clientMsgId)
           : false
-      if (confirmed) return
+      if (confirmed && context?.targetConversationId && context.clientMsgId) {
+        releasePendingMessagePreviews(context.targetConversationId, context.clientMsgId)
+        return
+      }
 
       const sendState = isUncertainSendError(error) ? 'uncertain' : 'failed'
 
@@ -613,6 +603,10 @@ export function useSendMessageMutation(conversationId: string | null) {
         if (!old) return old
         return old.map((conv) => updateConversationLastMessage(conv, newMessage))
       })
+      releasePendingMessagePreviews(
+        targetConversationId,
+        arg.clientMsgId ?? newMessage.clientMsgId ?? '',
+      )
     },
   })
 }

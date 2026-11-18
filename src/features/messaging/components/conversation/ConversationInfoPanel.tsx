@@ -55,6 +55,7 @@ import { GROUP_MAX_MEMBERS, GROUP_MAX_NAME_LENGTH } from '@/features/conversatio
 import {
   addGroupMembers,
   disbandGroup,
+  getConversationById,
   getGroupMembers,
   leaveGroup,
   removeGroupMember,
@@ -66,9 +67,8 @@ import type { DayGroup, MessageAttachmentItem } from '@/features/messaging/types
 import type { Conversation } from '@/features/conversation/types/conversation.types'
 import { formatBytes, isImage, isVideo } from '@/features/file/utils/fileTypes'
 import { ImageLightboxModal } from './ImageLightboxModal'
-
-import { AxiosError } from 'axios'
-import { ApiError } from '@/infrastructure/api/errors'
+import { isAccessError, resolveGroupAction } from './groupAction'
+import { releaseConversationMessagePreviews } from '@/features/messaging/utils/messageSend'
 
 const CloseIcon = createIcon(CloseData)
 const UserIcon = createIcon(UserData)
@@ -304,6 +304,7 @@ export function ConversationInfoPanel({
     description: string
     successKey: string
     action: () => Promise<unknown>
+    verifyApplied: () => Promise<boolean>
   } | null>(null)
   const [isGroupActionPending, setIsGroupActionPending] = useState(false)
   const groupActionPendingRef = useRef(false)
@@ -357,21 +358,38 @@ export function ConversationInfoPanel({
       queryClient.invalidateQueries({ queryKey: queryKeys.chat.conversation(conversation.id) }),
     ])
   }
-  const runGroupAction = async (action: () => Promise<unknown>, successKey: string) => {
+  const runGroupAction = async (
+    action: () => Promise<unknown>,
+    successKey: string,
+    verifyApplied?: () => Promise<boolean>,
+  ) => {
     if (groupActionPendingRef.current) return false
     groupActionPendingRef.current = true
     setIsGroupActionPending(true)
     try {
-      await action()
+      const outcome = await resolveGroupAction(action, verifyApplied)
+      if (outcome === 'uncertain') {
+        toast.warning(t('chat.groupActionUncertain'))
+        return false
+      }
       toast.success(t(successKey))
       return true
     } catch (error) {
-      if (
-        (error instanceof ApiError && (error.status === 403 || error.status === 404)) ||
-        (error instanceof AxiosError &&
-          (error.response?.status === 403 || error.response?.status === 404))
-      ) {
-        onClose?.()
+      if (isAccessError(error)) {
+        try {
+          await getConversationById(conversation.id)
+        } catch (checkError) {
+          if (isAccessError(checkError)) {
+            releaseConversationMessagePreviews(conversation.id)
+            queryClient.removeQueries({ queryKey: queryKeys.chat.conversation(conversation.id) })
+            queryClient.removeQueries({ queryKey: queryKeys.chat.groupMembers(conversation.id) })
+            queryClient.removeQueries({ queryKey: CHAT_QUERY_KEYS.messages(conversation.id) })
+            queryClient.removeQueries({ queryKey: CHAT_QUERY_KEYS.liveMessages(conversation.id) })
+            queryClient.removeQueries({ queryKey: CHAT_QUERY_KEYS.mediaArchive(conversation.id) })
+            onClose?.()
+            navigate(ROUTES.messages)
+          }
+        }
       }
       toast.error(error instanceof Error ? error.message : t('common.error'))
       return false
@@ -406,7 +424,7 @@ export function ConversationInfoPanel({
   const handleGroupAvatarFile = async (file?: File) => {
     if (!file) return
     if (!canEditGroupMetadata) {
-      toast.error(t('chat.forbidden', 'Chỉ trưởng nhóm mới có quyền đổi ảnh nhóm'))
+      toast.error(t('chat.groupAvatarAdminOnly'))
       return
     }
     if (
@@ -431,23 +449,41 @@ export function ConversationInfoPanel({
   const handleDisbandGroup = async () => {
     if (isDisbandingGroup) return
     setIsDisbandingGroup(true)
+    let disbanded = false
     try {
-      await disbandGroup(conversation.id)
+      const outcome = await resolveGroupAction(
+        () => disbandGroup(conversation.id),
+        async () => {
+          try {
+            await getConversationById(conversation.id)
+            return false
+          } catch (error) {
+            if (isAccessError(error)) return true
+            throw error
+          }
+        },
+      )
+      disbanded = outcome === 'applied'
+      if (!disbanded) toast.warning(t('chat.groupActionUncertain'))
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t('common.error'))
+    }
+    if (disbanded) {
+      releaseConversationMessagePreviews(conversation.id)
       queryClient.removeQueries({ queryKey: queryKeys.chat.conversation(conversation.id) })
       queryClient.removeQueries({ queryKey: queryKeys.chat.groupMembers(conversation.id) })
       queryClient.removeQueries({ queryKey: CHAT_QUERY_KEYS.messages(conversation.id) })
       queryClient.removeQueries({ queryKey: CHAT_QUERY_KEYS.liveMessages(conversation.id) })
       queryClient.removeQueries({ queryKey: CHAT_QUERY_KEYS.mediaArchive(conversation.id) })
-      await queryClient.invalidateQueries({ queryKey: queryKeys.chat.conversations })
+      await queryClient
+        .invalidateQueries({ queryKey: queryKeys.chat.conversations })
+        .catch(() => undefined)
       toast.success(t('chat.groupDisbanded'))
       setDisbandGroupOpen(false)
       onClose()
       navigate(ROUTES.messages)
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : t('common.error'))
-    } finally {
-      setIsDisbandingGroup(false)
     }
+    setIsDisbandingGroup(false)
   }
 
   // Xử lý kéo ra kéo vào (resize ngang) trên Desktop
@@ -703,6 +739,7 @@ export function ConversationInfoPanel({
                   void runGroupAction(
                     () => updateGroup(conversation.id, title),
                     'chat.groupUpdated',
+                    async () => (await getConversationById(conversation.id)).title === title,
                   ).then((success) => success && setGroupTitleEditing(false))
               }}
             >
@@ -1120,6 +1157,12 @@ export function ConversationInfoPanel({
                                     member.role === 'ADMIN' ? 'MEMBER' : 'ADMIN',
                                   ),
                                 'chat.groupUpdated',
+                                async () =>
+                                  (await getGroupMembers(conversation.id)).some(
+                                    (item) =>
+                                      item.id === member.id &&
+                                      item.role === (member.role === 'ADMIN' ? 'MEMBER' : 'ADMIN'),
+                                  ),
                               )
                             }
                           >
@@ -1137,6 +1180,10 @@ export function ConversationInfoPanel({
                                 }),
                                 successKey: 'chat.groupMemberRemoved',
                                 action: () => removeGroupMember(conversation.id, member.id),
+                                verifyApplied: async () =>
+                                  !(await getGroupMembers(conversation.id)).some(
+                                    (item) => item.id === member.id,
+                                  ),
                               })
                             }
                           >
@@ -1261,6 +1308,10 @@ export function ConversationInfoPanel({
                       void runGroupAction(
                         () => addGroupMembers(conversation.id, [friend.id]),
                         'chat.groupMembersAdded',
+                        async () =>
+                          (await getGroupMembers(conversation.id)).some(
+                            (item) => item.id === friend.id,
+                          ),
                       ).then((success) => success && setAddMembersOpen(false))
                     }
                     className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left hover:bg-muted"
@@ -1353,14 +1404,24 @@ export function ConversationInfoPanel({
               variant="destructive"
               disabled={mustPromoteAdminBeforeLeaving}
               onClick={() =>
-                void runGroupAction(() => leaveGroup(conversation.id), 'chat.groupLeft').then(
-                  (success) => {
-                    if (!success) return
-                    setLeaveGroupOpen(false)
-                    onClose()
-                    navigate(ROUTES.messages)
+                void runGroupAction(
+                  () => leaveGroup(conversation.id),
+                  'chat.groupLeft',
+                  async () => {
+                    try {
+                      await getConversationById(conversation.id)
+                      return false
+                    } catch (error) {
+                      if (isAccessError(error)) return true
+                      throw error
+                    }
                   },
-                )
+                ).then((success) => {
+                  if (!success) return
+                  setLeaveGroupOpen(false)
+                  onClose()
+                  navigate(ROUTES.messages)
+                })
               }
             >
               {t('chat.leaveGroupAction')}
@@ -1414,11 +1475,13 @@ export function ConversationInfoPanel({
               disabled={isGroupActionPending}
               onClick={() => {
                 if (!pendingGroupAction) return
-                void runGroupAction(pendingGroupAction.action, pendingGroupAction.successKey).then(
-                  (success) => {
-                    if (success) setPendingGroupAction(null)
-                  },
-                )
+                void runGroupAction(
+                  pendingGroupAction.action,
+                  pendingGroupAction.successKey,
+                  pendingGroupAction.verifyApplied,
+                ).then((success) => {
+                  if (success) setPendingGroupAction(null)
+                })
               }}
             >
               {t('chat.confirm')}

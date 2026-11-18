@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Camera01Icon as CameraData, CheckIcon as CheckData } from '@hugeicons/core-free-icons'
 import { createIcon } from '@/components/icons/hugeIcon'
@@ -147,6 +147,7 @@ export function GroupWizard({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [createdGroup, setCreatedGroup] = useState<ConversationResponse | null>(null)
   const [isRestoring, setIsRestoring] = useState(false)
+  const [draftReadyForUserId, setDraftReadyForUserId] = useState<string | null>(null)
   const avatarInput = useRef<HTMLInputElement>(null)
   const requestId = useRef<{ signature: string; id: string } | null>(null)
   const createGroup = useCreateGroupMutation()
@@ -161,6 +162,7 @@ export function GroupWizard({
       // oxlint-disable-next-line react/set-state-in-effect
       setGroupName(stored.title)
       setSelected(stored.memberIds)
+      setDraftReadyForUserId(user?.id ?? null)
       if (stored.groupId) {
         let cancelled = false
         setIsRestoring(true)
@@ -190,15 +192,13 @@ export function GroupWizard({
       setSelected(draft.memberIds)
       setStep(draft.step)
     }
+    setDraftReadyForUserId(user?.id ?? null)
   }, [user?.id])
 
-  useEffect(() => {
-    if (!user?.id || isRestoring || createdGroup) return
-    const timer = setTimeout(() => {
-      writeStoredGroupWizardDraft(user.id, { step, title: groupName, memberIds: selected })
-    }, 300)
-    return () => clearTimeout(timer)
-  }, [user?.id, step, groupName, selected, isRestoring, createdGroup])
+  useLayoutEffect(() => {
+    if (!user?.id || draftReadyForUserId !== user.id || isRestoring || createdGroup) return
+    writeStoredGroupWizardDraft(user.id, { step, title: groupName, memberIds: selected })
+  }, [user?.id, step, groupName, selected, isRestoring, createdGroup, draftReadyForUserId])
 
   useEffect(
     () => () => {
@@ -394,6 +394,7 @@ export function GroupWizard({
                 type="button"
                 onClick={() => {
                   clearStoredGroupWizardState()
+                  clearStoredGroupWizardDraft(user?.id)
                   onDone()
                 }}
                 className="rounded-xl px-4 py-2 text-sm font-semibold text-muted-foreground transition-colors hover:bg-muted"

@@ -303,8 +303,9 @@ export function ChatShell() {
 
   const handleRetrySend = (messageId: string) => {
     const message = messagesQuery.liveMessages?.find((item) => item.id === messageId)
-    if (!message?.retryPayload || sendMessageMutation.isPending) return
-    void sendMessageMutation.mutateAsync(message.retryPayload).catch(() => undefined)
+    const attempt = message?.retryAttempt ?? message?.retryPayload
+    if (!attempt || sendMessageMutation.isPending) return
+    void sendMessageMutation.mutateAsync(attempt).catch(() => undefined)
   }
 
   const handlePositionChange = useCallback(

@@ -15,6 +15,7 @@ import { getConversationMessages } from '@/features/messaging/api/message.api'
 import { getConversationById, getGroupMembers } from '@/features/conversation/api/conversation.api'
 import { updateConversationLastMessage } from '@/features/conversation/utils/chat.mapper'
 import { fetchMissedMessages } from '@/features/messaging/utils/messageSync'
+import { releaseConversationMessagePreviews } from '@/features/messaging/utils/messageSend'
 import type {
   MessageReactionPayload,
   MessageResponse,
@@ -202,6 +203,7 @@ export function useChatRealtime(activeConversationId: string | null) {
     const clearRemovedConversation = (conversationId: string) => {
       revokedConversationIds.current.add(conversationId)
       clearConversationTyping(conversationId)
+      releaseConversationMessagePreviews(conversationId)
       queryClient.removeQueries({ queryKey: CHAT_QUERY_KEYS.messages(conversationId) })
       queryClient.removeQueries({ queryKey: CHAT_QUERY_KEYS.liveMessages(conversationId) })
       queryClient.removeQueries({ queryKey: CHAT_QUERY_KEYS.mediaArchive(conversationId) })
@@ -236,6 +238,7 @@ export function useChatRealtime(activeConversationId: string | null) {
           conversation.joinGeneration &&
           cached.joinGeneration !== conversation.joinGeneration
         ) {
+          releaseConversationMessagePreviews(conversationId)
           queryClient.removeQueries({ queryKey: CHAT_QUERY_KEYS.messages(conversationId) })
           queryClient.removeQueries({ queryKey: CHAT_QUERY_KEYS.liveMessages(conversationId) })
           queryClient.removeQueries({ queryKey: CHAT_QUERY_KEYS.mediaArchive(conversationId) })

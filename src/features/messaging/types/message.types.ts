@@ -62,6 +62,7 @@ export interface MessageResponse {
   clientMsgId?: string | null
   sendState?: 'uncertain' | 'failed'
   retryPayload?: SendMessageDto
+  retryAttempt?: SendMessageArg
   attachments?: MessageAttachmentItem[]
   reactions?: MessageReactionItem[]
   isForwarded?: boolean
@@ -95,6 +96,26 @@ export interface MessageAttachmentInput {
   height?: number
   durationMs?: number
   checksum?: string
+}
+
+export interface SendMessagePendingFile {
+  id: string
+  file: File
+  clientMsgId?: string
+  previewUrl?: string
+  uploadedAttachment?: MessageAttachmentInput
+}
+
+export interface SendMessageArg {
+  body?: string
+  kind?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE' | 'SYSTEM'
+  attachments?: MessageAttachmentInput[]
+  pendingFiles?: SendMessagePendingFile[]
+  isForwarded?: boolean
+  sourceMessageId?: string
+  replyToId?: string | null
+  targetConversationId?: string
+  clientMsgId?: string
 }
 
 export interface SendMessageDto {

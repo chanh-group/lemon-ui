@@ -221,6 +221,8 @@
     "chooseGroupAvatar": "Choose group photo (optional)",
     "removeGroupAvatar": "Remove group photo",
     "groupAvatarUploadFailed": "The group was created, but its photo could not be uploaded. Try again or remove the photo to continue.",
+    "groupAvatarAdminOnly": "Only a group admin can change the group photo.",
+    "groupActionUncertain": "Could not confirm whether the group change was saved. Check the group before trying again.",
     "retryGroupAvatar": "Retry photo upload",
     "openGroup": "Open group",
     "createGroup": "Create group",

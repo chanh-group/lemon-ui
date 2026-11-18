@@ -221,6 +221,8 @@
     "chooseGroupAvatar": "Chọn ảnh nhóm (không bắt buộc)",
     "removeGroupAvatar": "Bỏ ảnh nhóm",
     "groupAvatarUploadFailed": "Nhóm đã được tạo nhưng chưa tải được ảnh. Hãy thử lại hoặc bỏ ảnh để tiếp tục.",
+    "groupAvatarAdminOnly": "Chỉ quản trị viên nhóm được đổi ảnh nhóm.",
+    "groupActionUncertain": "Chưa xác nhận được thay đổi nhóm đã lưu hay chưa. Hãy kiểm tra nhóm trước khi thử lại.",
     "retryGroupAvatar": "Thử tải ảnh lại",
     "openGroup": "Mở nhóm",
     "createGroup": "Tạo nhóm",
