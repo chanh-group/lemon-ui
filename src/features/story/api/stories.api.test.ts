@@ -33,7 +33,7 @@ describe('story API contract', () => {
                 userId: 'u',
                 kind: 'VIDEO',
                 caption: 'hello',
-                createdAt: new Date().toISOString(),
+                createdAt: '2026-01-01T12:34:56.000Z',
                 hasViewed: true,
                 myReaction: '👍',
                 myReactionKind: 'REACTION',
@@ -50,6 +50,7 @@ describe('story API contract', () => {
       name: 'Alice',
       kind: 'MEDIA',
       mediaType: 'video',
+      createdAt: '2026-01-01T12:34:56.000Z',
       viewed: true,
       viewerReaction: '👍',
     })

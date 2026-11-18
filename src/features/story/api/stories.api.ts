@@ -196,6 +196,7 @@ export async function listStories(currentUserId?: string): Promise<StoryEntry[]>
           id: item.id,
           name: group.user?.fullName || item.caption?.slice(0, 18) || 'Story',
           time: formatRelativeTime(item.createdAt),
+          createdAt: item.createdAt,
           viewed: Boolean(item.hasViewed),
           mine: currentUserId ? (item.userId ?? group.user?.id) === currentUserId : false,
           online: true,
