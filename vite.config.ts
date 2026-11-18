@@ -10,7 +10,7 @@ export default defineConfig({
     react(),
     babel({ presets: [reactCompilerPreset()] }),
     tailwindcss(),
-    compression({ algorithms: ['gzip'], threshold: 1024 }),
+    compression({ algorithm: 'gzip', threshold: 1024 }),
   ],
   server: {
     host: '0.0.0.0',
