@@ -3,6 +3,7 @@ import { api } from '@/infrastructure/api/client'
 import {
   createMediaStory,
   getArchivedStories,
+  getStorageUsage,
   getStoryReactions,
   getStoryViews,
   listStories,
@@ -198,5 +199,20 @@ describe('story API contract', () => {
     expect(get).toHaveBeenCalledWith('/stories/s/views', { params: { cursor: 'cursor' } })
     await replyStory('s', { content: 'hi' })
     expect(post).toHaveBeenCalledWith('/stories/s/reply', { body: 'hi' })
+  })
+
+  it('fetches storage usage from the backend', async () => {
+    const get = vi.fn(() => Promise.resolve({ data: { usedBytes: 100, limitBytes: 512 } }))
+    api.get = get as unknown as typeof api.get
+    const result = await getStorageUsage()
+    expect(result).toEqual({ usedBytes: 100, limitBytes: 512 })
+    expect(get).toHaveBeenCalledWith('/stories/storage')
+  })
+
+  it('defaults missing storage fields to safe values', async () => {
+    api.get = vi.fn(() => Promise.resolve({ data: {} })) as unknown as typeof api.get
+    const result = await getStorageUsage()
+    expect(result.usedBytes).toBe(0)
+    expect(result.limitBytes).toBe(512 * 1024 * 1024)
   })
 })
