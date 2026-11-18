@@ -6,7 +6,6 @@ import {
   STORY_MAX_TRIM_SECONDS,
 } from '../constants'
 import {
-  buildStoryVideoArgs,
   clampTrimStart,
   isVideoDurationKnown,
   maxTrimStartSeconds,
@@ -100,43 +99,5 @@ describe('toStoryDurationMs', () => {
 
   it('clamps above 60 seconds', () => {
     expect(toStoryDurationMs(60.4)).toBe(60000)
-  })
-})
-
-describe('buildStoryVideoArgs', () => {
-  it('builds the deterministic ffmpeg argument list', () => {
-    expect(buildStoryVideoArgs(0)).toEqual([
-      '-ss',
-      '0',
-      '-i',
-      'input',
-      '-t',
-      '59.9',
-      '-map',
-      '0:v:0',
-      '-map',
-      '0:a:0?',
-      '-vf',
-      "scale='trunc(min(1080,iw)/2)*2':-2",
-      '-c:v',
-      'libx264',
-      '-preset',
-      'ultrafast',
-      '-b:v',
-      '2400k',
-      '-maxrate',
-      '2800k',
-      '-bufsize',
-      '5600k',
-      '-pix_fmt',
-      'yuv420p',
-      '-c:a',
-      'aac',
-      '-b:a',
-      '96k',
-      '-movflags',
-      '+faststart',
-      'output.mp4',
-    ])
   })
 })

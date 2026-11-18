@@ -35,39 +35,3 @@ export function clampTrimStart(durationSeconds: number, startSeconds: number): n
 export function toStoryDurationMs(durationSeconds: number): number {
   return Math.max(1, Math.min(Math.ceil(durationSeconds * 1000), STORY_MAX_VIDEO_SECONDS * 1000))
 }
-
-export function buildStoryVideoArgs(startSeconds: number): string[] {
-  return [
-    '-ss',
-    String(startSeconds),
-    '-i',
-    'input',
-    '-t',
-    String(STORY_MAX_TRIM_SECONDS),
-    '-map',
-    '0:v:0',
-    '-map',
-    '0:a:0?',
-    '-vf',
-    "scale='trunc(min(1080,iw)/2)*2':-2",
-    '-c:v',
-    'libx264',
-    '-preset',
-    'ultrafast',
-    '-b:v',
-    '2400k',
-    '-maxrate',
-    '2800k',
-    '-bufsize',
-    '5600k',
-    '-pix_fmt',
-    'yuv420p',
-    '-c:a',
-    'aac',
-    '-b:a',
-    '96k',
-    '-movflags',
-    '+faststart',
-    'output.mp4',
-  ]
-}
