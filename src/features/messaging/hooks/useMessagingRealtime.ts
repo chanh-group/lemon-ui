@@ -22,20 +22,6 @@ import type {
   TypingEventPayload,
 } from '@/features/messaging/types/message.types'
 import type { ConversationResponse } from '@/features/conversation/types/conversation.types'
-import { queryKeys } from '@/infrastructure/query/keys'
-import {
-  applyFriendRemoved,
-  applyFriendRequestAccepted,
-  applyFriendRequestCancelled,
-  applyFriendRequestCreated,
-  applyFriendRequestDeclined,
-  type FriendRemovedEvent,
-  type FriendRequestAcceptedEvent,
-  type FriendRequestCancelledEvent,
-  type FriendRequestCreatedEvent,
-  type FriendRequestDeclinedEvent,
-} from '@/features/friend/hooks/FriendRequestRealtime'
-import type { ChatUser, FriendRequest } from '@/features/friend/types/friend.types'
 
 export function mergeMessagesByTime(
   existing: MessageResponse[],
@@ -130,7 +116,6 @@ export function useChatRealtime(activeConversationId: string | null) {
     const handleReady = () => {
       setConnectionStatus('connected')
       refreshInbox()
-      void queryClient.invalidateQueries({ queryKey: queryKeys.chat.friendRequests })
       if (activeConversationId) {
         void syncMissedMessages(activeConversationId).catch(() =>
           toast.error(t('chat.messagesLoadError')),
@@ -155,13 +140,11 @@ export function useChatRealtime(activeConversationId: string | null) {
     socket.io.on('reconnect_attempt', handleReconnectAttempt)
     if (isChatSocketReady() && activeConversationId) {
       refreshInbox()
-      void queryClient.invalidateQueries({ queryKey: queryKeys.chat.friendRequests })
       void syncMissedMessages(activeConversationId).catch(() =>
         toast.error(t('chat.messagesLoadError')),
       )
     } else if (isChatSocketReady()) {
       refreshInbox()
-      void queryClient.invalidateQueries({ queryKey: queryKeys.chat.friendRequests })
     }
 
     const handleMessageCorrelated = ({
@@ -376,75 +359,6 @@ export function useChatRealtime(activeConversationId: string | null) {
       )
     }
 
-    // G. Lời mời kết bạn & cập nhật bạn bè realtime
-    const handleFriendRequest = (event: FriendRequestCreatedEvent) => {
-      queryClient.setQueryData<{ incoming: FriendRequest[]; outgoing: FriendRequest[] }>(
-        queryKeys.chat.friendRequests,
-        (old) => applyFriendRequestCreated(old, event),
-      )
-      void queryClient.invalidateQueries({ queryKey: queryKeys.chat.friendRequests })
-      toast.info(t('chat.friendRequestNotificationTitle'), {
-        id: `friend-request-${event.id}`,
-        description: t('chat.friendRequestNotificationDescription', {
-          name: event.user?.name || event.user?.username || '',
-        }),
-      })
-    }
-
-    const handleFriendRequestCancelled = (event: FriendRequestCancelledEvent) => {
-      queryClient.setQueryData<{ incoming: FriendRequest[]; outgoing: FriendRequest[] }>(
-        queryKeys.chat.friendRequests,
-        (old) => applyFriendRequestCancelled(old, event),
-      )
-      void queryClient.invalidateQueries({ queryKey: queryKeys.chat.friendRequests })
-    }
-
-    const handleFriendRequestAccepted = (event: FriendRequestAcceptedEvent) => {
-      let acceptedUser: ChatUser | undefined
-      queryClient.setQueryData<{ incoming: FriendRequest[]; outgoing: FriendRequest[] }>(
-        queryKeys.chat.friendRequests,
-        (old) => {
-          acceptedUser = old?.outgoing.find(
-            (r) => r.id === event.requestId || r.user.id === event.addresseeId,
-          )?.user
-          return applyFriendRequestAccepted(old, event)
-        },
-      )
-      if (acceptedUser) {
-        const friend = acceptedUser
-        queryClient.setQueryData<ChatUser[]>(queryKeys.chat.friends, (old) => {
-          if (!old) return [friend]
-          if (old.some((f) => f.id === friend.id)) return old
-          return [...old, friend]
-        })
-      }
-      void queryClient.invalidateQueries({ queryKey: queryKeys.chat.friendRequests })
-      void queryClient.invalidateQueries({ queryKey: queryKeys.chat.friends })
-      void queryClient.invalidateQueries({ queryKey: queryKeys.chat.conversations })
-      toast.success(t('chat.friendRequestAccepted'), {
-        id: `friend-request-accepted-${event.requestId}`,
-      })
-    }
-
-    const handleFriendRequestDeclined = (event: FriendRequestDeclinedEvent) => {
-      queryClient.setQueryData<{ incoming: FriendRequest[]; outgoing: FriendRequest[] }>(
-        queryKeys.chat.friendRequests,
-        (old) => applyFriendRequestDeclined(old, event),
-      )
-      void queryClient.invalidateQueries({ queryKey: queryKeys.chat.friendRequests })
-    }
-
-    const handleFriendRemoved = (event?: FriendRemovedEvent) => {
-      if (event?.friendId) {
-        queryClient.setQueryData<ChatUser[]>(queryKeys.chat.friends, (old) =>
-          applyFriendRemoved(old, event.friendId),
-        )
-      }
-      void queryClient.invalidateQueries({ queryKey: queryKeys.chat.friends })
-      void queryClient.invalidateQueries({ queryKey: queryKeys.chat.conversations })
-      void queryClient.invalidateQueries({ queryKey: queryKeys.chat.friendRequests })
-    }
-
     socket.on('message:new', handleNewMessage)
     socket.on('message:correlated', handleMessageCorrelated)
     socket.on('read:updated', handleReadUpdated)
@@ -452,11 +366,6 @@ export function useChatRealtime(activeConversationId: string | null) {
     socket.on('message:revoked', handleMessageRevoked)
     socket.on('typing', handleTyping)
     socket.on('message:reaction', handleMessageReaction)
-    socket.on('friend:request:new', handleFriendRequest)
-    socket.on('friend:request:cancelled', handleFriendRequestCancelled)
-    socket.on('friend:request:accepted', handleFriendRequestAccepted)
-    socket.on('friend:request:declined', handleFriendRequestDeclined)
-    socket.on('friend:removed', handleFriendRemoved)
 
     return () => {
       socket.off('connect', handleConnect)
@@ -471,11 +380,6 @@ export function useChatRealtime(activeConversationId: string | null) {
       socket.off('message:revoked', handleMessageRevoked)
       socket.off('typing', handleTyping)
       socket.off('message:reaction', handleMessageReaction)
-      socket.off('friend:request:new', handleFriendRequest)
-      socket.off('friend:request:cancelled', handleFriendRequestCancelled)
-      socket.off('friend:request:accepted', handleFriendRequestAccepted)
-      socket.off('friend:request:declined', handleFriendRequestDeclined)
-      socket.off('friend:removed', handleFriendRemoved)
     }
   }, [status, activeConversationId, userId, queryClient, t])
 

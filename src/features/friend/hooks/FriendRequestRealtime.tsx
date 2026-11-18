@@ -187,15 +187,17 @@ export function FriendRequestRealtime() {
     }
 
     const handleFriendRequestAccepted = (event: FriendRequestAcceptedEvent) => {
-      let acceptedUser: ChatUser | undefined
+      const currentData = queryClient.getQueryData<{
+        incoming: FriendRequest[]
+        outgoing: FriendRequest[]
+      }>(queryKeys.chat.friendRequests)
+      const acceptedUser = currentData?.outgoing.find(
+        (r) => r.id === event.requestId || r.user.id === event.addresseeId,
+      )?.user
+
       queryClient.setQueryData<{ incoming: FriendRequest[]; outgoing: FriendRequest[] }>(
         queryKeys.chat.friendRequests,
-        (old) => {
-          acceptedUser = old?.outgoing.find(
-            (r) => r.id === event.requestId || r.user.id === event.addresseeId,
-          )?.user
-          return applyFriendRequestAccepted(old, event)
-        },
+        (old) => applyFriendRequestAccepted(old, event),
       )
       if (acceptedUser) {
         const friend = acceptedUser
