@@ -12,6 +12,8 @@ import type { StoryEntry } from '@/features/story/types/story.types'
 import { TEXT_STORY_BG } from '@/features/story/data/storiesData'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/features/auth/api'
+import { useQuery } from '@tanstack/react-query'
+import { api } from '@/infrastructure/api/client'
 
 const ArrowLeft = createIcon(ArrowLeft01Icon)
 const Archive = createIcon(ArchiveIcon)
@@ -22,6 +24,10 @@ export function StoriesArchivePage() {
   const { user } = useAuth()
   const { data, isLoading, isError, refetch, hasNextPage, fetchNextPage, isFetchingNextPage } =
     useArchivedStories()
+  const storage = useQuery({
+    queryKey: ['stories', 'storage'],
+    queryFn: async () => (await api.get<{ usedBytes: number; limitBytes: number }>('/stories/storage')).data,
+  })
   const [selectedStory, setSelectedStory] = useState<StoryEntry | null>(null)
 
   const formatDate = (value?: string) => {
@@ -75,6 +81,13 @@ export function StoriesArchivePage() {
           <div className="max-w-5xl mx-auto">
             <div className="mb-6">
               <p className="text-sm text-muted-foreground">{t('chat.archiveDescription')}</p>
+              {storage.data && (
+                <div className="mt-4 space-y-2" aria-label={t('chat.storyStorage')}>
+                  <p className="text-sm text-foreground">{t('chat.storyStorageUsage', { used: (storage.data.usedBytes / 1024 / 1024).toFixed(1), limit: (storage.data.limitBytes / 1024 / 1024).toFixed(0) })}</p>
+                  <progress className="w-full accent-primary" value={Math.min(storage.data.usedBytes, storage.data.limitBytes)} max={storage.data.limitBytes} aria-label={t('chat.storyStorage')} />
+                </div>
+              )}
+              {storage.isError && <p role="alert" className="mt-2 text-sm text-destructive">{t('chat.storyStorageError')}</p>}
             </div>
 
             {isLoading ? (

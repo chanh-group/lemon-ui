@@ -542,7 +542,10 @@
     "defaultPartnerName": "this user",
     "storyTrimHint": "Video exceeds 1 minute. Choose the segment to share (up to 1 minute).",
     "storyTrimRange": "Selected: {{start}}s – {{end}}s",
-    "storyVideoInvalid": "Cannot read this video. Choose another file."
+    "storyVideoInvalid": "Cannot read this video. Choose another file.",
+    "storyStorage": "Story storage",
+    "storyStorageUsage": "{{used}} / {{limit}} MiB used",
+    "storyStorageError": "Unable to load story storage."
   },
   "theme": {
     "toLight": "Switch to light mode",
