@@ -21,6 +21,16 @@ import type {
   TypingEventPayload,
 } from '@/features/messaging/types/message.types'
 import type { ConversationResponse } from '@/features/conversation/types/conversation.types'
+import { queryKeys } from '@/infrastructure/query/keys'
+import {
+  applyFriendRequestCreated,
+  applyFriendRequestCancelled,
+  applyFriendRemoved,
+  type FriendRequestCreatedEvent,
+  type FriendRequestCancelledEvent,
+  type FriendRemovedEvent,
+} from '@/features/friend/hooks/FriendRequestRealtime'
+import type { ChatUser, FriendRequest } from '@/features/friend/types/friend.types'
 
 export function mergeMessagesByTime(
   existing: MessageResponse[],
@@ -70,13 +80,14 @@ export function useChatRealtime(activeConversationId: string | null) {
 
   // 1. Quản lý kết nối socket theo trạng thái đăng nhập
   useEffect(() => {
-    if (status !== 'authenticated' || !userId) {
+    if (status === 'anonymous') {
       disconnectChatSocket()
       return
     }
+    if (status !== 'authenticated') return
 
     connectChatSocket()
-  }, [status, userId])
+  }, [status])
 
   // 2. Đăng ký realtime event listeners
   useEffect(() => {
@@ -114,6 +125,7 @@ export function useChatRealtime(activeConversationId: string | null) {
     const handleConnect = () => {
       setConnectionStatus('connected')
       refreshInbox()
+      void queryClient.invalidateQueries({ queryKey: queryKeys.chat.friendRequests })
       if (activeConversationId) {
         void syncMissedMessages(activeConversationId).catch(() =>
           toast.error(t('chat.messagesLoadError')),
@@ -134,11 +146,13 @@ export function useChatRealtime(activeConversationId: string | null) {
     socket.io.on('reconnect_attempt', handleReconnectAttempt)
     if (socket.connected && activeConversationId) {
       refreshInbox()
+      void queryClient.invalidateQueries({ queryKey: queryKeys.chat.friendRequests })
       void syncMissedMessages(activeConversationId).catch(() =>
         toast.error(t('chat.messagesLoadError')),
       )
     } else if (socket.connected) {
       refreshInbox()
+      void queryClient.invalidateQueries({ queryKey: queryKeys.chat.friendRequests })
     }
 
     const handleMessageCorrelated = ({
@@ -353,6 +367,40 @@ export function useChatRealtime(activeConversationId: string | null) {
       )
     }
 
+    // G. Lời mời kết bạn & cập nhật bạn bè realtime
+    const handleFriendRequest = (event: FriendRequestCreatedEvent) => {
+      queryClient.setQueryData<{ incoming: FriendRequest[]; outgoing: FriendRequest[] }>(
+        queryKeys.chat.friendRequests,
+        (old) => applyFriendRequestCreated(old, event),
+      )
+      void queryClient.invalidateQueries({ queryKey: queryKeys.chat.friendRequests })
+      toast.info(t('chat.friendRequestNotificationTitle'), {
+        id: `friend-request-${event.id}`,
+        description: t('chat.friendRequestNotificationDescription', {
+          name: event.user?.name || event.user?.username || '',
+        }),
+      })
+    }
+
+    const handleFriendRequestCancelled = (event: FriendRequestCancelledEvent) => {
+      queryClient.setQueryData<{ incoming: FriendRequest[]; outgoing: FriendRequest[] }>(
+        queryKeys.chat.friendRequests,
+        (old) => applyFriendRequestCancelled(old, event),
+      )
+      void queryClient.invalidateQueries({ queryKey: queryKeys.chat.friendRequests })
+    }
+
+    const handleFriendRemoved = (event?: FriendRemovedEvent) => {
+      if (event?.friendId) {
+        queryClient.setQueryData<ChatUser[]>(queryKeys.chat.friends, (old) =>
+          applyFriendRemoved(old, event.friendId),
+        )
+      }
+      void queryClient.invalidateQueries({ queryKey: queryKeys.chat.friends })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.chat.conversations })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.chat.friendRequests })
+    }
+
     socket.on('message:new', handleNewMessage)
     socket.on('message:correlated', handleMessageCorrelated)
     socket.on('read:updated', handleReadUpdated)
@@ -360,6 +408,9 @@ export function useChatRealtime(activeConversationId: string | null) {
     socket.on('message:revoked', handleMessageRevoked)
     socket.on('typing', handleTyping)
     socket.on('message:reaction', handleMessageReaction)
+    socket.on('friend:request:new', handleFriendRequest)
+    socket.on('friend:request:cancelled', handleFriendRequestCancelled)
+    socket.on('friend:removed', handleFriendRemoved)
 
     return () => {
       socket.off('connect', handleConnect)
@@ -373,6 +424,9 @@ export function useChatRealtime(activeConversationId: string | null) {
       socket.off('message:revoked', handleMessageRevoked)
       socket.off('typing', handleTyping)
       socket.off('message:reaction', handleMessageReaction)
+      socket.off('friend:request:new', handleFriendRequest)
+      socket.off('friend:request:cancelled', handleFriendRequestCancelled)
+      socket.off('friend:removed', handleFriendRemoved)
     }
   }, [status, activeConversationId, userId, queryClient, t])
 
