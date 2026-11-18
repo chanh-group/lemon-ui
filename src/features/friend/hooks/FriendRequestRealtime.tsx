@@ -3,9 +3,18 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { useAuth } from '@/features/auth/api'
-import { connectChatSocket, disconnectChatSocket, getChatSocket } from '@/lib/socket'
+import {
+  connectChatSocket,
+  disconnectChatSocket,
+  getChatSocket,
+  isChatSocketReady,
+} from '@/lib/socket'
 import { queryKeys } from '@/infrastructure/query/keys'
 import type { ChatUser, FriendRequest } from '../types/friend.types'
+
+export interface SocketReadyEvent {
+  userId: string
+}
 
 export interface FriendRequestCreatedEvent {
   id: string
@@ -216,11 +225,22 @@ export function FriendRequestRealtime() {
       void queryClient.invalidateQueries({ queryKey: queryKeys.chat.friendRequests })
     }
 
-    const handleConnect = () => {
+    const refetchFriendRequests = () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.chat.friendRequests })
     }
 
-    socket.on('connect', handleConnect)
+    const refetchBadges = () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.chat.friendRequests })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.chat.conversations })
+    }
+
+    // Backend đã join đủ các room nghiệp vụ thì mới refetch, tránh race condition
+    const handleReady = (_event?: SocketReadyEvent) => {
+      refetchFriendRequests()
+      refetchBadges()
+    }
+
+    socket.on('ready', handleReady)
     socket.on('friend:request:new', handleFriendRequest)
     socket.on('friend:request:cancelled', handleFriendRequestCancelled)
     socket.on('friend:request:accepted', handleFriendRequestAccepted)
@@ -229,14 +249,15 @@ export function FriendRequestRealtime() {
     socket.on('notification', handleGenericNotification)
     socket.on('notification:new', handleGenericNotification)
 
-    if (socket.connected) {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.chat.friendRequests })
+    if (isChatSocketReady()) {
+      refetchFriendRequests()
+      refetchBadges()
     }
 
     connectChatSocket()
 
     return () => {
-      socket.off('connect', handleConnect)
+      socket.off('ready', handleReady)
       socket.off('friend:request:new', handleFriendRequest)
       socket.off('friend:request:cancelled', handleFriendRequestCancelled)
       socket.off('friend:request:accepted', handleFriendRequestAccepted)

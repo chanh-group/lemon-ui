@@ -7,6 +7,7 @@ import {
   connectChatSocket,
   disconnectChatSocket,
   getChatSocket,
+  isChatSocketReady,
   type SocketConnectionStatus,
 } from '@/lib/socket'
 import { CHAT_QUERY_KEYS, type MessagePageParam } from '@/features/messaging/hooks/useMessages'
@@ -78,7 +79,7 @@ export function useChatRealtime(activeConversationId: string | null) {
   const [connectionStatus, setConnectionStatus] = useState<SocketConnectionStatus | null>(() => {
     if (status !== 'authenticated') return null
     const socket = getChatSocket()
-    return socket.connected ? 'connected' : socket.active ? 'connecting' : 'disconnected'
+    return isChatSocketReady() ? 'connected' : socket.active ? 'connecting' : 'disconnected'
   })
   const userId = user?.id
 
@@ -126,7 +127,7 @@ export function useChatRealtime(activeConversationId: string | null) {
       // Không invalidate timeline: missed đã nằm trong liveMessages, còn refetch
       // infinite query sẽ tải lại mọi trang đã load và presign lại toàn bộ media.
     }
-    const handleConnect = () => {
+    const handleReady = () => {
       setConnectionStatus('connected')
       refreshInbox()
       void queryClient.invalidateQueries({ queryKey: queryKeys.chat.friendRequests })
@@ -135,6 +136,9 @@ export function useChatRealtime(activeConversationId: string | null) {
           toast.error(t('chat.messagesLoadError')),
         )
       }
+    }
+    const handleConnect = () => {
+      // Chờ sự kiện 'ready' khi backend đã join đủ các room nghiệp vụ
     }
     const handleDisconnect = () => {
       refreshedInboxOnConnection.current = false
@@ -145,16 +149,17 @@ export function useChatRealtime(activeConversationId: string | null) {
     const handleReconnectAttempt = () => setConnectionStatus('connecting')
 
     socket.on('connect', handleConnect)
+    socket.on('ready', handleReady)
     socket.on('disconnect', handleDisconnect)
     socket.on('connect_error', handleConnectError)
     socket.io.on('reconnect_attempt', handleReconnectAttempt)
-    if (socket.connected && activeConversationId) {
+    if (isChatSocketReady() && activeConversationId) {
       refreshInbox()
       void queryClient.invalidateQueries({ queryKey: queryKeys.chat.friendRequests })
       void syncMissedMessages(activeConversationId).catch(() =>
         toast.error(t('chat.messagesLoadError')),
       )
-    } else if (socket.connected) {
+    } else if (isChatSocketReady()) {
       refreshInbox()
       void queryClient.invalidateQueries({ queryKey: queryKeys.chat.friendRequests })
     }
@@ -455,6 +460,7 @@ export function useChatRealtime(activeConversationId: string | null) {
 
     return () => {
       socket.off('connect', handleConnect)
+      socket.off('ready', handleReady)
       socket.off('disconnect', handleDisconnect)
       socket.off('connect_error', handleConnectError)
       socket.io.off('reconnect_attempt', handleReconnectAttempt)

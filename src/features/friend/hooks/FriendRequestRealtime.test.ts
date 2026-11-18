@@ -9,6 +9,7 @@ import {
   type FriendRequestCancelledEvent,
   type FriendRequestAcceptedEvent,
   type FriendRequestDeclinedEvent,
+  type SocketReadyEvent,
 } from './FriendRequestRealtime'
 import type { ChatUser, FriendRequest } from '../types/friend.types'
 
@@ -249,5 +250,12 @@ describe('applyFriendRemoved', () => {
 
   it('returns undefined if current friends list is undefined', () => {
     expect(applyFriendRemoved(undefined, 'friend-1')).toBeUndefined()
+  })
+})
+
+describe('SocketReadyEvent', () => {
+  it('defines the expected shape for ready event payload', () => {
+    const event: SocketReadyEvent = { userId: 'user-1' }
+    expect(event.userId).toBe('user-1')
   })
 })

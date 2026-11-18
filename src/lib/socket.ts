@@ -4,8 +4,13 @@ import { useAuthStore } from '@/infrastructure/auth/auth-store'
 
 let socket: Socket | null = null
 let pingTimer: ReturnType<typeof setInterval> | null = null
+let isSocketReady = false
 
 export type SocketConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'error'
+
+export function isChatSocketReady(): boolean {
+  return Boolean(socket?.connected && isSocketReady)
+}
 
 function getSocketUrl(): string | undefined {
   return env.WS_URL.trim() || undefined
@@ -33,7 +38,12 @@ export function getChatSocket(): Socket {
       }, 30000)
     })
 
+    socket.on('ready', () => {
+      isSocketReady = true
+    })
+
     socket.on('disconnect', () => {
+      isSocketReady = false
       if (pingTimer) {
         clearInterval(pingTimer)
         pingTimer = null
@@ -41,6 +51,7 @@ export function getChatSocket(): Socket {
     })
 
     socket.on('connect_error', (err) => {
+      isSocketReady = false
       // Token expired or invalid
       console.warn('[Socket] Connect error:', err.message)
     })
@@ -64,6 +75,7 @@ export function connectChatSocket(): Socket {
  * Ngắt kết nối socket (khi logout).
  */
 export function disconnectChatSocket(): void {
+  isSocketReady = false
   if (pingTimer) {
     clearInterval(pingTimer)
     pingTimer = null
