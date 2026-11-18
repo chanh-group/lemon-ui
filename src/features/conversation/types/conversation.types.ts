@@ -12,6 +12,7 @@ export interface Conversation {
   avatarUrl?: string | null
   memberCount?: number
   myRole?: 'ADMIN' | 'MEMBER'
+  joinGeneration?: string
   members?: string
   lastActive?: string
   partnerId?: string
@@ -38,6 +39,7 @@ export interface ConversationResponse {
   avatarUrl?: string | null
   memberCount?: number
   myRole?: 'ADMIN' | 'MEMBER'
+  joinGeneration?: string
   partner?: ConversationPartnerResponse
   lastMessagePreview: string | null
   lastMessageSenderId?: string | null

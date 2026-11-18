@@ -95,7 +95,7 @@ describe('ConversationInfoPanel & Header Integration Tests', () => {
     expect(html).toContain('bg-success')
   })
 
-  it('lets members see the roster and edit group identity while only admins can disband', () => {
+  it('lets members see the roster while only admins can edit metadata or disband', () => {
     const group: Conversation = {
       ...dummyConversation,
       id: 'group-01',
@@ -155,8 +155,8 @@ describe('ConversationInfoPanel & Header Integration Tests', () => {
     expect(memberHtml.replace(/<!--.*?-->/g, '')).toContain('Thành viên (4)')
     expect(memberHtml).toContain('Xem tất cả')
     expect(memberHtml.indexOf('Bob')).toBeLessThan(memberHtml.indexOf('Alice'))
-    expect(memberHtml).toContain('aria-label="Sửa tên"')
-    expect(memberHtml).toContain('aria-label="Chọn ảnh nhóm')
+    expect(memberHtml).not.toContain('aria-label="Sửa tên"')
+    expect(memberHtml).not.toContain('aria-label="Chọn ảnh nhóm')
     expect(memberHtml).not.toContain('>Hồ sơ</span>')
     expect(memberHtml).not.toContain('Giải tán nhóm')
     expect(memberHtml).not.toContain('Thêm thành viên')
@@ -169,6 +169,8 @@ describe('ConversationInfoPanel & Header Integration Tests', () => {
         defaultPrivacyOpen
       />,
     )
+    expect(adminHtml).toContain('aria-label="Sửa tên"')
+    expect(adminHtml).toContain('aria-label="Chọn ảnh nhóm')
     expect(adminHtml).toContain('Giải tán nhóm')
     expect(adminHtml).toContain('Thêm thành viên')
   })

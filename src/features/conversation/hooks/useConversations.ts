@@ -18,7 +18,7 @@ export function useConversationsQuery() {
   return useQuery<ConversationResponse[], Error, Conversation[]>({
     queryKey: conversationKeys.conversations,
     queryFn: () => getConversations(50),
-    select: (data) => data.map(mapConversationResponse),
+    select: (data) => data.map((item) => mapConversationResponse(item)),
     staleTime: 1000 * 30,
   })
 }
@@ -31,7 +31,7 @@ export function useConversationQuery(conversationId: string | null, enabled = tr
       if (!conversationId) throw new Error('No conversation selected')
       return getConversationById(conversationId, signal)
     },
-    select: mapConversationResponse,
+    select: (data) => mapConversationResponse(data),
     enabled: Boolean(conversationId) && enabled,
     staleTime: 1000 * 30,
   })

@@ -225,8 +225,21 @@ export function useChatRealtime(activeConversationId: string | null) {
       try {
         await queryClient.cancelQueries({ queryKey: CHAT_QUERY_KEYS.messages(conversationId) })
         await queryClient.cancelQueries({ queryKey: queryKeys.chat.groupMembers(conversationId) })
+        const cached = queryClient.getQueryData<ConversationResponse>(
+          queryKeys.chat.conversation(conversationId),
+        )
         const conversation = await getConversationById(conversationId, abortController.signal)
         if (generation !== verificationGeneration.current) return
+
+        if (
+          cached?.joinGeneration &&
+          conversation.joinGeneration &&
+          cached.joinGeneration !== conversation.joinGeneration
+        ) {
+          queryClient.removeQueries({ queryKey: CHAT_QUERY_KEYS.messages(conversationId) })
+          queryClient.removeQueries({ queryKey: CHAT_QUERY_KEYS.liveMessages(conversationId) })
+          queryClient.removeQueries({ queryKey: CHAT_QUERY_KEYS.mediaArchive(conversationId) })
+        }
 
         revokedConversationIds.current.delete(conversationId)
 
@@ -431,6 +444,9 @@ export function useChatRealtime(activeConversationId: string | null) {
                       attachments: undefined,
                       reactions: undefined,
                       storyPreview: null,
+                      replyToId: null,
+                      replyTarget: null,
+                      isForwarded: false,
                       deletedAt: revoked.deletedAt,
                     }
                   : m.replyTarget?.id === revoked.id
@@ -460,6 +476,9 @@ export function useChatRealtime(activeConversationId: string | null) {
                   attachments: undefined,
                   reactions: undefined,
                   storyPreview: null,
+                  replyToId: null,
+                  replyTarget: null,
+                  isForwarded: false,
                   deletedAt: revoked.deletedAt,
                 }
               : message.replyTarget?.id === revoked.id

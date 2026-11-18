@@ -60,7 +60,7 @@ export interface MessageResponse {
   storyId?: string | null
   storyPreview?: StoryPreview | null
   clientMsgId?: string | null
-  sendState?: 'uncertain'
+  sendState?: 'uncertain' | 'failed'
   retryPayload?: SendMessageDto
   attachments?: MessageAttachmentItem[]
   reactions?: MessageReactionItem[]

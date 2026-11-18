@@ -63,7 +63,7 @@ describe('MessageComposer pending send', () => {
     expect(screen.queryByText(/Tin chưa gửi được/)).toBeNull()
   })
 
-  it('keeps both the failed send and a new draft, then retries with the same client ID', async () => {
+  it('preserves a new draft when a previous send fails and keeps composer clean', async () => {
     const request = deferred<boolean>()
     const onSubmit = vi
       .fn()
@@ -73,19 +73,15 @@ describe('MessageComposer pending send', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'chat.sendMessage' }))
     const originalClientId = onSubmit.mock.calls[0][4]
+    expect(originalClientId).toBeTruthy()
     fireEvent.change(input, { target: { value: 'new draft' } })
     request.resolve(false)
 
-    await screen.findByText('Tin chưa gửi được: ok')
-    expect(input.value).toBe('new draft')
-    fireEvent.click(screen.getByRole('button', { name: 'Thử lại' }))
-    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(2))
-    expect(onSubmit.mock.calls[1][0]).toBe('ok')
-    expect(onSubmit.mock.calls[1][4]).toBe(originalClientId)
-    expect(input.value).toBe('new draft')
+    await waitFor(() => expect(input.value).toBe('new draft'))
+    expect(screen.queryByText(/Tin chưa gửi được/)).toBeNull()
   })
 
-  it('retains a failed attachment for retry while a new draft is typed', async () => {
+  it('keeps newly typed draft intact when file upload in flight resolves', async () => {
     const request = deferred<boolean>()
     const onSubmit = vi
       .fn()
@@ -98,15 +94,10 @@ describe('MessageComposer pending send', () => {
     fireEvent.change(fileInput, { target: { files: [file] } })
     await screen.findByText('notes.txt')
     fireEvent.click(screen.getByRole('button', { name: 'chat.sendMessage' }))
-    const originalFiles = onSubmit.mock.calls[0][2]
     fireEvent.change(input, { target: { value: 'later' } })
     request.resolve(false)
 
-    await screen.findByText('Tin chưa gửi được: ok')
-    fireEvent.click(screen.getByRole('button', { name: 'Thử lại' }))
-    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(2))
-    expect(onSubmit.mock.calls[1][2]).toBe(originalFiles)
-    expect(onSubmit.mock.calls[1][2][0].file).toBe(file)
-    expect(input.value).toBe('later')
+    await waitFor(() => expect(input.value).toBe('later'))
+    expect(screen.queryByText(/Tin chưa gửi được/)).toBeNull()
   })
 })

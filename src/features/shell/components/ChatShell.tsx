@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -15,6 +16,7 @@ import type {
 import type { ChatTab } from '@/types/common'
 import type { StoryEntry } from '@/features/story/types/story.types'
 import {
+  isMessageConfirmed,
   useConversationMessagesQuery,
   useMarkReadMutation,
   useSendMessageMutation,
@@ -61,6 +63,7 @@ export function visibleLiveMessages(
 
 export function ChatShell() {
   const { t } = useTranslation()
+  const queryClient = useQueryClient()
   const { user } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
@@ -294,12 +297,7 @@ export function ChatShell() {
       // A network error can arrive after the server committed the message and
       // realtime reconciliation replaced the optimistic row. Treat that case
       // as success so the composer does not create a false failed-attempt banner.
-      return Boolean(
-        clientMsgId &&
-        messagesQuery.liveMessages?.some(
-          (message) => message.clientMsgId === clientMsgId && !message.id.startsWith('temp-'),
-        ),
-      )
+      return Boolean(clientMsgId && isMessageConfirmed(queryClient, selectedId, clientMsgId))
     }
   }
 

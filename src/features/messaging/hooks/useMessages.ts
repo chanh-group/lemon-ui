@@ -5,6 +5,7 @@ import {
   useQuery,
   useQueryClient,
   type InfiniteData,
+  type QueryClient,
 } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -316,19 +317,33 @@ export interface SendMessagePendingFile {
   uploadedAttachment?: MessageAttachmentInput
 }
 
-export type SendMessageArg =
-  | string
-  | {
-      body?: string
-      kind?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE' | 'SYSTEM'
-      attachments?: MessageAttachmentInput[]
-      pendingFiles?: SendMessagePendingFile[]
-      isForwarded?: boolean
-      sourceMessageId?: string
-      replyToId?: string | null
-      targetConversationId?: string
-      clientMsgId?: string
-    }
+export interface SendMessageArg {
+  body?: string
+  kind?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE' | 'SYSTEM'
+  attachments?: MessageAttachmentInput[]
+  pendingFiles?: SendMessagePendingFile[]
+  isForwarded?: boolean
+  sourceMessageId?: string
+  replyToId?: string | null
+  targetConversationId?: string
+  clientMsgId?: string
+}
+
+export function isMessageConfirmed(
+  queryClient: QueryClient,
+  conversationId: string,
+  clientMsgId: string,
+): boolean {
+  const live =
+    queryClient.getQueryData<MessageResponse[]>(CHAT_QUERY_KEYS.liveMessages(conversationId)) ?? []
+  const timeline =
+    queryClient
+      .getQueryData<InfiniteData<MessageTimelineResponse>>(CHAT_QUERY_KEYS.messages(conversationId))
+      ?.pages.flatMap((page: MessageTimelineResponse) => page.items) ?? []
+  return [...live, ...timeline].some(
+    (message) => message.clientMsgId === clientMsgId && !message.id.startsWith('temp-'),
+  )
+}
 
 /** Hook gửi tin nhắn mới với Optimistic UI */
 export function useSendMessageMutation(conversationId: string | null) {
@@ -339,8 +354,7 @@ export function useSendMessageMutation(conversationId: string | null) {
 
   return useMutation({
     onMutate: async (arg: SendMessageArg) => {
-      const targetConversationId =
-        typeof arg === 'string' ? conversationId : (arg.targetConversationId ?? conversationId)
+      const targetConversationId = arg.targetConversationId ?? conversationId
       if (!targetConversationId) return
 
       await queryClient.cancelQueries({
@@ -352,10 +366,8 @@ export function useSendMessageMutation(conversationId: string | null) {
         CHAT_QUERY_KEYS.conversations,
       )
 
-      const clientMsgId = (typeof arg !== 'string' && arg.clientMsgId) || generateUUID()
-      if (typeof arg !== 'string') {
-        arg.clientMsgId = clientMsgId
-      }
+      const clientMsgId = arg.clientMsgId || generateUUID()
+      arg.clientMsgId = clientMsgId
       const wasUncertain =
         queryClient
           .getQueryData<MessageResponse[]>(CHAT_QUERY_KEYS.liveMessages(targetConversationId))
@@ -365,7 +377,7 @@ export function useSendMessageMutation(conversationId: string | null) {
 
       // Chuẩn bị attachments tạm thời cho UI lạc quan (dùng local blob URL cho media)
       let optimisticAttachments: MessageAttachmentItem[] | undefined
-      if (typeof arg !== 'string' && arg.pendingFiles && arg.pendingFiles.length > 0) {
+      if (arg.pendingFiles && arg.pendingFiles.length > 0) {
         optimisticAttachments = arg.pendingFiles.map((pf) => {
           const mimeType = pf.file.type || 'application/octet-stream'
           const kindRaw = getKindFromMime(mimeType, pf.file.name)
@@ -382,7 +394,7 @@ export function useSendMessageMutation(conversationId: string | null) {
             downloadUrl: previewUrl,
           }
         })
-      } else if (typeof arg !== 'string' && arg.attachments && arg.attachments.length > 0) {
+      } else if (arg.attachments && arg.attachments.length > 0) {
         optimisticAttachments = arg.attachments.map((att) => ({
           id: generateUUID(),
           kind: att.kind || 'FILE',
@@ -394,11 +406,11 @@ export function useSendMessageMutation(conversationId: string | null) {
         }))
       }
 
-      const bodyText = typeof arg === 'string' ? arg : arg.body
+      const bodyText = arg.body
       const kind = resolveSendMessageKind(
         bodyText,
-        typeof arg === 'string' ? undefined : arg.kind,
-        optimisticAttachments || (typeof arg !== 'string' ? arg.attachments : undefined),
+        arg.kind,
+        optimisticAttachments || arg.attachments,
       )
 
       const optimisticMessage: MessageResponse = {
@@ -407,14 +419,14 @@ export function useSendMessageMutation(conversationId: string | null) {
         senderId: currentUserId,
         kind,
         body: bodyText || null,
-        replyToId: typeof arg !== 'string' ? (arg.replyToId ?? null) : null,
+        replyToId: arg.replyToId ?? null,
         clientMsgId,
         attachments:
           optimisticAttachments && optimisticAttachments.length > 0
             ? optimisticAttachments
             : undefined,
         reactions: [],
-        isForwarded: typeof arg !== 'string' ? arg.isForwarded : false,
+        isForwarded: arg.isForwarded,
         createdAt: new Date().toISOString(),
         editedAt: null,
         deletedAt: null,
@@ -442,13 +454,12 @@ export function useSendMessageMutation(conversationId: string | null) {
     },
 
     mutationFn: async (arg: SendMessageArg) => {
-      const targetConversationId =
-        typeof arg === 'string' ? conversationId : (arg.targetConversationId ?? conversationId)
+      const targetConversationId = arg.targetConversationId ?? conversationId
       if (!targetConversationId) throw new Error('No conversation selected')
-      const clientMsgId = (typeof arg !== 'string' && arg.clientMsgId) || generateUUID()
+      const clientMsgId = arg.clientMsgId || generateUUID()
 
       let finalAttachments: MessageAttachmentInput[] | undefined
-      if (typeof arg !== 'string' && arg.pendingFiles && arg.pendingFiles.length > 0) {
+      if (arg.pendingFiles && arg.pendingFiles.length > 0) {
         finalAttachments = []
         for (const item of arg.pendingFiles) {
           if (item.uploadedAttachment) {
@@ -491,23 +502,19 @@ export function useSendMessageMutation(conversationId: string | null) {
           item.uploadedAttachment = uploadedAttachment
           finalAttachments.push(uploadedAttachment)
         }
-      } else if (typeof arg !== 'string') {
+      } else {
         finalAttachments = arg.attachments
       }
 
-      const bodyText = typeof arg === 'string' ? arg : arg.body
+      const bodyText = arg.body
       const payload: SendMessageDto = {
         body: bodyText,
         clientMsgId,
-        kind: resolveSendMessageKind(
-          bodyText,
-          typeof arg === 'string' ? undefined : arg.kind,
-          finalAttachments,
-        ),
+        kind: resolveSendMessageKind(bodyText, arg.kind, finalAttachments),
         attachments: finalAttachments,
-        isForwarded: typeof arg !== 'string' ? arg.isForwarded : undefined,
-        sourceMessageId: typeof arg !== 'string' ? arg.sourceMessageId : undefined,
-        replyToId: typeof arg !== 'string' ? arg.replyToId : undefined,
+        isForwarded: arg.isForwarded,
+        sourceMessageId: arg.sourceMessageId,
+        replyToId: arg.replyToId,
       }
       queryClient.setQueryData<MessageResponse[]>(
         CHAT_QUERY_KEYS.liveMessages(targetConversationId),
@@ -520,44 +527,20 @@ export function useSendMessageMutation(conversationId: string | null) {
     },
 
     onError: (error: unknown, _arg: SendMessageArg, context) => {
-      // Nếu gửi thất bại thì hiển thị thông báo lỗi và xoá tin nhắn đó đi
       const confirmed =
         context?.targetConversationId && context.clientMsgId
-          ? [
-              ...(queryClient.getQueryData<MessageResponse[]>(
-                CHAT_QUERY_KEYS.liveMessages(context.targetConversationId),
-              ) ?? []),
-              ...(queryClient
-                .getQueryData<InfiniteData<MessageTimelineResponse>>(
-                  CHAT_QUERY_KEYS.messages(context.targetConversationId),
-                )
-                ?.pages.flatMap((page) => page.items) ?? []),
-            ].some(
-              (message) =>
-                message.clientMsgId === context.clientMsgId && !message.id.startsWith('temp-'),
-            )
+          ? isMessageConfirmed(queryClient, context.targetConversationId, context.clientMsgId)
           : false
       if (confirmed) return
-      if (isUncertainSendError(error) && context?.targetConversationId) {
-        queryClient.setQueryData<MessageResponse[]>(
-          CHAT_QUERY_KEYS.liveMessages(context.targetConversationId),
-          (old) =>
-            old?.map((message) =>
-              message.clientMsgId === context.clientMsgId
-                ? { ...message, sendState: 'uncertain' }
-                : message,
-            ),
-        )
-        toast.error(t('chat.sendUncertain'))
-        return
-      }
+
+      const sendState = isUncertainSendError(error) ? 'uncertain' : 'failed'
+
       if (context?.targetConversationId) {
         queryClient.setQueryData<MessageResponse[]>(
           CHAT_QUERY_KEYS.liveMessages(context.targetConversationId),
           (old) =>
-            old?.filter(
-              (m) =>
-                m.clientMsgId !== context.clientMsgId && m.id !== `temp-${context.clientMsgId}`,
+            old?.map((message) =>
+              message.clientMsgId === context.clientMsgId ? { ...message, sendState } : message,
             ),
         )
       }
@@ -571,13 +554,18 @@ export function useSendMessageMutation(conversationId: string | null) {
           ),
         )
       }
-      toast.error(error instanceof Error ? error.message : t('chat.sendMessageError'))
+      toast.error(
+        isUncertainSendError(error)
+          ? t('chat.sendUncertain')
+          : error instanceof Error
+            ? error.message
+            : t('chat.sendMessageError'),
+      )
     },
 
     onSuccess: (newMessage: MessageResponse, arg: SendMessageArg, context) => {
       const targetConversationId =
-        context?.targetConversationId ||
-        (typeof arg === 'string' ? conversationId : (arg.targetConversationId ?? conversationId))
+        context?.targetConversationId || (arg.targetConversationId ?? conversationId)
       if (!targetConversationId) return
 
       // Cập nhật messages cache: Thay thế tin nhắn tạm bằng tin nhắn chính thức từ backend

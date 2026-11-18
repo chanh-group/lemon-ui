@@ -216,6 +216,7 @@
     "groupName": "Tên nhóm",
     "groupNamePlaceholder": "Đặt tên cho nhóm…",
     "defaultGroupName": "Nhóm mới",
+    "defaultUserName": "Người dùng Lemon",
     "groupNameOptional": "Để trống sẽ dùng tên “{{name}}”.",
     "chooseGroupAvatar": "Chọn ảnh nhóm (không bắt buộc)",
     "removeGroupAvatar": "Bỏ ảnh nhóm",

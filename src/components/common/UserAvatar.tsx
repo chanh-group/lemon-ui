@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
 import { avatarColor, initials } from '@/lib/avatar'
+import { useAvatarSrc } from '@/lib/avatar-loader'
 
 interface UserAvatarProps {
   name?: string | null
@@ -28,20 +29,21 @@ export function UserAvatar({
   fallbackDelayMs,
   square = false,
 }: UserAvatarProps) {
+  const resolvedSrc = useAvatarSrc(src)
   const safeName = name?.trim() || 'User'
   const label = alt ?? safeName
   const radius = square ? 'rounded-2xl' : undefined
 
   return (
     <Avatar
-      key={src || 'no-avatar'}
+      key={resolvedSrc || 'no-avatar'}
       className={cn('size-11 ring-1 ring-border', radius, className)}
     >
-      {src ? (
-        <AvatarImage src={src} alt={label} className={cn('object-cover', imageClassName)} />
+      {resolvedSrc ? (
+        <AvatarImage src={resolvedSrc} alt={label} className={cn('object-cover', imageClassName)} />
       ) : null}
       <AvatarFallback
-        delayMs={fallbackDelayMs ?? (src ? 300 : undefined)}
+        delayMs={fallbackDelayMs ?? (resolvedSrc ? 300 : undefined)}
         className={cn('text-3.25 font-bold text-[#172b20]', radius, fallbackClassName)}
         style={{ backgroundColor: avatarColor(safeName), ...fallbackStyle }}
       >

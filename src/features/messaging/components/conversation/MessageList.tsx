@@ -385,7 +385,7 @@ const MessageRowView = memo(function MessageRowView({
             </div>
           )}
 
-          {msg.replyToId && (
+          {!msg.deletedAt && msg.replyToId && (
             <div className="mb-2 rounded-lg border-l-2 border-primary bg-muted/70 px-2 py-1 text-xs">
               <p className="font-semibold">
                 {replyTargetName
@@ -401,7 +401,7 @@ const MessageRowView = memo(function MessageRowView({
             </div>
           )}
 
-          {msg.storyPreview && <StoryReplyQuote preview={msg.storyPreview} />}
+          {!msg.deletedAt && msg.storyPreview && <StoryReplyQuote preview={msg.storyPreview} />}
 
           {msg.deletedAt ? (
             <span className="italic text-muted-foreground text-xs">
@@ -520,7 +520,7 @@ const MessageRowView = memo(function MessageRowView({
           </div>
         )}
 
-        {(isLast || msg.status === 'uncertain') && (
+        {(isLast || msg.status === 'uncertain' || msg.status === 'failed') && (
           <span
             className={cn(
               'mt-1 flex items-center gap-1 px-1 text-[11px] text-muted-foreground',
@@ -534,11 +534,13 @@ const MessageRowView = memo(function MessageRowView({
                   className="size-3.5 text-muted-foreground animate-pulse"
                   aria-label={t('chat.sending', 'Đang gửi')}
                 />
-              ) : msg.status === 'uncertain' ? (
+              ) : msg.status === 'uncertain' || msg.status === 'failed' ? (
                 <button
                   type="button"
                   onClick={() => onRetryMessage?.(msg.id)}
-                  title={t('chat.sendUncertain')}
+                  title={
+                    msg.status === 'uncertain' ? t('chat.sendUncertain') : t('chat.failedMessage')
+                  }
                   className="text-destructive underline"
                 >
                   {t('chat.retrySend')}

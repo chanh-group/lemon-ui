@@ -67,6 +67,9 @@ import type { Conversation } from '@/features/conversation/types/conversation.ty
 import { formatBytes, isImage, isVideo } from '@/features/file/utils/fileTypes'
 import { ImageLightboxModal } from './ImageLightboxModal'
 
+import { AxiosError } from 'axios'
+import { ApiError } from '@/infrastructure/api/errors'
+
 const CloseIcon = createIcon(CloseData)
 const UserIcon = createIcon(UserData)
 const BellIcon = createIcon(BellData)
@@ -361,12 +364,19 @@ export function ConversationInfoPanel({
     try {
       await action()
       toast.success(t(successKey))
-      await refreshGroup()
       return true
     } catch (error) {
+      if (
+        (error instanceof ApiError && (error.status === 403 || error.status === 404)) ||
+        (error instanceof AxiosError &&
+          (error.response?.status === 403 || error.response?.status === 404))
+      ) {
+        onClose?.()
+      }
       toast.error(error instanceof Error ? error.message : t('common.error'))
       return false
     } finally {
+      await refreshGroup().catch(() => undefined)
       groupActionPendingRef.current = false
       setIsGroupActionPending(false)
     }
@@ -391,10 +401,14 @@ export function ConversationInfoPanel({
     membersQuery.isSuccess &&
     activeMembers.length > 1 &&
     activeMembers.filter((member) => member.role === 'ADMIN').length === 1
-  const canEditGroupMetadata = conversation.isGroup && Boolean(conversation.myRole)
+  const canEditGroupMetadata = conversation.isGroup && conversation.myRole === 'ADMIN'
 
   const handleGroupAvatarFile = async (file?: File) => {
     if (!file) return
+    if (!canEditGroupMetadata) {
+      toast.error(t('chat.forbidden', 'Chỉ trưởng nhóm mới có quyền đổi ảnh nhóm'))
+      return
+    }
     if (
       file.size < 1 ||
       !['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type)

@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { clearAllGroupAvatarBlobs } from '@/lib/avatar-loader'
 
 export type AuthStatus = 'unknown' | 'authenticated' | 'anonymous'
 
@@ -16,6 +17,12 @@ export const useAuthStore = create<AuthState>()((set) => ({
   accessToken: null,
   status: 'unknown',
   setAccessToken: (token: string) => set({ accessToken: token, status: 'authenticated' }),
-  markAnonymous: () => set({ accessToken: null, status: 'anonymous' }),
-  reset: () => set({ accessToken: null, status: 'anonymous' }),
+  markAnonymous: () => {
+    clearAllGroupAvatarBlobs()
+    set({ accessToken: null, status: 'anonymous' })
+  },
+  reset: () => {
+    clearAllGroupAvatarBlobs()
+    set({ accessToken: null, status: 'anonymous' })
+  },
 }))

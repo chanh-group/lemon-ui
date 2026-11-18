@@ -7,6 +7,7 @@ import type {
   Conversation,
   ConversationResponse,
 } from '@/features/conversation/types/conversation.types'
+import i18n from '@/i18n'
 
 /** Định dạng giờ HH:mm */
 export function formatTimeHHmm(dateStrOrObj?: string | Date | null): string {
@@ -81,12 +82,21 @@ export function updateConversationLastMessage(
 }
 
 /** Chuyển đổi từ ConversationResponse của Backend sang Conversation của UI */
-export function mapConversationResponse(raw: ConversationResponse): Conversation {
+export function mapConversationResponse(
+  raw: ConversationResponse,
+  t?: (key: string, options?: { defaultValue?: string } | string) => string,
+): Conversation {
   const isGroup = raw.kind === 'GROUP'
   const partner = raw.partner
+  const defaultGroupName = t
+    ? t('chat.defaultGroupName', 'Nhóm trò chuyện')
+    : i18n.t('chat.defaultGroupName', { defaultValue: 'Nhóm trò chuyện' })
+  const defaultUserName = t
+    ? t('chat.defaultUserName', 'Người dùng Lemon')
+    : i18n.t('chat.defaultUserName', { defaultValue: 'Người dùng Lemon' })
   const name = isGroup
-    ? raw.title?.trim() || 'Nhóm trò chuyện'
-    : partner?.fullName || partner?.username || 'Người dùng Lemon'
+    ? raw.title?.trim() || defaultGroupName
+    : partner?.fullName || partner?.username || defaultUserName
 
   const dateToUse = raw.lastMessageAt || raw.createdAt
 
@@ -102,6 +112,7 @@ export function mapConversationResponse(raw: ConversationResponse): Conversation
     avatarUrl: raw.avatarUrl ?? null,
     memberCount: raw.memberCount,
     myRole: raw.myRole,
+    joinGeneration: raw.joinGeneration,
     partnerId: partner?.id,
     partnerUsername: partner?.username,
     partnerBio: partner?.bio ?? null,
@@ -292,24 +303,27 @@ export function mapMessageResponse(raw: MessageResponse, currentUserId?: string)
       raw.kind === 'TEXT' &&
       !isRevoked &&
       !raw.id.startsWith('temp-') &&
-      raw.sendState !== 'uncertain',
-    attachments: raw.attachments,
-    photoLabel: raw.attachments?.[0]?.fileName,
+      raw.sendState !== 'uncertain' &&
+      raw.sendState !== 'failed',
+    attachments: isRevoked ? undefined : raw.attachments,
+    photoLabel: isRevoked ? undefined : raw.attachments?.[0]?.fileName,
     time: formatTimeHHmm(raw.createdAt),
     status:
       raw.sendState === 'uncertain'
         ? 'uncertain'
-        : raw.id.startsWith('temp-')
-          ? 'sending'
-          : isMe
-            ? 'sent'
-            : undefined,
+        : raw.sendState === 'failed'
+          ? 'failed'
+          : raw.id.startsWith('temp-')
+            ? 'sending'
+            : isMe
+              ? 'sent'
+              : undefined,
     reactions: isRevoked ? undefined : raw.reactions,
     isForwarded: isRevoked ? undefined : raw.isForwarded,
     storyId: isRevoked ? null : raw.storyId,
     storyPreview: isRevoked ? null : raw.storyPreview,
-    replyToId: raw.replyToId,
-    replyTarget: raw.replyTarget,
+    replyToId: isRevoked ? null : raw.replyToId,
+    replyTarget: isRevoked ? null : raw.replyTarget,
     createdAt:
       typeof raw.createdAt === 'string' ? raw.createdAt : new Date(raw.createdAt).toISOString(),
     editedAt: raw.editedAt

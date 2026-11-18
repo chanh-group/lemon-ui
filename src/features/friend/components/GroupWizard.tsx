@@ -35,6 +35,60 @@ interface StoredGroupWizardState {
   savedAt: number
 }
 
+interface StoredGroupWizardDraft {
+  userId: string
+  step: 'members' | 'name'
+  title: string
+  memberIds: string[]
+  savedAt: number
+}
+
+function readStoredGroupWizardDraft(userId?: string): StoredGroupWizardDraft | null {
+  if (!userId || typeof sessionStorage === 'undefined') return null
+  try {
+    const key = `lemonchat.group-wizard.draft.${userId}`
+    const parsed = JSON.parse(
+      sessionStorage.getItem(key) ?? 'null',
+    ) as StoredGroupWizardDraft | null
+    if (!parsed || parsed.userId !== userId || Date.now() - parsed.savedAt > GROUP_WIZARD_TTL_MS) {
+      sessionStorage.removeItem(key)
+      return null
+    }
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+function writeStoredGroupWizardDraft(
+  userId: string,
+  draft: { step: 'members' | 'name'; title: string; memberIds: string[] },
+): void {
+  if (!userId || typeof sessionStorage === 'undefined') return
+  try {
+    const key = `lemonchat.group-wizard.draft.${userId}`
+    sessionStorage.setItem(
+      key,
+      JSON.stringify({
+        userId,
+        ...draft,
+        savedAt: Date.now(),
+      }),
+    )
+  } catch {
+    // ignore
+  }
+}
+
+function clearStoredGroupWizardDraft(userId?: string): void {
+  if (!userId || typeof sessionStorage === 'undefined') return
+  try {
+    sessionStorage.removeItem(`lemonchat.group-wizard.draft.${userId}`)
+  } catch {
+    // ignore
+  }
+}
+
 function readStoredGroupWizardState(userId?: string): StoredGroupWizardState | null {
   if (!userId || typeof sessionStorage === 'undefined') return null
   try {
@@ -101,32 +155,50 @@ export function GroupWizard({
 
   useEffect(() => {
     const stored = readStoredGroupWizardState(user?.id)
-    if (!stored) return
-    requestId.current = { signature: stored.signature, id: stored.clientRequestId }
-    // Restoring persisted wizard state is an intentional external-store synchronization.
-    // oxlint-disable-next-line react/set-state-in-effect
-    setGroupName(stored.title)
-    setSelected(stored.memberIds)
-    if (!stored.groupId) return
+    if (stored) {
+      requestId.current = { signature: stored.signature, id: stored.clientRequestId }
+      // Restoring persisted wizard state is an intentional external-store synchronization.
+      // oxlint-disable-next-line react/set-state-in-effect
+      setGroupName(stored.title)
+      setSelected(stored.memberIds)
+      if (stored.groupId) {
+        let cancelled = false
+        setIsRestoring(true)
+        void getConversationById(stored.groupId)
+          .then((group) => {
+            if (cancelled) return
+            setCreatedGroup(group)
+            setStep('name')
+          })
+          .catch(() => {
+            if (!cancelled) clearStoredGroupWizardState()
+          })
+          .finally(() => {
+            if (!cancelled) setIsRestoring(false)
+          })
+        return () => {
+          cancelled = true
+        }
+      }
+      return
+    }
 
-    let cancelled = false
-    setIsRestoring(true)
-    void getConversationById(stored.groupId)
-      .then((group) => {
-        if (cancelled) return
-        setCreatedGroup(group)
-        setStep('name')
-      })
-      .catch(() => {
-        if (!cancelled) clearStoredGroupWizardState()
-      })
-      .finally(() => {
-        if (!cancelled) setIsRestoring(false)
-      })
-    return () => {
-      cancelled = true
+    const draft = readStoredGroupWizardDraft(user?.id)
+    if (draft) {
+      // oxlint-disable-next-line react/set-state-in-effect
+      setGroupName(draft.title)
+      setSelected(draft.memberIds)
+      setStep(draft.step)
     }
   }, [user?.id])
+
+  useEffect(() => {
+    if (!user?.id || isRestoring || createdGroup) return
+    const timer = setTimeout(() => {
+      writeStoredGroupWizardDraft(user.id, { step, title: groupName, memberIds: selected })
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [user?.id, step, groupName, selected, isRestoring, createdGroup])
 
   useEffect(
     () => () => {
@@ -219,6 +291,7 @@ export function GroupWizard({
       }
       toast.success(t('chat.groupCreated', { name: group.title ?? name }))
       clearStoredGroupWizardState()
+      clearStoredGroupWizardDraft(user?.id)
       requestId.current = null
       onDone(group.id)
     } catch (error) {
@@ -236,11 +309,13 @@ export function GroupWizard({
           step === 'members'
             ? () => {
                 clearStoredGroupWizardState()
+                clearStoredGroupWizardDraft(user?.id)
                 onBack()
               }
             : createdGroup
               ? () => {
                   clearStoredGroupWizardState()
+                  clearStoredGroupWizardDraft(user?.id)
                   onDone(createdGroup.id)
                 }
               : () => setStep('members')

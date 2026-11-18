@@ -216,6 +216,7 @@
     "groupName": "Group name",
     "groupNamePlaceholder": "Name your group…",
     "defaultGroupName": "New group",
+    "defaultUserName": "Lemon User",
     "groupNameOptional": "Leave blank to use “{{name}}”.",
     "chooseGroupAvatar": "Choose group photo (optional)",
     "removeGroupAvatar": "Remove group photo",
