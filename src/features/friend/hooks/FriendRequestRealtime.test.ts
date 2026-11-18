@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { ApiError } from '@/infrastructure/api/errors'
+import { isFriendRequestNotFoundError } from './useFriends'
 import {
   applyFriendRequestCreated,
   applyFriendRequestCancelled,
@@ -257,5 +259,33 @@ describe('SocketReadyEvent', () => {
   it('defines the expected shape for ready event payload', () => {
     const event: SocketReadyEvent = { userId: 'user-1' }
     expect(event.userId).toBe('user-1')
+  })
+})
+
+describe('isFriendRequestNotFoundError', () => {
+  it('returns true for ApiError with FRIEND_REQUEST_NOT_FOUND code or 404 status', () => {
+    const errByCode = new ApiError('FRIEND_REQUEST_NOT_FOUND', 400, 'Not found')
+    expect(isFriendRequestNotFoundError(errByCode)).toBe(true)
+
+    const errByStatus = new ApiError('NOT_FOUND', 404, 'Not found')
+    expect(isFriendRequestNotFoundError(errByStatus)).toBe(true)
+  })
+
+  it('returns true for axios error object with 404 or FRIEND_REQUEST_NOT_FOUND', () => {
+    expect(isFriendRequestNotFoundError({ response: { status: 404 } })).toBe(true)
+    expect(
+      isFriendRequestNotFoundError({
+        response: { data: { code: 'FRIEND_REQUEST_NOT_FOUND' } },
+      }),
+    ).toBe(true)
+  })
+
+  it('returns false for unrelated errors, null, or undefined', () => {
+    expect(isFriendRequestNotFoundError(null)).toBe(false)
+    expect(isFriendRequestNotFoundError(undefined)).toBe(false)
+    expect(isFriendRequestNotFoundError(new Error('Network error'))).toBe(false)
+    expect(isFriendRequestNotFoundError(new ApiError('UNAUTHORIZED', 401, 'Unauthorized'))).toBe(
+      false,
+    )
   })
 })

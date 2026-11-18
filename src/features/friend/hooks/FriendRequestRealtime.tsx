@@ -240,6 +240,18 @@ export function FriendRequestRealtime() {
       refetchBadges()
     }
 
+    // Cơ chế tự phục hồi (Hội tụ dữ liệu): Lắng nghe khi người dùng quay lại tab
+    const handleVisibilityChange = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        refetchFriendRequests()
+        refetchBadges()
+      }
+    }
+
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityChange)
+    }
+
     socket.on('ready', handleReady)
     socket.on('friend:request:new', handleFriendRequest)
     socket.on('friend:request:cancelled', handleFriendRequestCancelled)
@@ -257,6 +269,9 @@ export function FriendRequestRealtime() {
     connectChatSocket()
 
     return () => {
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleVisibilityChange)
+      }
       socket.off('ready', handleReady)
       socket.off('friend:request:new', handleFriendRequest)
       socket.off('friend:request:cancelled', handleFriendRequestCancelled)
