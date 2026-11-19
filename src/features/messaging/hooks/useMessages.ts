@@ -18,6 +18,7 @@ import {
   retryUncertainSend,
 } from '@/features/messaging/utils/messageSend'
 import { queryKeys } from '@/infrastructure/query/keys'
+import { api } from '@/infrastructure/api/client'
 import {
   getConversationMessages,
   editMessage,
@@ -35,6 +36,8 @@ import type {
   MessageAttachmentInput,
   MessageAttachmentItem,
   MessageResponse,
+  MessageReactionItem,
+  MessageReactionPayload,
   MessageTimelineResponse,
   SendMessageDto,
   SendMessageArg,
@@ -97,6 +100,7 @@ export function upsertOptimisticMessage(
 export interface MessagePageParam {
   cursor?: string
   after?: string
+  around?: string
 }
 
 export function windowHasLatest(
@@ -105,6 +109,8 @@ export function windowHasLatest(
   const page = data?.pages[0]
   const param = data?.pageParams[0] as MessagePageParam | undefined
   if (!page || !param) return false
+  if (param.around)
+    return !(page as MessageTimelineResponse & { hasMoreNewer: boolean }).hasMoreNewer
   return (!param.cursor && !param.after) || (Boolean(param.after) && !page.hasMore)
 }
 
@@ -114,11 +120,20 @@ export function useConversationMessagesQuery(conversationId: string | null, enab
   const { t } = useTranslation()
   const initialPrefetches = useRef(new Set<string>())
   const activeConversationId = useRef(conversationId)
+  const windowGeneration = useRef(0)
   const query = useInfiniteQuery({
     queryKey: CHAT_QUERY_KEYS.messages(conversationId ?? 'none'),
     queryFn: ({ pageParam, signal }: { pageParam: MessagePageParam; signal: AbortSignal }) => {
       if (!conversationId) {
         return Promise.resolve<MessageTimelineResponse>({ items: [], hasMore: false })
+      }
+      if (pageParam.around) {
+        return api
+          .get<MessageTimelineResponse & { hasMoreNewer: boolean }>(
+            `/conversations/${conversationId}/messages/${pageParam.around}/window`,
+            { params: { limit: MESSAGE_PAGE_SIZE }, signal },
+          )
+          .then((response) => response.data)
       }
       return getConversationMessages(
         conversationId,
@@ -132,6 +147,12 @@ export function useConversationMessagesQuery(conversationId: string | null, enab
     getNextPageParam: (lastPage) =>
       lastPage.hasMore && lastPage.nextCursor ? { cursor: lastPage.nextCursor } : undefined,
     getPreviousPageParam: (firstPage, _allPages, firstPageParam) => {
+      if (firstPageParam.around) {
+        return (firstPage as MessageTimelineResponse & { hasMoreNewer: boolean }).hasMoreNewer &&
+          firstPage.items[0]?.id
+          ? { after: firstPage.items[0].id }
+          : undefined
+      }
       if (!firstPageParam.cursor && !firstPageParam.after) return undefined
       if (firstPageParam.after) {
         return firstPage.hasMore && firstPage.nextCursor
@@ -158,6 +179,9 @@ export function useConversationMessagesQuery(conversationId: string | null, enab
 
   useEffect(() => {
     activeConversationId.current = conversationId
+    return () => {
+      windowGeneration.current += 1
+    }
   }, [conversationId])
 
   useEffect(() => {
@@ -260,9 +284,20 @@ export function useConversationMessagesQuery(conversationId: string | null, enab
     const existing = latestRequests.current.get(conversationId)
     if (existing) return existing
     const key = CHAT_QUERY_KEYS.messages(conversationId)
+    const generation = ++windowGeneration.current
     const request = (async () => {
       const page = await getConversationMessages(conversationId, undefined, MESSAGE_PAGE_SIZE)
+      if (
+        generation !== windowGeneration.current ||
+        activeConversationId.current !== conversationId
+      )
+        return
       await queryClient.cancelQueries({ queryKey: key, exact: true })
+      if (
+        generation !== windowGeneration.current ||
+        activeConversationId.current !== conversationId
+      )
+        return
       queryClient.setQueryData<InfiniteData<MessageTimelineResponse, MessagePageParam>>(key, {
         pages: [page],
         pageParams: [{}],
@@ -277,11 +312,31 @@ export function useConversationMessagesQuery(conversationId: string | null, enab
     }
   }
 
+  const loadMessageWindow = async (messageId: string) => {
+    if (!conversationId) return
+    const generation = ++windowGeneration.current
+    const key = CHAT_QUERY_KEYS.messages(conversationId)
+    const response = await api.get<MessageTimelineResponse & { hasMoreNewer: boolean }>(
+      `/conversations/${conversationId}/messages/${messageId}/window`,
+      { params: { limit: MESSAGE_PAGE_SIZE } },
+    )
+    if (generation !== windowGeneration.current || activeConversationId.current !== conversationId)
+      return
+    await queryClient.cancelQueries({ queryKey: key, exact: true })
+    if (generation !== windowGeneration.current || activeConversationId.current !== conversationId)
+      return
+    queryClient.setQueryData<InfiniteData<MessageTimelineResponse, MessagePageParam>>(key, {
+      pages: [response.data],
+      pageParams: [{ around: messageId }],
+    })
+  }
+
   return {
     ...query,
     liveMessages: liveMessagesQuery.data,
     hasLatest: windowHasLatest(data),
     loadLatest,
+    loadMessageWindow,
   }
 }
 
@@ -771,37 +826,194 @@ export function useDeleteMessageForMeMutation(conversationId: string | null) {
   })
 }
 
-/** Hook thả / toggle cảm xúc tin nhắn */
+type ReactionState = {
+  userId: string
+  desired: string | null
+  confirmed: string | null
+  pending: number
+  revision: number
+  sync: number
+  queue: Promise<void>
+}
+
+const reactionStates = new WeakMap<QueryClient, Map<string, ReactionState>>()
+const reactionKey = (conversationId: string, messageId: string) =>
+  JSON.stringify([conversationId, messageId])
+
+function ownReaction(reactions: MessageReactionItem[] | undefined, userId: string) {
+  return reactions?.find((reaction) => reaction.userIds.includes(userId))?.emoji ?? null
+}
+
+function setOwnReaction(
+  reactions: MessageReactionItem[] | undefined,
+  userId: string,
+  emoji: string | null,
+) {
+  const result = (reactions ?? []).flatMap((reaction) => {
+    const userIds = reaction.userIds.filter((id) => id !== userId)
+    const count = reaction.count - (reaction.userIds.length - userIds.length)
+    return count > 0 ? [{ ...reaction, count, userIds }] : []
+  })
+  if (emoji) {
+    const existing = result.find((reaction) => reaction.emoji === emoji)
+    if (existing) {
+      existing.userIds = [...existing.userIds, userId]
+      existing.count += 1
+    } else result.push({ emoji, count: 1, userIds: [userId] })
+  }
+  return result
+}
+
+function updateReactions(
+  queryClient: QueryClient,
+  conversationId: string,
+  messageId: string,
+  update: (reactions: MessageReactionItem[] | undefined) => MessageReactionItem[],
+) {
+  const updateMessage = (message: MessageResponse) =>
+    message.id === messageId && !message.deletedAt
+      ? { ...message, reactions: update(message.reactions) }
+      : message
+  queryClient.setQueryData<InfiniteData<MessageTimelineResponse, MessagePageParam>>(
+    CHAT_QUERY_KEYS.messages(conversationId),
+    (old) =>
+      old && {
+        ...old,
+        pages: old.pages.map((page) => ({ ...page, items: page.items.map(updateMessage) })),
+      },
+  )
+  queryClient.setQueryData<MessageResponse[]>(CHAT_QUERY_KEYS.liveMessages(conversationId), (old) =>
+    old?.map(updateMessage),
+  )
+}
+
+/** Apply a socket snapshot while preserving the latest local intent. */
+export function applyRealtimeReaction(queryClient: QueryClient, payload: MessageReactionPayload) {
+  const state = reactionStates
+    .get(queryClient)
+    ?.get(reactionKey(payload.conversationId, payload.messageId))
+  if (state) {
+    state.revision += 1
+    state.confirmed = ownReaction(payload.reactions, state.userId)
+    if (state.pending === 0) state.desired = state.confirmed
+  }
+  updateReactions(queryClient, payload.conversationId, payload.messageId, () =>
+    state ? setOwnReaction(payload.reactions, state.userId, state.desired) : payload.reactions,
+  )
+}
+
+/** Serialize toggle requests per message while showing the most recent choice immediately. */
 export function useReactMessageMutation(conversationId: string | null) {
   const queryClient = useQueryClient()
+  const { user } = useAuth()
+  const { t } = useTranslation()
+  const operations = useRef(new WeakMap<object, { state: ReactionState; target: string | null }>())
 
   return useMutation({
-    mutationFn: ({ messageId, emoji }: { messageId: string; emoji: string }) =>
-      reactToMessage(messageId, emoji),
-    onSuccess: (data) => {
-      if (!conversationId) return
-      queryClient.setQueryData<InfiniteData<MessageTimelineResponse, MessagePageParam>>(
-        CHAT_QUERY_KEYS.messages(conversationId),
-        (old) => {
-          if (!old) return old
-          return {
-            ...old,
-            pages: old.pages.map((page) => ({
-              ...page,
-              items: page.items.map((m) =>
-                m.id === data.messageId ? { ...m, reactions: data.reactions } : m,
-              ),
-            })),
-          }
-        },
-      )
-      queryClient.setQueryData<MessageResponse[]>(
-        CHAT_QUERY_KEYS.liveMessages(conversationId),
-        (old) =>
-          old?.map((message) =>
-            message.id === data.messageId ? { ...message, reactions: data.reactions } : message,
-          ),
+    onMutate: (arg: { messageId: string; emoji: string }) => {
+      if (!conversationId || !user?.id) return
+      void queryClient.cancelQueries({
+        queryKey: CHAT_QUERY_KEYS.messages(conversationId),
+        exact: true,
+      })
+      let states = reactionStates.get(queryClient)
+      if (!states) reactionStates.set(queryClient, (states = new Map()))
+      const key = reactionKey(conversationId, arg.messageId)
+      let state = states.get(key)
+      if (!state) {
+        const timeline = queryClient.getQueryData<InfiniteData<MessageTimelineResponse>>(
+          CHAT_QUERY_KEYS.messages(conversationId),
+        )
+        const message =
+          timeline?.pages.flatMap((page) => page.items).find((item) => item.id === arg.messageId) ??
+          queryClient
+            .getQueryData<MessageResponse[]>(CHAT_QUERY_KEYS.liveMessages(conversationId))
+            ?.find((item) => item.id === arg.messageId)
+        const confirmed = ownReaction(message?.reactions, user.id)
+        state = {
+          userId: user.id,
+          desired: confirmed,
+          confirmed,
+          pending: 0,
+          revision: 0,
+          sync: 0,
+          queue: Promise.resolve(),
+        }
+        states.set(key, state)
+      }
+      state.revision += 1
+      state.sync += 1
+      state.desired = state.desired === arg.emoji ? null : arg.emoji
+      state.pending += 1
+      operations.current.set(arg, { state, target: state.desired })
+      updateReactions(queryClient, conversationId, arg.messageId, (reactions) =>
+        setOwnReaction(reactions, state!.userId, state!.desired),
       )
     },
+    mutationFn: async (arg: { messageId: string; emoji: string }) => {
+      const operation = operations.current.get(arg)
+      if (!conversationId || !operation)
+        throw new Error('Cannot react without a conversation and user')
+      const { state, target } = operation
+      const run = state.queue.then(async () => {
+        if (target === state.confirmed) return
+        const revision = state.revision
+        const data = await reactToMessage(arg.messageId, target ?? state.confirmed!)
+        state.confirmed = ownReaction(data.reactions, state.userId)
+        updateReactions(queryClient, conversationId, arg.messageId, (current) =>
+          setOwnReaction(
+            state.revision === revision ? data.reactions : current,
+            state.userId,
+            state.desired,
+          ),
+        )
+      })
+      state.queue = run.catch(() => {})
+      try {
+        await run
+      } catch (error) {
+        if (state.pending === 1) {
+          state.desired = state.confirmed
+          updateReactions(queryClient, conversationId, arg.messageId, (current) =>
+            setOwnReaction(current, state.userId, state.confirmed),
+          )
+        }
+        throw error
+      } finally {
+        state.pending -= 1
+        if (state.pending === 0) {
+          const revision = state.revision
+          const sync = ++state.sync
+          void api
+            .get<MessageTimelineResponse>(
+              `/conversations/${conversationId}/messages/${arg.messageId}/window`,
+              { params: { limit: 1 } },
+            )
+            .then((response) => {
+              const message = response.data.items.find((item) => item.id === arg.messageId)
+              if (!message || state.pending || state.revision !== revision) return
+              state.confirmed = ownReaction(message.reactions, state.userId)
+              state.desired = state.confirmed
+              updateReactions(
+                queryClient,
+                conversationId,
+                arg.messageId,
+                () => message.reactions ?? [],
+              )
+            })
+            .catch(() => {})
+            .finally(() => {
+              if (state.pending || state.sync !== sync) return
+              reactionStates.get(queryClient)?.delete(reactionKey(conversationId, arg.messageId))
+              void queryClient.invalidateQueries({
+                queryKey: CHAT_QUERY_KEYS.messages(conversationId),
+                exact: true,
+              })
+            })
+        }
+      }
+    },
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : t('chat.sendMessageError')),
   })
 }

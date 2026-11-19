@@ -44,6 +44,7 @@ export function StoriesCreateView() {
   const [step, setStep] = useState<StoryStep>('choose')
   const [viewingOwn, setViewingOwn] = useState<StoryEntry | null>(null)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [mediaControls, setMediaControls] = useState<HTMLDivElement | null>(null)
   const createText = useCreateTextStory()
   const createMedia = useCreateMediaStory()
 
@@ -76,7 +77,9 @@ export function StoriesCreateView() {
   const shareMediaPayload = (file: File, captionText: string, durationMs?: number) =>
     shareMedia({ file, captionText, durationMs })
   return (
-    <main className="flex h-dvh w-full overflow-hidden bg-background pb-16 text-foreground md:pb-0">
+    <main
+      className={`flex h-dvh w-full bg-background pb-16 text-foreground md:overflow-hidden md:pb-0 ${step === 'media' ? 'flex-col overflow-y-auto md:flex-row' : 'overflow-hidden'}`}
+    >
       <SideNav
         active="stories"
         onOpenSettings={() => navigate(ROUTES.settings)}
@@ -84,7 +87,9 @@ export function StoriesCreateView() {
       />
 
       {/* Panel trái — "Tin của bạn" (kiểu Facebook) */}
-      <div className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col border-r border-border bg-card md:w-88 md:flex-none">
+      <div
+        className={`flex min-h-0 w-full min-w-0 flex-col border-r border-border bg-card md:h-full md:w-88 md:flex-none ${step === 'media' ? 'shrink-0' : 'h-full flex-1'}`}
+      >
         <header className="flex h-14 shrink-0 items-center justify-between border-b border-border px-4 pt-3">
           <button
             type="button"
@@ -150,8 +155,12 @@ export function StoriesCreateView() {
           </div>
         )}
 
+        {step === 'media' && (
+          <div ref={setMediaControls} className="md:min-h-0 md:overflow-y-auto" />
+        )}
+
         {/* Tin đã chia sẻ của mình (nếu có) */}
-        {myStories.length > 0 && (
+        {step !== 'media' && myStories.length > 0 && (
           <div className="min-h-0 flex-1 overflow-y-auto py-2">
             <p className="px-4 pb-1 pt-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
               {t('chat.sharedStories')}
@@ -193,7 +202,7 @@ export function StoriesCreateView() {
       {/* View lớn bên phải — nội dung bước đang chọn (kiểu Facebook) */}
       <section
         aria-label={step === 'choose' ? t('chat.createStoryTitle') : t('chat.storyEditor')}
-        className="hidden h-full min-h-0 min-w-0 flex-1 overflow-y-auto md:block"
+        className={`min-h-0 min-w-0 md:block md:h-full md:flex-1 md:overflow-y-auto ${step === 'media' ? 'block shrink-0' : 'hidden'}`}
       >
         <div
           className={
@@ -213,32 +222,25 @@ export function StoriesCreateView() {
               isSharing={createText.isPending}
             />
           )}
-          {step === 'media' && (
+          {step === 'media' && mediaControls && (
             <MediaStoryEditor
               onDiscard={() => setStep('choose')}
               onShare={shareMediaPayload}
               isSharing={createMedia.isPending}
+              controlsTarget={mediaControls}
             />
           )}
         </div>
       </section>
 
       {/* Mobile (<md): editor mở overlay toàn màn */}
-      {showingEditor && (
+      {step === 'text' && (
         <div className="fixed inset-x-0 bottom-16 top-0 z-40 overflow-y-auto bg-background md:hidden">
-          {step === 'text' ? (
-            <TextStoryEditor
-              onDiscard={() => setStep('choose')}
-              onShare={shareText}
-              isSharing={createText.isPending}
-            />
-          ) : (
-            <MediaStoryEditor
-              onDiscard={() => setStep('choose')}
-              onShare={shareMediaPayload}
-              isSharing={createMedia.isPending}
-            />
-          )}
+          <TextStoryEditor
+            onDiscard={() => setStep('choose')}
+            onShare={shareText}
+            isSharing={createText.isPending}
+          />
         </div>
       )}
 

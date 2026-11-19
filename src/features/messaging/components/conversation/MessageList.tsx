@@ -11,6 +11,9 @@ import {
   type RefObject,
 } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useQuery } from '@tanstack/react-query'
+import { getStoryById } from '@/features/story/api/stories.api'
+import { useStoryMedia } from '@/features/story/hooks/useStories'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import {
   CheckCheckIcon as CheckCheckData,
@@ -147,25 +150,46 @@ function MediaBubble({ label, kind }: { label: string; kind: ChatMessage['kind']
   )
 }
 
-function StoryReplyQuote({ preview }: { preview: NonNullable<ChatMessage['storyPreview']> }) {
+function StoryReplyQuote({
+  preview,
+  onOpen,
+}: {
+  preview: NonNullable<ChatMessage['storyPreview']>
+  onOpen?: (id: string) => void
+}) {
   const { t } = useTranslation()
+  const story = useQuery({
+    queryKey: ['story-reply', preview.id],
+    queryFn: () => getStoryById(preview.id),
+    retry: false,
+    staleTime: 60_000,
+  })
+  const media = useStoryMedia(story.data ?? { id: preview.id })
+  const mediaUrl = story.data?.mediaUrl ?? media.data
   return (
-    <div className="mb-2 flex items-center gap-2.5 rounded-xl border border-border/80 bg-muted/70 p-2 text-xs shadow-xs">
-      <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-linear-to-br from-primary via-secondary to-ring text-xs font-bold shadow-xs">
-        🍋
-      </div>
-      <div className="min-w-0 flex-1 text-left">
-        <p className="flex items-center gap-1 text-[11px] font-semibold text-brand-ink">
-          <span>{t('chat.replyToStory')}</span>
-          {preview.authorName && (
-            <span className="font-normal text-muted-foreground">· {preview.authorName}</span>
-          )}
-        </p>
-        <p className="truncate text-xs text-muted-foreground">
-          {preview.caption || t('chat.unnamedStory')}
-        </p>
-      </div>
-    </div>
+    <button
+      type="button"
+      onClick={() => onOpen?.(preview.id)}
+      className="mb-2 flex max-w-full items-center gap-2 rounded-lg bg-muted/50 p-1.5 text-left text-xs hover:bg-muted"
+    >
+      <span className="flex h-16 w-10 shrink-0 items-center justify-center overflow-hidden rounded bg-muted text-center text-[8px]">
+        {story.data?.kind === 'TEXT' ? (
+          <span className="line-clamp-4 break-all">{story.data.caption}</span>
+        ) : mediaUrl ? (
+          story.data?.mediaType === 'video' ? (
+            <video src={mediaUrl} muted preload="metadata" className="h-full w-full object-cover" />
+          ) : (
+            <img src={mediaUrl} alt="" className="h-full w-full object-cover" />
+          )
+        ) : null}
+      </span>
+      <span className="min-w-0">
+        <span className="block text-[11px] text-muted-foreground">{t('chat.replyToStory')}</span>
+        <span className="block truncate">
+          {story.isError ? t('chat.replyUnavailable') : preview.caption || t('chat.unnamedStory')}
+        </span>
+      </span>
+    </button>
   )
 }
 
@@ -184,7 +208,10 @@ const MessageRowView = memo(function MessageRowView({
   onReact,
   onForward,
   onReply,
+  onJumpToMessage,
+  onOpenStoryReply,
   onRetryMessage,
+  highlighted,
 }: {
   group: MessageGroup
   messageIndex: number
@@ -200,7 +227,10 @@ const MessageRowView = memo(function MessageRowView({
   onReact?: (messageId: string, emoji: string) => void
   onForward?: (message: ChatMessage) => void
   onReply?: (message: ChatMessage) => void
+  onJumpToMessage?: (messageId: string) => void
+  onOpenStoryReply?: (storyId: string) => void
   onRetryMessage?: (messageId: string) => void
+  highlighted?: boolean
 }) {
   const { t } = useTranslation()
   const isMe = group.fromMe
@@ -324,7 +354,8 @@ const MessageRowView = memo(function MessageRowView({
       onTouchEnd={handleTouchEnd}
       onTouchCancel={handleTouchEnd}
       className={cn(
-        'group flex w-full items-center',
+        'group flex w-full items-center rounded-lg transition-colors',
+        highlighted && 'bg-primary/15',
         isMe ? 'justify-end' : 'justify-start gap-2.5',
         messageIndex > 0 && 'mt-0.5',
       )}
@@ -386,22 +417,42 @@ const MessageRowView = memo(function MessageRowView({
           )}
 
           {!msg.deletedAt && msg.replyToId && (
-            <div className="mb-2 rounded-lg border-l-2 border-primary bg-muted/70 px-2 py-1 text-xs">
-              <p className="font-semibold">
-                {replyTargetName
-                  ? t('chat.replyingTo', { name: replyTargetName })
-                  : t('chat.replyMessage')}
-              </p>
-              <p className="truncate text-muted-foreground">
-                {!msg.replyTarget || msg.replyTarget.deletedAt
-                  ? t('chat.replyUnavailable')
-                  : msg.replyTarget.body ||
-                    (msg.replyTarget.storyPreview ? t('chat.replyToStory') : t('chat.attachment'))}
-              </p>
-            </div>
+            <button
+              type="button"
+              onClick={() => onJumpToMessage?.(msg.replyToId!)}
+              className="mb-1 flex max-w-full items-center gap-2 rounded border-l-2 border-muted-foreground/30 bg-muted/40 px-2 py-1 text-left text-[11px] text-muted-foreground hover:bg-muted/70"
+            >
+              {msg.replyTarget?.attachments?.[0]?.kind === 'IMAGE' && (
+                <img
+                  src={
+                    msg.replyTarget.attachments[0].previewUrl ||
+                    msg.replyTarget.attachments[0].downloadUrl
+                  }
+                  alt=""
+                  className="size-9 shrink-0 rounded object-cover"
+                />
+              )}
+              <span className="min-w-0">
+                <span className="block">
+                  {replyTargetName
+                    ? t('chat.replyingTo', { name: replyTargetName })
+                    : t('chat.replyMessage')}
+                </span>
+                <span className="block truncate">
+                  {!msg.replyTarget || msg.replyTarget.deletedAt
+                    ? t('chat.replyUnavailable')
+                    : msg.replyTarget.body ||
+                      (msg.replyTarget.storyPreview
+                        ? t('chat.replyToStory')
+                        : t('chat.attachment'))}
+                </span>
+              </span>
+            </button>
           )}
 
-          {!msg.deletedAt && msg.storyPreview && <StoryReplyQuote preview={msg.storyPreview} />}
+          {!msg.deletedAt && msg.storyPreview && (
+            <StoryReplyQuote preview={msg.storyPreview} onOpen={onOpenStoryReply} />
+          )}
 
           {msg.deletedAt ? (
             <span className="italic text-muted-foreground text-xs">
@@ -574,6 +625,8 @@ interface MessageListProps {
   /** Còn đang ở cuối danh sách thì tự bám tin mới nhất; cuộn lên thì thôi. */
   followBottom?: boolean
   onReply?: (message: ChatMessage) => void
+  onJumpToMessage?: (messageId: string) => void
+  onOpenStoryReply?: (storyId: string) => void
   onVisibleMessage?: (messageId: string) => void
   onRetryMessage?: (messageId: string) => void
   restorePosition?: MessageScrollPosition
@@ -581,6 +634,7 @@ interface MessageListProps {
 
 export interface MessageListHandle {
   scrollToEnd: (behavior?: ScrollBehavior) => void
+  scrollToMessage: (messageId: string) => boolean
   firstVisibleMessage: () => Extract<MessageScrollPosition, { kind: 'message' }> | undefined
 }
 
@@ -625,6 +679,8 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
     onRetryMessage,
     restorePosition,
     onReply,
+    onJumpToMessage,
+    onOpenStoryReply,
   },
   ref,
 ) {
@@ -637,6 +693,12 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
   const [lightboxAttachment, setLightboxAttachment] = useState<MessageAttachmentItem | null>(null)
   const [documentAttachment, setDocumentAttachment] = useState<MessageAttachmentItem | null>(null)
   const [forwardingMessage, setForwardingMessage] = useState<ChatMessage | null>(null)
+  const [highlightedMessage, setHighlightedMessage] = useState<string | null>(null)
+  useEffect(() => {
+    if (!highlightedMessage) return
+    const timer = setTimeout(() => setHighlightedMessage(null), 2000)
+    return () => clearTimeout(timer)
+  }, [highlightedMessage])
 
   const revokeMutation = useRevokeMessageMutation(conversationId ?? null)
   const editMutation = useEditMessageMutation(conversationId ?? null)
@@ -733,6 +795,13 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
     ref,
     () => ({
       scrollToEnd: (behavior = 'auto') => virtualizer.scrollToEnd({ behavior }),
+      scrollToMessage: (messageId) => {
+        const index = rows.findIndex((row) => row.kind === 'message' && row.key === messageId)
+        if (index < 0) return false
+        virtualizer.scrollToIndex(index, { align: 'center', behavior: 'auto' })
+        setHighlightedMessage(messageId)
+        return true
+      },
       firstVisibleMessage: () => {
         const root = scrollRef.current
         if (!root) return undefined
@@ -872,6 +941,9 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
         onReact={handleReactMessage}
         onForward={handleForwardMessage}
         onReply={onReply}
+        onJumpToMessage={onJumpToMessage}
+        onOpenStoryReply={onOpenStoryReply}
+        highlighted={row.key === highlightedMessage}
         onRetryMessage={onRetryMessage}
       />
     )

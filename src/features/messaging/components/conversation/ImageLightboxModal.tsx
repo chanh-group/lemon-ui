@@ -86,9 +86,13 @@ export function ImageLightboxModal({ attachment, onClose }: ImageLightboxModalPr
         onClick={(e) => e.stopPropagation()}
         className="absolute top-4 inset-x-4 flex items-center justify-between text-white/90 z-10"
       >
-        <span className="truncate max-w-[60vw] text-sm font-medium drop-shadow-sm">
-          {attachment.fileName}
-        </span>
+        {isVid ? (
+          <span className="truncate max-w-[60vw] text-sm font-medium drop-shadow-sm">
+            {attachment.fileName}
+          </span>
+        ) : (
+          <span />
+        )}
         <div className="flex items-center gap-2">
           {!isVid && (
             <>

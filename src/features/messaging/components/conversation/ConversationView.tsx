@@ -53,6 +53,8 @@ interface ConversationViewProps {
   onVoiceCall?: () => void
   onVideoCall?: () => void
   onOpenStory?: () => void
+  onOpenStoryReply?: (storyId: string) => void
+  onLoadMessage?: (messageId: string) => Promise<void>
 }
 
 export function ConversationView({
@@ -86,6 +88,8 @@ export function ConversationView({
   onVoiceCall,
   onVideoCall,
   onOpenStory,
+  onOpenStoryReply,
+  onLoadMessage,
 }: ConversationViewProps) {
   const { t } = useTranslation()
   const [initialRestorePosition] = useState(restorePosition)
@@ -102,6 +106,8 @@ export function ConversationView({
   const [showJump, setShowJump] = useState(false)
   const [atBottom, setAtBottom] = useState(initialRestorePosition?.kind !== 'message')
   const [jumpPending, setJumpPending] = useState(false)
+  const [targetMessageId, setTargetMessageId] = useState<string | null>(null)
+  const targetRequest = useRef(0)
   const [jumpRequest, setJumpRequest] = useState(0)
   const handledJumpRequest = useRef(0)
   const atBottomRef = useRef(initialRestorePosition?.kind !== 'message')
@@ -152,6 +158,28 @@ export function ConversationView({
       toast.error(t('chat.messagesLoadError'))
     } finally {
       setJumpPending(false)
+    }
+  }
+
+  useLayoutEffect(() => {
+    if (targetMessageId && messageListRef.current?.scrollToMessage(targetMessageId)) {
+      setTargetMessageId(null)
+    }
+  }, [targetMessageId, groups])
+
+  const jumpToMessage = async (messageId: string) => {
+    const request = ++targetRequest.current
+    setTargetMessageId(null)
+    atBottomRef.current = false
+    setAtBottom(false)
+    setShowJump(true)
+    if (messageListRef.current?.scrollToMessage(messageId)) return
+    try {
+      if (!onLoadMessage) throw new Error('Message unavailable')
+      await onLoadMessage(messageId)
+      if (request === targetRequest.current) setTargetMessageId(messageId)
+    } catch {
+      if (request === targetRequest.current) toast.error(t('chat.replyUnavailable'))
     }
   }
 
@@ -354,6 +382,8 @@ export function ConversationView({
               typingUserCount={displayedTypingUserCount}
               typingNames={typingNames}
               onReply={setReplyingTo}
+              onJumpToMessage={(id) => void jumpToMessage(id)}
+              onOpenStoryReply={onOpenStoryReply}
               followBottom={atBottom && hasLatest}
               onVisibleMessage={onVisibleMessage}
               onRetryMessage={onRetryMessage}
@@ -376,9 +406,16 @@ export function ConversationView({
         </div>
 
         {replyingTo && (
-          <div className="flex items-center gap-3 border-t border-border bg-muted/50 px-4 py-2 text-sm">
+          <div className="flex items-center gap-2 border-t border-border bg-muted/40 px-4 py-2 text-xs text-muted-foreground">
+            {replyingTo.attachments?.[0]?.kind === 'IMAGE' && (
+              <img
+                src={replyingTo.attachments[0].previewUrl || replyingTo.attachments[0].downloadUrl}
+                alt=""
+                className="size-10 rounded object-cover"
+              />
+            )}
             <div className="min-w-0 flex-1">
-              <p className="font-semibold">
+              <p className="text-[11px]">
                 {replyDraftName
                   ? t('chat.replyingTo', { name: replyDraftName })
                   : t('chat.replyMessage')}

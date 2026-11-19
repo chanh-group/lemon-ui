@@ -30,6 +30,7 @@ export interface BackendStoryResponse {
   kind: 'TEXT' | 'MEDIA' | 'IMAGE' | 'VIDEO'
   caption?: string | null
   mediaUrl?: string | null
+  mimeType?: string | null
   background?: string | null
   createdAt: string
   expiresAt: string
@@ -121,7 +122,12 @@ export function mapBackendStoryToEntry(
     kind: item.kind === 'TEXT' ? 'TEXT' : 'MEDIA',
     caption: item.caption,
     mediaUrl: item.mediaUrl,
-    mediaType: item.kind === 'VIDEO' ? 'video' : item.kind === 'IMAGE' ? 'image' : undefined,
+    mediaType:
+      item.kind === 'VIDEO' || item.mimeType?.startsWith('video/')
+        ? 'video'
+        : item.kind === 'IMAGE' || item.mimeType?.startsWith('image/')
+          ? 'image'
+          : undefined,
     background: item.background,
     viewsCount: item.viewsCount ?? 0,
     reactionsCount: item.reactionsCount ?? 0,
@@ -611,6 +617,16 @@ export async function getArchivedStories(
     })),
     nextCursor: res.data?.nextCursor ?? null,
   }
+}
+
+export async function getStoryById(storyId: string, currentUserId?: string): Promise<StoryEntry> {
+  if (isAuthBypass()) {
+    const story = storyStore.find((item) => item.id === storyId)
+    if (!story) throw new Error('Story unavailable')
+    return story
+  }
+  const res = await api.get<BackendStoryResponse>(`/stories/${storyId}`)
+  return mapBackendStoryToEntry(res.data, currentUserId)
 }
 
 export async function getStoryMediaUrl(storyId: string): Promise<string> {
