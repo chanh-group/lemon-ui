@@ -331,6 +331,10 @@ export function MessageComposer({
           if (file.previewUrl) URL.revokeObjectURL(file.previewUrl)
         })
         requestAnimationFrame(() => inputRef.current?.focus())
+      } else {
+        draftRef.current = textToSend
+        onDraftChange(textToSend)
+        setPendingFiles((current) => [...filesToSend, ...current])
       }
     } catch {
       // Failed attempts remain on the message timeline row where user can retry

@@ -390,8 +390,6 @@ export function useChatRealtime(activeConversationId: string | null) {
       } else {
         void queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.conversations })
       }
-
-      void queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.conversations })
     }
 
     // B. Tin nhắn được chỉnh sửa

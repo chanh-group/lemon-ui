@@ -16,7 +16,10 @@ function isUncertainActionError(error: unknown): boolean {
       : error instanceof AxiosError
         ? error.response?.status
         : undefined
-  return status === undefined || status === 0 || status >= 500
+  if (error instanceof ApiError || error instanceof AxiosError) {
+    return status === undefined || status === 0 || status >= 500
+  }
+  return false
 }
 
 export async function resolveGroupAction(

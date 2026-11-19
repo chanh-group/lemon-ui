@@ -350,6 +350,9 @@ export function ConversationInfoPanel({
   })
 
   const [isResizing, setIsResizing] = useState(false)
+  const resizeCleanupRef = useRef<(() => void) | null>(null)
+
+  useEffect(() => () => resizeCleanupRef.current?.(), [])
 
   const refreshGroup = async () => {
     await Promise.all([
@@ -509,7 +512,10 @@ export function ConversationInfoPanel({
         window.removeEventListener('mouseup', onMouseUp)
         document.body.style.cursor = ''
         document.body.style.userSelect = ''
+        resizeCleanupRef.current = null
       }
+
+      resizeCleanupRef.current = onMouseUp
 
       document.body.style.cursor = 'col-resize'
       document.body.style.userSelect = 'none'
