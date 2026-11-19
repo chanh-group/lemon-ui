@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -15,6 +16,7 @@ import type {
 import type { ChatTab } from '@/types/common'
 import type { StoryEntry } from '@/features/story/types/story.types'
 import {
+  isMessageConfirmed,
   useConversationMessagesQuery,
   useMarkReadMutation,
   useSendMessageMutation,
@@ -23,6 +25,7 @@ import {
 import {
   useConversationsQuery,
   useConversationQuery,
+  useGroupMembersQuery,
 } from '@/features/conversation/hooks/useConversations'
 import { useChatRealtime } from '@/features/messaging/hooks/useMessagingRealtime'
 import { useStoriesList } from '@/features/story/hooks/useStories'
@@ -60,6 +63,7 @@ export function visibleLiveMessages(
 
 export function ChatShell() {
   const { t } = useTranslation()
+  const queryClient = useQueryClient()
   const { user } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
@@ -85,11 +89,20 @@ export function ChatShell() {
   }, [legacySelect, navigate, selectedId, tab])
 
   // Realtime Socket.IO sync
-  const { isPartnerTyping, connectionStatus } = useChatRealtime(selectedId)
+  const {
+    isPartnerTyping,
+    typingUserCount,
+    typingUserIds,
+    conversationAccess,
+    retryConversationAccess,
+  } = useChatRealtime(selectedId)
 
   // API Queries & Mutations
   const conversationsQuery = useConversationsQuery()
-  const messagesQuery = useConversationMessagesQuery(selectedId)
+  const messagesQuery = useConversationMessagesQuery(
+    selectedId,
+    !selectedId || conversationAccess === 'allowed',
+  )
   const sendMessageMutation = useSendMessageMutation(selectedId)
   const markReadMutation = useMarkReadMutation()
   const callWindow = useCallWindow()
@@ -145,6 +158,14 @@ export function ChatShell() {
     Boolean(selectedId) && !selectedFromList && !conversationsQuery.isPending
   const conversationDetailQuery = useConversationQuery(selectedId, needsConversationDetail)
   const selected = selectedFromList ?? conversationDetailQuery.data ?? null
+  const groupMembersQuery = useGroupMembersQuery(
+    selected?.isGroup ? selected.id : null,
+    Boolean(selected?.isGroup) && conversationAccess === 'allowed',
+  )
+  const typingNames = typingUserIds.flatMap((id) => {
+    const member = groupMembersQuery.data?.find((item) => item.id === id)
+    return member ? [member.fullName || member.username] : []
+  })
   const partnerStories =
     selected && !selected.isGroup && selected.partnerId
       ? allStories.filter((story) => story.authorId === selected.partnerId && !story.mine)
@@ -153,8 +174,8 @@ export function ChatShell() {
 
   const restoringConversation =
     Boolean(selectedId) &&
-    !selected &&
-    (conversationsQuery.isPending || conversationDetailQuery.isPending)
+    (conversationAccess === 'verifying' ||
+      (!selected && (conversationsQuery.isPending || conversationDetailQuery.isPending)))
   const restoreFailed =
     Boolean(selectedId) &&
     !selected &&
@@ -215,7 +236,7 @@ export function ChatShell() {
   }
 
   const startCall = (media: CallMedia) => {
-    if (!selected) return
+    if (!selected || selected.isGroup) return
     const fallback = () =>
       navigate(callPath(selected.id, { media, state: 'ringing' }), {
         state: {
@@ -258,7 +279,8 @@ export function ChatShell() {
     text: string,
     attachments?: MessageAttachmentInput[],
     pendingFiles?: SendMessagePendingFile[],
-    replyToId?: string,
+    replyToId?: string | null,
+    clientMsgId?: string,
   ): Promise<boolean> => {
     if (!selectedId) return false
     try {
@@ -268,17 +290,22 @@ export function ChatShell() {
         attachments,
         pendingFiles,
         replyToId,
+        clientMsgId,
       })
       return true
     } catch {
-      return false
+      // A network error can arrive after the server committed the message and
+      // realtime reconciliation replaced the optimistic row. Treat that case
+      // as success so the composer does not create a false failed-attempt banner.
+      return Boolean(clientMsgId && isMessageConfirmed(queryClient, selectedId, clientMsgId))
     }
   }
 
   const handleRetrySend = (messageId: string) => {
     const message = messagesQuery.liveMessages?.find((item) => item.id === messageId)
-    if (!message?.retryPayload || sendMessageMutation.isPending) return
-    void sendMessageMutation.mutateAsync(message.retryPayload).catch(() => undefined)
+    const attempt = message?.retryAttempt ?? message?.retryPayload
+    if (!attempt || sendMessageMutation.isPending) return
+    void sendMessageMutation.mutateAsync(attempt).catch(() => undefined)
   }
 
   const handlePositionChange = useCallback(
@@ -319,17 +346,6 @@ export function ChatShell() {
         !selectedId && 'pb-16',
       )}
     >
-      {connectionStatus !== 'connected' && (
-        <div
-          className="fixed right-3 top-3 z-50 rounded-lg border border-border bg-card px-3 py-2 text-xs text-muted-foreground shadow-md"
-          role="status"
-          aria-live="polite"
-        >
-          {connectionStatus === 'connecting'
-            ? t('chat.realtimeConnecting')
-            : t('chat.realtimeOffline')}
-        </div>
-      )}
       <SideNav
         active={tab}
         onChange={(nextTab) => {
@@ -417,7 +433,7 @@ export function ChatShell() {
               </div>
             </section>
           )
-        ) : selected ? (
+        ) : selected && conversationAccess === 'allowed' ? (
           <ConversationView
             key={selected.id}
             conversation={selected}
@@ -454,7 +470,8 @@ export function ChatShell() {
             isSending={sendMessageMutation.isPending}
             showBack
             onBack={() => navigate(ROUTES.messages, { state: { tab } })}
-            isTyping={isPartnerTyping}
+            typingUserCount={isPartnerTyping ? typingUserCount : 0}
+            typingNames={typingNames}
             onTypingStart={handleTypingStart}
             onTypingStop={handleTypingStop}
             onVoiceCall={() => startCall('voice')}
@@ -463,10 +480,21 @@ export function ChatShell() {
         ) : selectedId ? (
           <section
             className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col items-center justify-center gap-3 bg-background p-8 text-center"
-            aria-busy={restoringConversation}
+            aria-busy={restoringConversation || conversationAccess === 'retryable-error'}
             aria-label={t('chat.loadingConversation')}
           >
-            {restoringConversation ? (
+            {conversationAccess === 'retryable-error' ? (
+              <>
+                <p className="text-sm text-muted-foreground">{t('chat.messagesLoadError')}</p>
+                <button
+                  type="button"
+                  className="rounded-lg bg-primary px-3 py-2 text-sm text-primary-foreground"
+                  onClick={retryConversationAccess}
+                >
+                  {t('common.retry', 'Thử lại')}
+                </button>
+              </>
+            ) : restoringConversation ? (
               <>
                 <span
                   className="size-8 animate-spin rounded-full border-2 border-border border-t-brand-ink"

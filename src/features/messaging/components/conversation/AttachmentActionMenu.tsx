@@ -6,18 +6,21 @@ import {
   Delete02Icon as DeleteData,
   Download01Icon as DownloadData,
   EyeIcon as ViewPreviewData,
-  Flag01Icon as FlagData,
   PinIcon as PinData,
+  Share01Icon as ForwardData,
   SmileIcon as SmileData,
 } from '@hugeicons/core-free-icons'
 import { createIcon } from '@/components/icons/hugeIcon'
-import { EllipsisVertical } from 'lucide-react'
+import { EllipsisVertical, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 import type { ChatMessage, MessageAttachmentItem } from '@/features/messaging/types/message.types'
@@ -25,12 +28,12 @@ import { isPreviewable } from '@/features/file/utils/fileTypes'
 
 const SmileIcon = createIcon(SmileData)
 const ReplyIcon = createIcon(ReplyData)
+const ForwardIcon = createIcon(ForwardData)
 const DownloadIcon = createIcon(DownloadData)
 const DeleteIcon = createIcon(DeleteData)
 const CopyIcon = createIcon(CopyData)
 const ViewPreviewIcon = createIcon(ViewPreviewData)
 const PinIcon = createIcon(PinData)
-const FlagIcon = createIcon(FlagData)
 
 export interface MessageActionPillProps {
   message: ChatMessage
@@ -38,6 +41,8 @@ export interface MessageActionPillProps {
   isMe: boolean
   onPreview?: (attachment: MessageAttachmentItem) => void
   onRevoke?: (messageId: string) => void
+  onDeleteForMe?: (messageId: string) => void
+  onEdit?: (message: ChatMessage) => void
   onReact?: (messageId: string, emoji: string) => void
   onForward?: (message: ChatMessage) => void
   onReply?: (message: ChatMessage) => void
@@ -52,6 +57,8 @@ export function MessageActionPill({
   isMe,
   onPreview,
   onRevoke,
+  onDeleteForMe,
+  onEdit,
   onReact,
   onForward,
   onReply,
@@ -125,12 +132,6 @@ export function MessageActionPill({
     e.stopPropagation()
     setMenuOpen(false)
     onRevoke?.(message.id)
-  }
-
-  const handleReport = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    setMenuOpen(false)
-    toast.success(t('chat.reportSubmitted', 'Đã gửi báo cáo'))
   }
 
   return (
@@ -216,15 +217,38 @@ export function MessageActionPill({
           side="top"
           className="w-44 rounded-xl border border-border/80 bg-popover p-1.5 shadow-lg z-50"
         >
-          {isMe && onRevoke && !message.deletedAt && (
+          {isMe && message.canEdit && onEdit && (
             <DropdownMenuItem
-              onClick={handleRevoke}
-              className="cursor-pointer gap-2.5 rounded-lg py-2 text-destructive focus:bg-destructive/10 focus:text-destructive"
+              onClick={() => onEdit(message)}
+              className="cursor-pointer gap-2.5 rounded-lg py-2 focus:bg-muted"
             >
-              <DeleteIcon className="size-4" />
-              <span className="font-medium text-xs">{t('chat.revoke', 'Gỡ')}</span>
+              <Pencil className="size-4" aria-hidden="true" />
+              <span className="font-medium text-xs">{t('chat.editMessage')}</span>
             </DropdownMenuItem>
           )}
+          {onDeleteForMe &&
+            !message.id.startsWith('temp-') &&
+            (isMe && onRevoke && !message.deletedAt ? (
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger className="gap-2.5 py-2 text-destructive">
+                  <DeleteIcon className="size-4" />
+                  <span className="font-medium text-xs">{t('chat.deleteMessage')}</span>
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                  <DropdownMenuItem onClick={() => onDeleteForMe(message.id)}>
+                    {t('chat.deleteForMe')}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleRevoke} variant="destructive">
+                    {t('chat.revokeForEveryone')}
+                  </DropdownMenuItem>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+            ) : (
+              <DropdownMenuItem onClick={() => onDeleteForMe(message.id)} variant="destructive">
+                <DeleteIcon className="size-4" />
+                {t('chat.deleteMessage')}
+              </DropdownMenuItem>
+            ))}
 
           {/* Tải xuống - only if message has attachment */}
           {attachment && (
@@ -253,7 +277,7 @@ export function MessageActionPill({
             onClick={handleForward}
             className="cursor-pointer gap-2.5 rounded-lg py-2 focus:bg-muted"
           >
-            <ReplyIcon className="size-4" />
+            <ForwardIcon className="size-4" />
             <span className="font-medium text-xs">{t('chat.forward', 'Chuyển tiếp')}</span>
           </DropdownMenuItem>
 
@@ -276,17 +300,6 @@ export function MessageActionPill({
             <PinIcon className="size-4" />
             <span className="font-medium text-xs">{t('chat.pin', 'Ghim')}</span>
           </DropdownMenuItem>
-
-          {/* Báo cáo - for received messages */}
-          {!isMe && (
-            <DropdownMenuItem
-              onClick={handleReport}
-              className="cursor-pointer gap-2.5 rounded-lg py-2 text-muted-foreground focus:bg-muted focus:text-foreground"
-            >
-              <FlagIcon className="size-4" />
-              <span className="font-medium text-xs">{t('chat.report', 'Báo cáo')}</span>
-            </DropdownMenuItem>
-          )}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

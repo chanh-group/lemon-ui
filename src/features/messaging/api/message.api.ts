@@ -12,9 +12,11 @@ export async function getConversationMessages(
   cursor?: string,
   limit = 30,
   after?: string,
+  signal?: AbortSignal,
 ): Promise<MessageTimelineResponse> {
   const res = await api.get<MessageTimelineResponse>(`/conversations/${conversationId}/messages`, {
     params: { cursor, limit, after },
+    signal,
   })
   return res.data
 }
@@ -46,6 +48,11 @@ export async function editMessage(messageId: string, body: string): Promise<Mess
 export async function revokeMessage(messageId: string): Promise<MessageResponse> {
   const res = await api.delete<MessageResponse>(`/messages/${messageId}`)
   return res.data
+}
+
+/** Ẩn tin nhắn ở tài khoản của người thao tác, không ảnh hưởng người khác. */
+export async function deleteMessageForMe(messageId: string): Promise<void> {
+  await api.delete(`/messages/${messageId}/for-me`)
 }
 
 /** Thả / toggle cảm xúc cho tin nhắn */

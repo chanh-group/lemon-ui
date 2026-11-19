@@ -7,6 +7,7 @@ import type {
   Conversation,
   ConversationResponse,
 } from '@/features/conversation/types/conversation.types'
+import i18n from '@/i18n'
 
 /** Định dạng giờ HH:mm */
 export function formatTimeHHmm(dateStrOrObj?: string | Date | null): string {
@@ -66,6 +67,7 @@ export function updateConversationLastMessage(
     ...conversation,
     lastMessageAt: message.createdAt,
     lastMessageSenderId: message.senderId,
+    lastMessageSender: message.sender,
     lastMessageDetail: message,
     lastMessagePreview: message.deletedAt
       ? '[message-revoked]'
@@ -80,12 +82,21 @@ export function updateConversationLastMessage(
 }
 
 /** Chuyển đổi từ ConversationResponse của Backend sang Conversation của UI */
-export function mapConversationResponse(raw: ConversationResponse): Conversation {
+export function mapConversationResponse(
+  raw: ConversationResponse,
+  t?: (key: string, options?: { defaultValue?: string } | string) => string,
+): Conversation {
   const isGroup = raw.kind === 'GROUP'
   const partner = raw.partner
+  const defaultGroupName = t
+    ? t('chat.defaultGroupName', 'Nhóm trò chuyện')
+    : i18n.t('chat.defaultGroupName', { defaultValue: 'Nhóm trò chuyện' })
+  const defaultUserName = t
+    ? t('chat.defaultUserName', 'Người dùng Lemon')
+    : i18n.t('chat.defaultUserName', { defaultValue: 'Người dùng Lemon' })
   const name = isGroup
-    ? 'Nhóm trò chuyện'
-    : partner?.fullName || partner?.username || 'Người dùng Lemon'
+    ? raw.title?.trim() || defaultGroupName
+    : partner?.fullName || partner?.username || defaultUserName
 
   const dateToUse = raw.lastMessageAt || raw.createdAt
 
@@ -98,11 +109,16 @@ export function mapConversationResponse(raw: ConversationResponse): Conversation
     unread: raw.unreadCount || 0,
     online: partner?.isOnline ?? false,
     isGroup,
+    avatarUrl: raw.avatarUrl ?? null,
+    memberCount: raw.memberCount,
+    myRole: raw.myRole,
+    joinGeneration: raw.joinGeneration,
     partnerId: partner?.id,
     partnerUsername: partner?.username,
     partnerBio: partner?.bio ?? null,
-    partnerAvatar: partner?.avatarUrl,
+    partnerAvatar: isGroup ? (raw.avatarUrl ?? null) : partner?.avatarUrl,
     lastMessageSenderId: raw.lastMessageSenderId ?? null,
+    lastMessageSenderName: raw.lastMessageSender?.fullName || raw.lastMessageSender?.username,
   }
 }
 
@@ -196,7 +212,7 @@ export function getConversationPreview({
     preview.startsWith('You: '),
   )
 
-  const shortName = getShortName(name, lang)
+  const shortName = getShortName(isGroup ? conversation.lastMessageSenderName : name, lang)
 
   // 4. Tin nhắn bày tỏ cảm xúc Story
   if (preview === '[story-reaction]') {
@@ -242,7 +258,11 @@ export function getConversationPreview({
   }
 
   const youPrefix = t('chat.youPrefix')
-  const text = isMe ? `${youPrefix}${cleanBody}` : cleanBody
+  const text = isMe
+    ? `${youPrefix}${cleanBody}`
+    : isGroup && shortName
+      ? t('chat.groupMessagePreview', { name: shortName, message: cleanBody })
+      : cleanBody
 
   return {
     text,
@@ -273,26 +293,37 @@ export function mapMessageResponse(raw: MessageResponse, currentUserId?: string)
   return {
     id: raw.id,
     fromMe: isMe,
-    sender: undefined,
-    text: isRevoked ? 'Tin nhắn đã bị thu hồi' : raw.body || '',
+    sender: raw.sender?.fullName || raw.sender?.username,
+    senderId: raw.senderId,
+    senderAvatarUrl: raw.sender?.avatarUrl,
+    text: isRevoked ? '' : raw.body || '',
     kind: uiKind,
-    attachments: raw.attachments,
-    photoLabel: raw.attachments?.[0]?.fileName,
+    canEdit:
+      isMe &&
+      raw.kind === 'TEXT' &&
+      !isRevoked &&
+      !raw.id.startsWith('temp-') &&
+      raw.sendState !== 'uncertain' &&
+      raw.sendState !== 'failed',
+    attachments: isRevoked ? undefined : raw.attachments,
+    photoLabel: isRevoked ? undefined : raw.attachments?.[0]?.fileName,
     time: formatTimeHHmm(raw.createdAt),
     status:
       raw.sendState === 'uncertain'
         ? 'uncertain'
-        : raw.id.startsWith('temp-')
-          ? 'sending'
-          : isMe
-            ? 'sent'
-            : undefined,
-    reactions: raw.reactions,
-    isForwarded: raw.isForwarded,
-    storyId: raw.storyId,
+        : raw.sendState === 'failed'
+          ? 'failed'
+          : raw.id.startsWith('temp-')
+            ? 'sending'
+            : isMe
+              ? 'sent'
+              : undefined,
+    reactions: isRevoked ? undefined : raw.reactions,
+    isForwarded: isRevoked ? undefined : raw.isForwarded,
+    storyId: isRevoked ? null : raw.storyId,
     storyPreview: isRevoked ? null : raw.storyPreview,
-    replyToId: raw.replyToId,
-    replyTarget: raw.replyTarget,
+    replyToId: isRevoked ? null : raw.replyToId,
+    replyTarget: isRevoked ? null : raw.replyTarget,
     createdAt:
       typeof raw.createdAt === 'string' ? raw.createdAt : new Date(raw.createdAt).toISOString(),
     editedAt: raw.editedAt

@@ -4,6 +4,46 @@ import en from './en.json'
 import vi from './vi.json'
 
 describe('Localization Integrity & Avatar Text Tests', () => {
+  it('translates delete choices, feedback, and revoked placeholders in both languages', async () => {
+    const i18n = createInstance()
+    await i18n.init({
+      lng: 'vi',
+      resources: { vi: { translation: vi }, en: { translation: en } },
+      interpolation: { escapeValue: false },
+    })
+
+    expect(i18n.t('chat.deleteMessage')).toBe('Xóa tin nhắn')
+    expect(i18n.t('chat.deleteForMe')).toBe('Xóa ở phía tôi')
+    expect(i18n.t('chat.revokeForEveryone')).toBe('Thu hồi với mọi người')
+    expect(i18n.t('chat.messageDeletedForMe')).toBe('Đã xóa tin nhắn ở phía bạn')
+    expect(i18n.t('chat.messageDeleteFailed')).toBe('Không thể xóa tin nhắn')
+    expect(i18n.t('chat.messageRevoked')).toBe('Đã thu hồi tin nhắn với mọi người')
+    expect(i18n.t('chat.messageRevokeFailed')).toBe('Không thể thu hồi tin nhắn')
+    expect(i18n.t('chat.messageRevokedText')).toBe('Tin nhắn đã bị thu hồi')
+    expect(i18n.t('chat.editMessage')).toBe('Chỉnh sửa tin nhắn')
+    expect(i18n.t('chat.cancelEdit')).toBe('Hủy')
+    expect(i18n.t('chat.saveEdit')).toBe('Lưu')
+    expect(i18n.t('chat.messageEdited')).toBe('Đã chỉnh sửa tin nhắn')
+    expect(i18n.t('chat.messageEditFailed')).toBe('Không thể chỉnh sửa tin nhắn')
+    expect(i18n.t('chat.messageEditedLabel')).toBe('Đã chỉnh sửa')
+
+    await i18n.changeLanguage('en')
+    expect(i18n.t('chat.deleteMessage')).toBe('Delete message')
+    expect(i18n.t('chat.deleteForMe')).toBe('Delete for me')
+    expect(i18n.t('chat.revokeForEveryone')).toBe('Delete for everyone')
+    expect(i18n.t('chat.messageDeletedForMe')).toBe('Message deleted for you')
+    expect(i18n.t('chat.messageDeleteFailed')).toBe('Could not delete message')
+    expect(i18n.t('chat.messageRevoked')).toBe('Message deleted for everyone')
+    expect(i18n.t('chat.messageRevokeFailed')).toBe('Could not delete message for everyone')
+    expect(i18n.t('chat.messageRevokedText')).toBe('This message was deleted')
+    expect(i18n.t('chat.editMessage')).toBe('Edit message')
+    expect(i18n.t('chat.cancelEdit')).toBe('Cancel')
+    expect(i18n.t('chat.saveEdit')).toBe('Save')
+    expect(i18n.t('chat.messageEdited')).toBe('Message updated')
+    expect(i18n.t('chat.messageEditFailed')).toBe('Could not update message')
+    expect(i18n.t('chat.messageEditedLabel')).toBe('Edited')
+  })
+
   it('interpolates the story author in the avatar label in both languages', async () => {
     const i18n = createInstance()
     await i18n.init({
@@ -104,7 +144,6 @@ describe('Localization Integrity & Avatar Text Tests', () => {
       'copyUsername',
       'usernameCopied',
       'friendBadge',
-      'closeAction',
       'searchInConversationComingSoon',
       'mute',
       'searchInConversation',

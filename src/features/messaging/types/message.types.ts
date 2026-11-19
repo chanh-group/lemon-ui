@@ -23,8 +23,11 @@ export interface ChatMessage {
   id: string
   fromMe: boolean
   sender?: string
+  senderId?: string
+  senderAvatarUrl?: string | null
   text?: string
   kind: 'text' | 'photo' | 'video' | 'audio' | 'file' | 'gif' | 'sticker'
+  canEdit?: boolean
   photoLabel?: string
   attachments?: MessageAttachmentItem[]
   time: string
@@ -49,6 +52,7 @@ export interface MessageResponse {
   id: string
   conversationId: string
   senderId: string
+  sender?: { id: string; username: string; fullName: string; avatarUrl: string | null }
   kind: 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE' | 'SYSTEM' | 'STORY_REPLY' | 'STORY_REACTION'
   body: string | null
   replyToId: string | null
@@ -56,8 +60,9 @@ export interface MessageResponse {
   storyId?: string | null
   storyPreview?: StoryPreview | null
   clientMsgId?: string | null
-  sendState?: 'uncertain'
+  sendState?: 'uncertain' | 'failed'
   retryPayload?: SendMessageDto
+  retryAttempt?: SendMessageArg
   attachments?: MessageAttachmentItem[]
   reactions?: MessageReactionItem[]
   isForwarded?: boolean
@@ -91,6 +96,26 @@ export interface MessageAttachmentInput {
   height?: number
   durationMs?: number
   checksum?: string
+}
+
+export interface SendMessagePendingFile {
+  id: string
+  file: File
+  clientMsgId?: string
+  previewUrl?: string
+  uploadedAttachment?: MessageAttachmentInput
+}
+
+export interface SendMessageArg {
+  body?: string
+  kind?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE' | 'SYSTEM'
+  attachments?: MessageAttachmentInput[]
+  pendingFiles?: SendMessagePendingFile[]
+  isForwarded?: boolean
+  sourceMessageId?: string
+  replyToId?: string | null
+  targetConversationId?: string
+  clientMsgId?: string
 }
 
 export interface SendMessageDto {

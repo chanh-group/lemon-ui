@@ -3,6 +3,7 @@ import { renderToString } from 'react-dom/server'
 import { MemoryRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { CHAT_QUERY_KEYS } from '@/features/messaging/hooks/useMessages'
+import { queryKeys } from '@/infrastructure/query/keys'
 import { ConversationInfoPanel, UserProfileCardContent } from './ConversationInfoPanel'
 import { ConversationHeader } from './ConversationHeader'
 import { ImageLightboxModal } from './ImageLightboxModal'
@@ -92,6 +93,86 @@ describe('ConversationInfoPanel & Header Integration Tests', () => {
     expect(html).toContain('Đồ đệ giuột của Mr.An')
     expect(html).toContain('Thông tin đoạn chat')
     expect(html).toContain('bg-success')
+  })
+
+  it('lets members see the roster while only admins can edit metadata or disband', () => {
+    const group: Conversation = {
+      ...dummyConversation,
+      id: 'group-01',
+      name: 'Nhóm dự án',
+      isGroup: true,
+      online: false,
+      myRole: 'MEMBER',
+      memberCount: 4,
+    }
+    queryClient.setQueryData(queryKeys.chat.groupMembers(group.id), [
+      {
+        id: 'member-01',
+        username: 'alice',
+        fullName: 'Alice',
+        avatarUrl: null,
+        role: 'MEMBER',
+        joinedAt: '2026-11-16T00:00:00Z',
+      },
+      {
+        id: 'member-02',
+        username: 'bob',
+        fullName: 'Bob',
+        avatarUrl: null,
+        role: 'ADMIN',
+        joinedAt: '2026-11-16T00:00:00Z',
+      },
+      {
+        id: 'member-03',
+        username: 'charlie',
+        fullName: 'Charlie',
+        avatarUrl: null,
+        role: 'MEMBER',
+        joinedAt: '2026-11-16T01:00:00Z',
+      },
+      {
+        id: 'member-04',
+        username: 'diana',
+        fullName: 'Diana',
+        avatarUrl: null,
+        role: 'MEMBER',
+        joinedAt: '2026-11-16T02:00:00Z',
+      },
+    ])
+
+    const memberHtml = renderWithProviders(
+      <ConversationInfoPanel
+        conversation={group}
+        groups={[]}
+        onClose={() => {}}
+        defaultPrivacyOpen
+      />,
+    )
+    expect(memberHtml).toContain('Alice')
+    expect(memberHtml).toContain('Bob')
+    expect(memberHtml).toContain('Charlie')
+    expect(memberHtml).not.toContain('Diana')
+    expect(memberHtml.replace(/<!--.*?-->/g, '')).toContain('Thành viên (4)')
+    expect(memberHtml).toContain('Xem tất cả')
+    expect(memberHtml.indexOf('Bob')).toBeLessThan(memberHtml.indexOf('Alice'))
+    expect(memberHtml).not.toContain('aria-label="Sửa tên"')
+    expect(memberHtml).not.toContain('aria-label="Chọn ảnh nhóm')
+    expect(memberHtml).not.toContain('>Hồ sơ</span>')
+    expect(memberHtml).not.toContain('Giải tán nhóm')
+    expect(memberHtml).not.toContain('Thêm thành viên')
+
+    const adminHtml = renderWithProviders(
+      <ConversationInfoPanel
+        conversation={{ ...group, myRole: 'ADMIN' }}
+        groups={[]}
+        onClose={() => {}}
+        defaultPrivacyOpen
+      />,
+    )
+    expect(adminHtml).toContain('aria-label="Sửa tên"')
+    expect(adminHtml).toContain('aria-label="Chọn ảnh nhóm')
+    expect(adminHtml).toContain('Giải tán nhóm')
+    expect(adminHtml).toContain('Thêm thành viên')
   })
 
   it('renders 3 quick action buttons: profile, mute and search', () => {
@@ -190,7 +271,6 @@ describe('ConversationInfoPanel & Header Integration Tests', () => {
         conversation={convWithUsername}
         username="antran_hust"
         bio="Yêu công nghệ"
-        onClose={() => {}}
       />,
     )
 
@@ -201,7 +281,7 @@ describe('ConversationInfoPanel & Header Integration Tests', () => {
     expect(html).toContain('Yêu công nghệ')
     expect(html).toContain('Hủy kết bạn')
     expect(html).toContain('Chặn người dùng')
-    expect(html).toContain('Đóng')
+    expect(html).not.toContain('Đóng')
     // Must NOT contain technical ID field
     expect(html).not.toContain('ID user-friend-01')
   })

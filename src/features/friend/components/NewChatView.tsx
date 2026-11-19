@@ -16,7 +16,8 @@ export function NewChatView() {
   const navigate = useNavigate()
   const [pane, setPane] = useState<NewChatPane>('main')
 
-  const backToMessages = () => navigate(ROUTES.messages)
+  const backToMessages = (conversationId?: string) =>
+    navigate(conversationId ? `${ROUTES.messages}/${conversationId}` : ROUTES.messages)
 
   return (
     <main className="flex h-dvh w-full overflow-hidden bg-background text-foreground">

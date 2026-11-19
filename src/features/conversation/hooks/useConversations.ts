@@ -4,7 +4,10 @@ import {
   getConversationById,
   getConversations,
   getOrCreateDirectConversation,
+  createGroup,
+  uploadGroupAvatar,
 } from '../api/conversation.api'
+import { getGroupMembers } from '../api/conversation.api'
 import { mapConversationResponse } from '../utils/chat.mapper'
 import type { Conversation, ConversationResponse } from '../types/conversation.types'
 
@@ -15,7 +18,7 @@ export function useConversationsQuery() {
   return useQuery<ConversationResponse[], Error, Conversation[]>({
     queryKey: conversationKeys.conversations,
     queryFn: () => getConversations(50),
-    select: (data) => data.map(mapConversationResponse),
+    select: (data) => data.map((item) => mapConversationResponse(item)),
     staleTime: 1000 * 30,
   })
 }
@@ -24,13 +27,25 @@ export function useConversationsQuery() {
 export function useConversationQuery(conversationId: string | null, enabled = true) {
   return useQuery<ConversationResponse, Error, Conversation>({
     queryKey: conversationKeys.conversation(conversationId ?? 'none'),
-    queryFn: () => {
+    queryFn: ({ signal }) => {
       if (!conversationId) throw new Error('No conversation selected')
-      return getConversationById(conversationId)
+      return getConversationById(conversationId, signal)
     },
-    select: mapConversationResponse,
+    select: (data) => mapConversationResponse(data),
     enabled: Boolean(conversationId) && enabled,
     staleTime: 1000 * 30,
+  })
+}
+
+export function useGroupMembersQuery(conversationId: string | null, enabled = true) {
+  return useQuery({
+    queryKey: conversationKeys.groupMembers(conversationId ?? 'none'),
+    queryFn: ({ signal }) => {
+      if (!conversationId) throw new Error('No group selected')
+      return getGroupMembers(conversationId, signal)
+    },
+    enabled: Boolean(conversationId) && enabled,
+    staleTime: 30_000,
   })
 }
 
@@ -53,6 +68,35 @@ export function useCreateDirectChatMutation() {
           return [newConversation, ...current]
         },
       )
+    },
+  })
+}
+
+export function useCreateGroupMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: createGroup,
+    onSuccess: (group) => {
+      queryClient.setQueryData<ConversationResponse[]>(conversationKeys.conversations, (current) =>
+        current ? [group, ...current.filter((item) => item.id !== group.id)] : [group],
+      )
+      queryClient.setQueryData(conversationKeys.conversation(group.id), group)
+      void queryClient.invalidateQueries({ queryKey: conversationKeys.conversations })
+    },
+  })
+}
+
+export function useUploadGroupAvatarMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ conversationId, file }: { conversationId: string; file: File }) =>
+      uploadGroupAvatar(conversationId, file),
+    onSuccess: (group) => {
+      queryClient.setQueryData(conversationKeys.conversation(group.id), group)
+      queryClient.setQueryData<ConversationResponse[]>(conversationKeys.conversations, (current) =>
+        current?.map((item) => (item.id === group.id ? group : item)),
+      )
+      void queryClient.invalidateQueries({ queryKey: conversationKeys.conversations })
     },
   })
 }

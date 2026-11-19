@@ -40,12 +40,14 @@ interface ConversationViewProps {
     text: string,
     attachments?: MessageAttachmentInput[],
     pendingFiles?: PendingFile[],
-    replyToId?: string,
+    replyToId?: string | null,
+    clientMsgId?: string,
   ) => Promise<boolean>
   isSending: boolean
   onBack?: () => void
   showBack: boolean
-  isTyping?: boolean
+  typingUserCount?: number
+  typingNames?: string[]
   onTypingStart?: () => void
   onTypingStop?: () => void
   onVoiceCall?: () => void
@@ -77,7 +79,8 @@ export function ConversationView({
   isSending,
   onBack,
   showBack,
-  isTyping,
+  typingUserCount = 0,
+  typingNames,
   onTypingStart,
   onTypingStop,
   onVoiceCall,
@@ -236,6 +239,8 @@ export function ConversationView({
     text: string,
     attachments?: MessageAttachmentInput[],
     pendingFiles?: PendingFile[],
+    replyToId?: string | null,
+    clientMsgId?: string,
   ) => {
     if (
       (!text &&
@@ -244,11 +249,9 @@ export function ConversationView({
       isSending
     )
       return false
-    const sent = await onSend(text, attachments, pendingFiles, replyingTo?.id)
+    const sent = await onSend(text, attachments, pendingFiles, replyToId ?? null, clientMsgId)
     if (!sent) return false
     setReplyingTo(null)
-    // Giữ text người dùng gõ thêm trong lúc tin trước đang gửi.
-    setDraft((current) => (current === text ? '' : current))
     await goToLatest()
     return true
   }
@@ -259,6 +262,7 @@ export function ConversationView({
       ? t('chat.you')
       : (replyingTo.sender ?? (conversation.isGroup ? null : conversation.name))
     : null
+  const displayedTypingUserCount = atBottom && hasLatest ? typingUserCount : 0
 
   return (
     <div className="relative flex h-full min-h-0 w-full min-w-0 flex-1 overflow-hidden">
@@ -317,7 +321,7 @@ export function ConversationView({
                 {t('common.retry')}
               </button>
             </div>
-          ) : groups.length === 0 && !isTyping ? (
+          ) : groups.length === 0 && displayedTypingUserCount === 0 ? (
             <div className="flex h-full flex-col items-center justify-center px-6 text-center">
               <span
                 className="mb-4 grid size-14 place-items-center rounded-full bg-primary/10 text-brand-ink"
@@ -326,10 +330,12 @@ export function ConversationView({
                 ✓
               </span>
               <h2 className="text-base font-semibold text-foreground">
-                {t('chat.newConnectionTitle', { name: conversation.name })}
+                {conversation.isGroup
+                  ? t('chat.emptyGroupTitle')
+                  : t('chat.newConnectionTitle', { name: conversation.name })}
               </h2>
               <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-                {t('chat.newConnectionPrompt')}
+                {conversation.isGroup ? t('chat.emptyGroupPrompt') : t('chat.newConnectionPrompt')}
               </p>
             </div>
           ) : (
@@ -337,13 +343,16 @@ export function ConversationView({
               ref={messageListRef}
               groups={groups}
               senderLabel={conversation.name}
-              senderAvatarUrl={conversation.partnerAvatar}
+              senderAvatarUrl={
+                conversation.isGroup ? conversation.avatarUrl : conversation.partnerAvatar
+              }
               scrollRef={scrollRef}
               scrollElement={scrollElement}
               isVisible={isVisible}
               conversationId={conversation.id}
               isGroup={conversation.isGroup}
-              isTyping={isTyping && hasLatest}
+              typingUserCount={displayedTypingUserCount}
+              typingNames={typingNames}
               onReply={setReplyingTo}
               followBottom={atBottom && hasLatest}
               onVisibleMessage={onVisibleMessage}
@@ -390,9 +399,11 @@ export function ConversationView({
           </div>
         )}
         <MessageComposer
+          conversationId={conversation.id}
           draft={draft}
           onDraftChange={setDraft}
           onSubmit={submit}
+          replyToId={replyingTo?.id}
           disabled={messagesLoading || Boolean(messagesError)}
           isSending={isSending}
           onTypingStart={onTypingStart}
