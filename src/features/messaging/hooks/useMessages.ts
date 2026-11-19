@@ -18,9 +18,9 @@ import {
   retryUncertainSend,
 } from '@/features/messaging/utils/messageSend'
 import { queryKeys } from '@/infrastructure/query/keys'
-import { api } from '@/infrastructure/api/client'
 import {
   getConversationMessages,
+  getMessageWindow,
   editMessage,
   deleteMessageForMe,
   markConversationRead,
@@ -128,12 +128,7 @@ export function useConversationMessagesQuery(conversationId: string | null, enab
         return Promise.resolve<MessageTimelineResponse>({ items: [], hasMore: false })
       }
       if (pageParam.around) {
-        return api
-          .get<MessageTimelineResponse & { hasMoreNewer: boolean }>(
-            `/conversations/${conversationId}/messages/${pageParam.around}/window`,
-            { params: { limit: MESSAGE_PAGE_SIZE }, signal },
-          )
-          .then((response) => response.data)
+        return getMessageWindow(conversationId, pageParam.around, MESSAGE_PAGE_SIZE, signal)
       }
       return getConversationMessages(
         conversationId,
@@ -316,17 +311,14 @@ export function useConversationMessagesQuery(conversationId: string | null, enab
     if (!conversationId) return
     const generation = ++windowGeneration.current
     const key = CHAT_QUERY_KEYS.messages(conversationId)
-    const response = await api.get<MessageTimelineResponse & { hasMoreNewer: boolean }>(
-      `/conversations/${conversationId}/messages/${messageId}/window`,
-      { params: { limit: MESSAGE_PAGE_SIZE } },
-    )
+    const response = await getMessageWindow(conversationId, messageId, MESSAGE_PAGE_SIZE)
     if (generation !== windowGeneration.current || activeConversationId.current !== conversationId)
       return
     await queryClient.cancelQueries({ queryKey: key, exact: true })
     if (generation !== windowGeneration.current || activeConversationId.current !== conversationId)
       return
     queryClient.setQueryData<InfiniteData<MessageTimelineResponse, MessagePageParam>>(key, {
-      pages: [response.data],
+      pages: [response],
       pageParams: [{ around: messageId }],
     })
   }
@@ -984,13 +976,9 @@ export function useReactMessageMutation(conversationId: string | null) {
         if (state.pending === 0) {
           const revision = state.revision
           const sync = ++state.sync
-          void api
-            .get<MessageTimelineResponse>(
-              `/conversations/${conversationId}/messages/${arg.messageId}/window`,
-              { params: { limit: 1 } },
-            )
+          void getMessageWindow(conversationId, arg.messageId, 1)
             .then((response) => {
-              const message = response.data.items.find((item) => item.id === arg.messageId)
+              const message = response.items.find((item) => item.id === arg.messageId)
               if (!message || state.pending || state.revision !== revision) return
               state.confirmed = ownReaction(message.reactions, state.userId)
               state.desired = state.confirmed

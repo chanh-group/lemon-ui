@@ -12,6 +12,7 @@ import {
 } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
+import { queryKeys } from '@/infrastructure/query/keys'
 import { getStoryById } from '@/features/story/api/stories.api'
 import { useStoryMedia } from '@/features/story/hooks/useStories'
 import { useVirtualizer } from '@tanstack/react-virtual'
@@ -159,7 +160,7 @@ function StoryReplyQuote({
 }) {
   const { t } = useTranslation()
   const story = useQuery({
-    queryKey: ['story-reply', preview.id],
+    queryKey: queryKeys.chat.storyReply(preview.id),
     queryFn: () => getStoryById(preview.id),
     retry: false,
     staleTime: 60_000,

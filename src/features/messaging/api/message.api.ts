@@ -21,6 +21,20 @@ export async function getConversationMessages(
   return res.data
 }
 
+/** Lấy cửa sổ tin nhắn xung quanh một tin cụ thể (cho jump-to-reply). */
+export async function getMessageWindow(
+  conversationId: string,
+  messageId: string,
+  limit = 30,
+  signal?: AbortSignal,
+): Promise<MessageTimelineResponse & { hasMoreNewer: boolean }> {
+  const res = await api.get<MessageTimelineResponse & { hasMoreNewer: boolean }>(
+    `/conversations/${conversationId}/messages/${messageId}/window`,
+    { params: { limit }, signal },
+  )
+  return res.data
+}
+
 /** Gửi tin nhắn mới vào cuộc hội thoại. */
 export async function sendMessage(
   conversationId: string,
