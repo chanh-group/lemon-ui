@@ -16,3 +16,7 @@ export function setConversationDraft(conversationId: string, draft: string): voi
 export function clearConversationDraft(conversationId: string): void {
   drafts.delete(conversationId)
 }
+
+export function clearAllDrafts(): void {
+  drafts.clear()
+}

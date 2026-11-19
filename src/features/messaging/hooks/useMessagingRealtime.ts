@@ -124,7 +124,6 @@ export function useChatRealtime(activeConversationId: string | null) {
   const [conversationAccess, setConversationAccess] = useState<
     'verifying' | 'allowed' | 'revoked' | 'retryable-error'
   >(activeConversationId ? 'verifying' : 'allowed')
-  const verifiedConversationIds = useRef(new Set<string>())
   const conversationTrustMap = useRef<Map<string, { verifiedAt: number; joinGeneration?: string }>>(
     new Map(),
   )
@@ -204,7 +203,6 @@ export function useChatRealtime(activeConversationId: string | null) {
 
     const clearRemovedConversation = (conversationId: string) => {
       revokedConversationIds.current.add(conversationId)
-      verifiedConversationIds.current.delete(conversationId)
       conversationTrustMap.current.delete(conversationId)
       clearConversationTyping(conversationId)
       releaseConversationMessagePreviews(conversationId)
@@ -269,7 +267,6 @@ export function useChatRealtime(activeConversationId: string | null) {
           verifiedAt: Date.now(),
           joinGeneration: conversation.joinGeneration,
         })
-        verifiedConversationIds.current.add(conversationId)
         setConversationAccess('allowed')
         await syncMissedMessages(conversationId)
       } catch (error: unknown) {
@@ -289,7 +286,6 @@ export function useChatRealtime(activeConversationId: string | null) {
     }
     retryVerification.current = () => {
       if (!activeConversationId) return
-      verifiedConversationIds.current.delete(activeConversationId)
       conversationTrustMap.current.delete(activeConversationId)
       void verifyConversation(activeConversationId)
     }
@@ -304,17 +300,22 @@ export function useChatRealtime(activeConversationId: string | null) {
       )
       const cachedConversation = inboxConversation ?? cachedDetail
 
-      // 1. Direct chat (1-1 bạn bè): cho phép tức thì từ cache
+      // 1. Direct chat (1-1 bạn bè): cho phép tức thì từ cache, background re-verify định kỳ
       if (cachedConversation && cachedConversation.kind === 'DIRECT') {
-        conversationTrustMap.current.set(conversationId, { verifiedAt: Date.now() })
-        verifiedConversationIds.current.add(conversationId)
+        const trust = conversationTrustMap.current.get(conversationId)
+        if (!trust) {
+          conversationTrustMap.current.set(conversationId, { verifiedAt: Date.now() })
+        }
         setConversationAccess('allowed')
-        void syncMissedMessages(conversationId)
+        void syncMissedMessages(conversationId).catch(() => {})
+        if (!trust || Date.now() - trust.verifiedAt >= 5 * 60_000) {
+          void verifyConversation(conversationId, { background: true })
+        }
         return
       }
 
       // 2. Group chat đã verified trong phiên
-      if (cachedTrust && verifiedConversationIds.current.has(conversationId)) {
+      if (cachedTrust) {
         const inboxGeneration = cachedConversation?.joinGeneration
         if (
           inboxGeneration &&
@@ -327,13 +328,12 @@ export function useChatRealtime(activeConversationId: string | null) {
           queryClient.removeQueries({ queryKey: CHAT_QUERY_KEYS.liveMessages(conversationId) })
           queryClient.removeQueries({ queryKey: CHAT_QUERY_KEYS.mediaArchive(conversationId) })
           conversationTrustMap.current.delete(conversationId)
-          verifiedConversationIds.current.delete(conversationId)
           void verifyConversation(conversationId)
           return
         }
 
         setConversationAccess('allowed')
-        void syncMissedMessages(conversationId)
+        void syncMissedMessages(conversationId).catch(() => {})
         if (Date.now() - cachedTrust.verifiedAt >= 5 * 60_000) {
           void verifyConversation(conversationId, { background: true })
         }
@@ -358,7 +358,6 @@ export function useChatRealtime(activeConversationId: string | null) {
     const handleDisconnect = () => {
       refreshedInboxOnConnection.current = false
       setConnectionStatus('disconnected')
-      verifiedConversationIds.current.clear()
       conversationTrustMap.current.clear()
       if (activeConversationId) setConversationAccess('verifying')
       timersForEffect.forEach((timer) => clearTimeout(timer))
