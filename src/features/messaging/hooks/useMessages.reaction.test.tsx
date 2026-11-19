@@ -12,7 +12,9 @@ import type {
 
 const mocks = vi.hoisted(() => ({ react: vi.fn(), error: vi.fn() }))
 vi.mock('@/features/auth/api', () => ({ useAuth: () => ({ user: { id: 'me' } }) }))
-vi.mock('@/infrastructure/api/client', () => ({ api: { get: vi.fn().mockRejectedValue(new Error('offline')) } }))
+vi.mock('@/infrastructure/api/client', () => ({
+  api: { get: vi.fn().mockRejectedValue(new Error('offline')) },
+}))
 vi.mock('react-i18next', async (importOriginal) => ({
   ...(await importOriginal<typeof import('react-i18next')>()),
   useTranslation: () => ({ t: (key: string) => key }),
