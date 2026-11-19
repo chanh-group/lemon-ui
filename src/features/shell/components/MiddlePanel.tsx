@@ -21,8 +21,9 @@ const Plus = createIcon(PlusData)
 const ChevronRight = createIcon(ChevronRightData)
 const Phone = createIcon(PhoneData)
 const X = createIcon(XData)
+import { useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { useEffect, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -39,6 +40,7 @@ import type { ChatTab } from '@/types/common'
 import type { Conversation } from '@/features/conversation/types/conversation.types'
 import type { StoryEntry } from '@/features/story/types/story.types'
 import { CallsHeaderActions } from '@/features/call/components/CallsHeaderActions'
+import { prefetchConversationMessages } from '@/features/messaging/hooks/useMessages'
 
 interface MiddlePanelProps {
   tab: ChatTab
@@ -123,6 +125,7 @@ export function MiddlePanel({
   const { t, i18n } = useTranslation()
   const { user } = useAuth()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const resultCount =
     tab === 'messages' ? conversations.length : tab === 'calls' ? calls.length : stories.length
   const meta: Record<ChatTab, { title: string; searchHint: string }> = {
@@ -153,6 +156,44 @@ export function MiddlePanel({
     }
     return result
   }, [stories])
+
+  const prefetchTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
+
+  const handlePrefetchHover = useCallback(
+    (conversationId: string) => {
+      if (prefetchTimers.current.has(conversationId)) return
+      const timer = setTimeout(() => {
+        prefetchTimers.current.delete(conversationId)
+        void prefetchConversationMessages(queryClient, conversationId)
+      }, 100)
+      prefetchTimers.current.set(conversationId, timer)
+    },
+    [queryClient],
+  )
+
+  const cancelPrefetchHover = useCallback((conversationId: string) => {
+    const timer = prefetchTimers.current.get(conversationId)
+    if (timer) {
+      clearTimeout(timer)
+      prefetchTimers.current.delete(conversationId)
+    }
+  }, [])
+
+  const handlePrefetchImmediate = useCallback(
+    (conversationId: string) => {
+      cancelPrefetchHover(conversationId)
+      void prefetchConversationMessages(queryClient, conversationId)
+    },
+    [cancelPrefetchHover, queryClient],
+  )
+
+  useEffect(() => {
+    const timers = prefetchTimers.current
+    return () => {
+      timers.forEach((t) => clearTimeout(t))
+      timers.clear()
+    }
+  }, [])
 
   return (
     <section
@@ -292,6 +333,10 @@ export function MiddlePanel({
                       <button
                         type="button"
                         aria-current={isActive ? 'true' : undefined}
+                        onMouseEnter={() => handlePrefetchHover(c.id)}
+                        onMouseLeave={() => cancelPrefetchHover(c.id)}
+                        onPointerDown={() => handlePrefetchImmediate(c.id)}
+                        onFocus={() => handlePrefetchImmediate(c.id)}
                         onClick={() => onSelectConversation(c.id)}
                         aria-label={`${c.name}${c.unread > 0 ? `, ${t('chat.unreadCount', { count: c.unread })}` : ''}`}
                         className={cn(

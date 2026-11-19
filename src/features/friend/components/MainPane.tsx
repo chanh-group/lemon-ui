@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   AtIcon as AtData,
   Mail01Icon as MailData,
@@ -19,6 +20,7 @@ import {
   useConversationsQuery,
 } from '@/features/conversation/hooks/useConversations'
 import { useFriendRequests, useFriends } from '@/features/friend/hooks/useFriends'
+import { prefetchConversationMessages } from '@/features/messaging/hooks/useMessages'
 import type { NewChatPane } from '@/features/friend/types/friend.types'
 import { Avatar, SectionLabel, SearchBox } from './kit'
 import { FriendRowMenu } from './FriendRowMenu'
@@ -31,6 +33,7 @@ export function MainPane({
 }) {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const [query, setQuery] = useState('')
   const { data: requests } = useFriendRequests()
   const friendsQuery = useFriends()
@@ -73,6 +76,44 @@ export function MainPane({
       onError: (error) => toast.error(error instanceof Error ? error.message : t('common.error')),
     })
   }
+
+  const prefetchTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
+
+  const handlePrefetchHover = useCallback(
+    (conversationId: string) => {
+      if (prefetchTimers.current.has(conversationId)) return
+      const timer = setTimeout(() => {
+        prefetchTimers.current.delete(conversationId)
+        void prefetchConversationMessages(queryClient, conversationId)
+      }, 100)
+      prefetchTimers.current.set(conversationId, timer)
+    },
+    [queryClient],
+  )
+
+  const cancelPrefetchHover = useCallback((conversationId: string) => {
+    const timer = prefetchTimers.current.get(conversationId)
+    if (timer) {
+      clearTimeout(timer)
+      prefetchTimers.current.delete(conversationId)
+    }
+  }, [])
+
+  const handlePrefetchImmediate = useCallback(
+    (conversationId: string) => {
+      cancelPrefetchHover(conversationId)
+      void prefetchConversationMessages(queryClient, conversationId)
+    },
+    [cancelPrefetchHover, queryClient],
+  )
+
+  useEffect(() => {
+    const timers = prefetchTimers.current
+    return () => {
+      timers.forEach((t) => clearTimeout(t))
+      timers.clear()
+    }
+  }, [])
 
   useEffect(() => {
     if (friendsQuery.isError) toast.error(friendsQuery.error.message)
@@ -200,6 +241,10 @@ export function MainPane({
               <li key={group.id}>
                 <button
                   type="button"
+                  onMouseEnter={() => handlePrefetchHover(group.id)}
+                  onMouseLeave={() => cancelPrefetchHover(group.id)}
+                  onPointerDown={() => handlePrefetchImmediate(group.id)}
+                  onFocus={() => handlePrefetchImmediate(group.id)}
                   onClick={() => openMessages(group.id)}
                   className="chat-item flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-all duration-150 hover:bg-muted"
                 >

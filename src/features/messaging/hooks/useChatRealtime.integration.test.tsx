@@ -187,6 +187,65 @@ describe('useChatRealtime reconnect access', () => {
     expect(queryClient.getQueryData(queryKeys.chat.conversation(group.id))).toBeUndefined()
     expect(queryClient.getQueryData(CHAT_QUERY_KEYS.conversations)).toEqual([])
   })
+
+  it('allows switching between friends instantly from cache without blocking network verify', async () => {
+    const friend1 = { id: 'friend-1', kind: 'DIRECT', isGroup: false }
+    const friend2 = { id: 'friend-2', kind: 'DIRECT', isGroup: false }
+    queryClient.setQueryData(CHAT_QUERY_KEYS.conversations, [friend1, friend2])
+    queryClient.setQueryData(CHAT_QUERY_KEYS.messages(friend2.id), {
+      pages: [{ items: [{ id: 'm-1' }], hasMore: false }],
+      pageParams: [undefined],
+    })
+
+    const { result, rerender } = renderHook(
+      ({ convId }: { convId: string }) => useChatRealtime(convId),
+      { wrapper, initialProps: { convId: friend1.id } },
+    )
+
+    expect(result.current.conversationAccess).toBe('allowed')
+    expect(mocks.getConversation).not.toHaveBeenCalled()
+
+    // Switch to friend 2
+    rerender({ convId: friend2.id })
+    expect(result.current.conversationAccess).toBe('allowed')
+    expect(mocks.getConversation).not.toHaveBeenCalled()
+    await waitFor(() => expect(mocks.fetchMissedMessages).toHaveBeenCalled())
+  })
+
+  it('purges stale message cache when switching to a group with an epoch mismatch', async () => {
+    const groupGen1 = { id: 'group-epoch', kind: 'GROUP', joinGeneration: 'gen-1' }
+    const staleGroup = { id: 'group-epoch', kind: 'GROUP', joinGeneration: 'gen-2' }
+    mocks.getConversation.mockResolvedValueOnce(groupGen1).mockResolvedValueOnce(staleGroup)
+    mocks.getMembers.mockResolvedValue([])
+
+    queryClient.setQueryData(CHAT_QUERY_KEYS.conversations, [groupGen1])
+    queryClient.setQueryData(CHAT_QUERY_KEYS.messages('group-epoch'), {
+      pages: [{ items: [{ id: 'old-epoch-msg' }], hasMore: false }],
+      pageParams: [undefined],
+    })
+
+    const { result, rerender } = renderHook(
+      ({ convId }: { convId: string }) => useChatRealtime(convId),
+      { wrapper, initialProps: { convId: 'group-epoch' } },
+    )
+
+    // First mount verifies gen-1
+    await waitFor(() => expect(result.current.conversationAccess).toBe('allowed'))
+
+    // Now server inbox updates with gen-2 (user was kicked and re-added)
+    queryClient.setQueryData(CHAT_QUERY_KEYS.conversations, [staleGroup])
+    queryClient.setQueryData(CHAT_QUERY_KEYS.messages('group-epoch'), {
+      pages: [{ items: [{ id: 'old-epoch-msg' }], hasMore: false }],
+      pageParams: [undefined],
+    })
+
+    // Switch away and back
+    rerender({ convId: 'other-conv' })
+    rerender({ convId: 'group-epoch' })
+
+    // Old cache should be purged immediately upon detecting epoch mismatch
+    expect(queryClient.getQueryData(CHAT_QUERY_KEYS.messages('group-epoch'))).toBeUndefined()
+  })
 })
 
 describe('useChatRealtime group typing', () => {

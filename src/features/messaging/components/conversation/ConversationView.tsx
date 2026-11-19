@@ -15,6 +15,11 @@ import { ConversationInfoPanel } from './ConversationInfoPanel'
 import { MessageList, type MessageListHandle } from './MessageList'
 import { MessageComposer, type PendingFile } from './MessageComposer'
 import type { MessageScrollPosition } from '@/features/messaging/utils/messageScrollPosition'
+import {
+  clearConversationDraft,
+  getConversationDraft,
+  setConversationDraft,
+} from '@/features/messaging/utils/draftStore'
 
 interface ConversationViewProps {
   conversation: Conversation
@@ -89,7 +94,11 @@ export function ConversationView({
 }: ConversationViewProps) {
   const { t } = useTranslation()
   const [initialRestorePosition] = useState(restorePosition)
-  const [draft, setDraft] = useState('')
+  const [draft, setDraftState] = useState(() => getConversationDraft(conversation.id))
+  const handleDraftChange = (nextDraft: string) => {
+    setDraftState(nextDraft)
+    setConversationDraft(conversation.id, nextDraft)
+  }
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null)
   const [isInfoOpen, setIsInfoOpen] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -251,6 +260,8 @@ export function ConversationView({
       return false
     const sent = await onSend(text, attachments, pendingFiles, replyToId ?? null, clientMsgId)
     if (!sent) return false
+    clearConversationDraft(conversation.id)
+    setDraftState('')
     setReplyingTo(null)
     await goToLatest()
     return true
@@ -401,7 +412,7 @@ export function ConversationView({
         <MessageComposer
           conversationId={conversation.id}
           draft={draft}
-          onDraftChange={setDraft}
+          onDraftChange={handleDraftChange}
           onSubmit={submit}
           replyToId={replyingTo?.id}
           disabled={messagesLoading || Boolean(messagesError)}
