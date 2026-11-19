@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   getSocket: vi.fn(),
   connect: vi.fn(),
   disconnect: vi.fn(),
+  isSocketReady: vi.fn(() => true),
   navigate: vi.fn(),
   getConversation: vi.fn(),
   getMembers: vi.fn(),
@@ -31,6 +32,7 @@ vi.mock('@/lib/socket', () => ({
   getChatSocket: mocks.getSocket,
   connectChatSocket: mocks.connect,
   disconnectChatSocket: mocks.disconnect,
+  isChatSocketReady: mocks.isSocketReady,
 }))
 vi.mock('@/features/conversation/api/conversation.api', () => ({
   getConversationById: mocks.getConversation,
@@ -174,6 +176,7 @@ describe('useChatRealtime reconnect access', () => {
       socket.emit('disconnect')
       socket.connected = true
       socket.emit('connect')
+      socket.emit('ready')
     })
     await waitFor(() => expect(result.current.conversationAccess).toBe('revoked'))
 
