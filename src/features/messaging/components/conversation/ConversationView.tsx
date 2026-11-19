@@ -162,9 +162,13 @@ export function ConversationView({
   }
 
   useLayoutEffect(() => {
-    if (targetMessageId && messageListRef.current?.scrollToMessage(targetMessageId)) {
+    if (!targetMessageId) return
+    if (messageListRef.current?.scrollToMessage(targetMessageId)) {
       setTargetMessageId(null)
+      return
     }
+    const timer = setTimeout(() => setTargetMessageId(null), 5000)
+    return () => clearTimeout(timer)
   }, [targetMessageId, groups])
 
   const jumpToMessage = async (messageId: string) => {

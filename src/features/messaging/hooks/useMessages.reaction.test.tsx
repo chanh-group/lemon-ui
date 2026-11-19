@@ -10,7 +10,7 @@ import type {
   MessageTimelineResponse,
 } from '../types/message.types'
 
-const mocks = vi.hoisted(() => ({ react: vi.fn(), error: vi.fn() }))
+const mocks = vi.hoisted(() => ({ react: vi.fn(), error: vi.fn(), window: vi.fn() }))
 vi.mock('@/features/auth/api', () => ({ useAuth: () => ({ user: { id: 'me' } }) }))
 vi.mock('@/infrastructure/api/client', () => ({
   api: { get: vi.fn().mockRejectedValue(new Error('offline')) },
@@ -20,7 +20,10 @@ vi.mock('react-i18next', async (importOriginal) => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }))
 vi.mock('sonner', () => ({ toast: { error: mocks.error } }))
-vi.mock('@/features/messaging/api/message.api', () => ({ reactToMessage: mocks.react }))
+vi.mock('@/features/messaging/api/message.api', () => ({
+  reactToMessage: mocks.react,
+  getMessageWindow: mocks.window,
+}))
 
 const reaction = (emoji: string, ...userIds: string[]): MessageReactionItem => ({
   emoji,

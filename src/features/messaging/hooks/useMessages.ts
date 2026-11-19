@@ -989,14 +989,17 @@ export function useReactMessageMutation(conversationId: string | null) {
                 () => message.reactions ?? [],
               )
             })
-            .catch(() => {})
-            .finally(() => {
+            .catch(() => {
               if (state.pending || state.sync !== sync) return
               reactionStates.get(queryClient)?.delete(reactionKey(conversationId, arg.messageId))
               void queryClient.invalidateQueries({
                 queryKey: CHAT_QUERY_KEYS.messages(conversationId),
                 exact: true,
               })
+            })
+            .finally(() => {
+              if (state.pending || state.sync !== sync) return
+              reactionStates.get(queryClient)?.delete(reactionKey(conversationId, arg.messageId))
             })
         }
       }
