@@ -100,10 +100,7 @@ export function ChatShell() {
 
   // API Queries & Mutations
   const conversationsQuery = useConversationsQuery()
-  const messagesQuery = useConversationMessagesQuery(
-    selectedId,
-    !selectedId || conversationAccess === 'allowed',
-  )
+  const messagesQuery = useConversationMessagesQuery(selectedId, Boolean(selectedId))
   const sendMessageMutation = useSendMessageMutation(selectedId)
   const markReadMutation = useMarkReadMutation()
   const callWindow = useCallWindow()
@@ -159,9 +156,13 @@ export function ChatShell() {
     Boolean(selectedId) && !selectedFromList && !conversationsQuery.isPending
   const conversationDetailQuery = useConversationQuery(selectedId, needsConversationDetail)
   const selected = selectedFromList ?? conversationDetailQuery.data ?? null
+  const hasCachedMessages = Boolean(messagesQuery.data)
+  const canRenderCachedConversation =
+    Boolean(selected) &&
+    (conversationAccess === 'allowed' || (conversationAccess === 'verifying' && hasCachedMessages))
   const groupMembersQuery = useGroupMembersQuery(
     selected?.isGroup ? selected.id : null,
-    Boolean(selected?.isGroup) && conversationAccess === 'allowed',
+    Boolean(selected?.isGroup) && (conversationAccess === 'allowed' || canRenderCachedConversation),
   )
   const typingNames = typingUserIds.flatMap((id) => {
     const member = groupMembersQuery.data?.find((item) => item.id === id)
@@ -175,7 +176,7 @@ export function ChatShell() {
 
   const restoringConversation =
     Boolean(selectedId) &&
-    (conversationAccess === 'verifying' ||
+    ((!hasCachedMessages && conversationAccess === 'verifying') ||
       (!selected && (conversationsQuery.isPending || conversationDetailQuery.isPending)))
   const restoreFailed =
     Boolean(selectedId) &&
@@ -435,7 +436,7 @@ export function ChatShell() {
               </div>
             </section>
           )
-        ) : selected && conversationAccess === 'allowed' ? (
+        ) : selected && canRenderCachedConversation ? (
           <ConversationView
             key={selected.id}
             conversation={selected}

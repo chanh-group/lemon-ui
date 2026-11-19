@@ -124,20 +124,15 @@ export function useChatRealtime(activeConversationId: string | null) {
   const [conversationAccess, setConversationAccess] = useState<
     'verifying' | 'allowed' | 'revoked' | 'retryable-error'
   >(activeConversationId ? 'verifying' : 'allowed')
-  const [verifiedConversationId, setVerifiedConversationId] = useState<string | null>(null)
+  const conversationTrustMap = useRef<Map<string, { verifiedAt: number; joinGeneration?: string }>>(
+    new Map(),
+  )
   const [connectionStatus, setConnectionStatus] = useState<SocketConnectionStatus | null>(() => {
     if (status !== 'authenticated') return null
     const socket = getChatSocket()
     return isChatSocketReady() ? 'connected' : socket.active ? 'connecting' : 'disconnected'
   })
   const userId = user?.id
-
-  useEffect(() => {
-    if (!activeConversationId) {
-      // oxlint-disable-next-line react/set-state-in-effect
-      setVerifiedConversationId(null)
-    }
-  }, [activeConversationId])
 
   // 1. Quản lý kết nối socket theo trạng thái đăng nhập
   useEffect(() => {
@@ -208,6 +203,7 @@ export function useChatRealtime(activeConversationId: string | null) {
 
     const clearRemovedConversation = (conversationId: string) => {
       revokedConversationIds.current.add(conversationId)
+      conversationTrustMap.current.delete(conversationId)
       clearConversationTyping(conversationId)
       releaseConversationMessagePreviews(conversationId)
       queryClient.removeQueries({ queryKey: CHAT_QUERY_KEYS.messages(conversationId) })
@@ -224,14 +220,18 @@ export function useChatRealtime(activeConversationId: string | null) {
       }
     }
 
-    const verifyConversation = async (conversationId: string) => {
+    const verifyConversation = async (
+      conversationId: string,
+      options: { background?: boolean } = {},
+    ) => {
       const generation = ++verificationGeneration.current
       verificationAbort.current?.abort()
       const abortController = new AbortController()
       verificationAbort.current = abortController
-      setConversationAccess('verifying')
+      if (!options.background) {
+        setConversationAccess('verifying')
+      }
       try {
-        await queryClient.cancelQueries({ queryKey: CHAT_QUERY_KEYS.messages(conversationId) })
         await queryClient.cancelQueries({ queryKey: queryKeys.chat.groupMembers(conversationId) })
         const cached = queryClient.getQueryData<ConversationResponse>(
           queryKeys.chat.conversation(conversationId),
@@ -263,7 +263,10 @@ export function useChatRealtime(activeConversationId: string | null) {
           type: 'active',
         })
         if (generation !== verificationGeneration.current) return
-        setVerifiedConversationId(conversationId)
+        conversationTrustMap.current.set(conversationId, {
+          verifiedAt: Date.now(),
+          joinGeneration: conversation.joinGeneration,
+        })
         setConversationAccess('allowed')
         await syncMissedMessages(conversationId)
       } catch (error: unknown) {
@@ -273,14 +276,71 @@ export function useChatRealtime(activeConversationId: string | null) {
           clearRemovedConversation(conversationId)
           return
         }
-        setConversationAccess('retryable-error')
-        toast.error(t('chat.messagesLoadError'))
+        if (!options.background) {
+          setConversationAccess('retryable-error')
+          toast.error(t('chat.messagesLoadError'))
+        }
       } finally {
         if (verificationAbort.current === abortController) verificationAbort.current = null
       }
     }
     retryVerification.current = () => {
-      if (activeConversationId) void verifyConversation(activeConversationId)
+      if (!activeConversationId) return
+      conversationTrustMap.current.delete(activeConversationId)
+      void verifyConversation(activeConversationId)
+    }
+
+    const verifyActiveConversation = (conversationId: string) => {
+      const cachedTrust = conversationTrustMap.current.get(conversationId)
+      const inboxConversation = queryClient
+        .getQueryData<ConversationResponse[]>(CHAT_QUERY_KEYS.conversations)
+        ?.find((c) => c.id === conversationId)
+      const cachedDetail = queryClient.getQueryData<ConversationResponse>(
+        queryKeys.chat.conversation(conversationId),
+      )
+      const cachedConversation = inboxConversation ?? cachedDetail
+
+      // 1. Direct chat (1-1 bạn bè): cho phép tức thì từ cache, background re-verify định kỳ
+      if (cachedConversation && cachedConversation.kind === 'DIRECT') {
+        const trust = conversationTrustMap.current.get(conversationId)
+        if (!trust) {
+          conversationTrustMap.current.set(conversationId, { verifiedAt: Date.now() })
+        }
+        setConversationAccess('allowed')
+        void syncMissedMessages(conversationId).catch(() => {})
+        if (!trust || Date.now() - trust.verifiedAt >= 5 * 60_000) {
+          void verifyConversation(conversationId, { background: true })
+        }
+        return
+      }
+
+      // 2. Group chat đã verified trong phiên
+      if (cachedTrust) {
+        const inboxGeneration = cachedConversation?.joinGeneration
+        if (
+          inboxGeneration &&
+          cachedTrust.joinGeneration &&
+          inboxGeneration !== cachedTrust.joinGeneration
+        ) {
+          // Lệch epoch: dọn cache cũ ngay lập tức trước khi render để chống flash tin nhắn cũ
+          releaseConversationMessagePreviews(conversationId)
+          queryClient.removeQueries({ queryKey: CHAT_QUERY_KEYS.messages(conversationId) })
+          queryClient.removeQueries({ queryKey: CHAT_QUERY_KEYS.liveMessages(conversationId) })
+          queryClient.removeQueries({ queryKey: CHAT_QUERY_KEYS.mediaArchive(conversationId) })
+          conversationTrustMap.current.delete(conversationId)
+          void verifyConversation(conversationId)
+          return
+        }
+
+        setConversationAccess('allowed')
+        void syncMissedMessages(conversationId).catch(() => {})
+        if (Date.now() - cachedTrust.verifiedAt >= 5 * 60_000) {
+          void verifyConversation(conversationId, { background: true })
+        }
+        return
+      }
+
+      void verifyConversation(conversationId)
     }
 
     const handleReady = () => {
@@ -298,6 +358,7 @@ export function useChatRealtime(activeConversationId: string | null) {
     const handleDisconnect = () => {
       refreshedInboxOnConnection.current = false
       setConnectionStatus('disconnected')
+      conversationTrustMap.current.clear()
       if (activeConversationId) setConversationAccess('verifying')
       timersForEffect.forEach((timer) => clearTimeout(timer))
       timersForEffect.clear()
@@ -313,7 +374,7 @@ export function useChatRealtime(activeConversationId: string | null) {
     socket.io.on('reconnect_attempt', handleReconnectAttempt)
     if (isChatSocketReady() && activeConversationId) {
       refreshInbox()
-      void verifyConversation(activeConversationId)
+      verifyActiveConversation(activeConversationId)
     } else if (isChatSocketReady()) {
       refreshInbox()
     }
@@ -639,19 +700,12 @@ export function useChatRealtime(activeConversationId: string | null) {
     ? (partnerTypingMap[activeConversationId]?.length ?? 0)
     : 0
   const isPartnerTyping = typingUserCount > 0
-  const effectiveConversationAccess =
-    conversationAccess === 'allowed' &&
-    activeConversationId &&
-    verifiedConversationId !== activeConversationId
-      ? 'verifying'
-      : conversationAccess
-
   return {
     isPartnerTyping,
     typingUserCount,
     typingUserIds: activeConversationId ? (partnerTypingMap[activeConversationId] ?? []) : [],
     connectionStatus,
-    conversationAccess: effectiveConversationAccess,
+    conversationAccess,
     retryConversationAccess: () => retryVerification.current?.(),
   }
 }

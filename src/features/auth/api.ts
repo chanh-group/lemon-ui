@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { isAuthBypass } from '@/config/env'
 import { DEV_SESSION_KEY } from '@/config/constants'
 import { api, toApiError } from '@/infrastructure/api/client'
+import { clearAllDrafts } from '@/features/messaging/utils/draftStore'
 import { authEndpoints, userEndpoints } from '@/infrastructure/api/endpoints'
 import type { ApiError } from '@/infrastructure/api/errors'
 import { useAuthStore } from '@/infrastructure/auth/auth-store'
@@ -169,6 +170,7 @@ export function useResetPassword() {
     mutationFn: async (input) => {
       if (isAuthBypass()) {
         queryClient.clear()
+        clearAllDrafts()
         useAuthStore.getState().reset()
         return
       }
@@ -179,6 +181,7 @@ export function useResetPassword() {
           newPassword: input.newPassword,
         })
         queryClient.clear()
+        clearAllDrafts()
         useAuthStore.getState().reset()
       } catch (error) {
         throw toApiError(error)
@@ -202,6 +205,7 @@ export function useChangePassword() {
     mutationFn: async (input) => {
       if (isAuthBypass()) {
         queryClient.clear()
+        clearAllDrafts()
         removeItem(DEV_SESSION_KEY)
         useAuthStore.getState().reset()
         return
@@ -209,6 +213,7 @@ export function useChangePassword() {
       try {
         await api.post(authEndpoints.changePassword, input)
         queryClient.clear()
+        clearAllDrafts()
         useAuthStore.getState().reset()
       } catch (error) {
         throw toApiError(error)
@@ -265,7 +270,11 @@ export function useUpdateProfile() {
 export function useLogout() {
   const queryClient = useQueryClient()
   return useMutation<void, ApiError, void>({
-    mutationFn: () => signOutEverywhere(() => queryClient.clear()),
+    mutationFn: () =>
+      signOutEverywhere(() => {
+        queryClient.clear()
+        clearAllDrafts()
+      }),
   })
 }
 

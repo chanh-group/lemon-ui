@@ -47,6 +47,8 @@ import type { ConversationResponse } from '@/features/conversation/types/convers
 
 export const CHAT_QUERY_KEYS = queryKeys.chat
 const MESSAGE_PAGE_SIZE = 30
+const MESSAGE_CACHE_TIME = 30 * 60_000
+const MESSAGE_STALE_TIME = Infinity
 /** Cửa sổ 3 trang: -1 (mới hơn), 0 (đang đọc), +1 (cũ hơn). */
 const MAX_MESSAGE_PAGES = 3
 /** Mở hội thoại tải sẵn trang hiện tại + 2 trang cũ để cuộn không chạm mép. */
@@ -114,19 +116,10 @@ export function windowHasLatest(
   return (!param.cursor && !param.after) || (Boolean(param.after) && !page.hasMore)
 }
 
-/** Giữ cửa sổ 3 trang (-1, 0, +1) quanh vùng đang đọc và tải sẵn 2 trang cũ. */
-export function useConversationMessagesQuery(conversationId: string | null, enabled = true) {
-  const queryClient = useQueryClient()
-  const { t } = useTranslation()
-  const initialPrefetches = useRef(new Set<string>())
-  const activeConversationId = useRef(conversationId)
-  const windowGeneration = useRef(0)
-  const query = useInfiniteQuery({
-    queryKey: CHAT_QUERY_KEYS.messages(conversationId ?? 'none'),
+function conversationMessagesQueryOptions(conversationId: string) {
+  return {
+    queryKey: CHAT_QUERY_KEYS.messages(conversationId),
     queryFn: ({ pageParam, signal }: { pageParam: MessagePageParam; signal: AbortSignal }) => {
-      if (!conversationId) {
-        return Promise.resolve<MessageTimelineResponse>({ items: [], hasMore: false })
-      }
       if (pageParam.around) {
         return getMessageWindow(conversationId, pageParam.around, MESSAGE_PAGE_SIZE, signal)
       }
@@ -139,9 +132,13 @@ export function useConversationMessagesQuery(conversationId: string | null, enab
       )
     },
     initialPageParam: {} as MessagePageParam,
-    getNextPageParam: (lastPage) =>
+    getNextPageParam: (lastPage: MessageTimelineResponse) =>
       lastPage.hasMore && lastPage.nextCursor ? { cursor: lastPage.nextCursor } : undefined,
-    getPreviousPageParam: (firstPage, _allPages, firstPageParam) => {
+    getPreviousPageParam: (
+      firstPage: MessageTimelineResponse,
+      _allPages: MessageTimelineResponse[],
+      firstPageParam: MessagePageParam,
+    ) => {
       if (firstPageParam.around) {
         return (firstPage as MessageTimelineResponse & { hasMoreNewer: boolean }).hasMoreNewer &&
           firstPage.items[0]?.id
@@ -157,8 +154,27 @@ export function useConversationMessagesQuery(conversationId: string | null, enab
       return firstPage.items[0]?.id ? { after: firstPage.items[0].id } : undefined
     },
     maxPages: MAX_MESSAGE_PAGES,
+    staleTime: MESSAGE_STALE_TIME,
+    gcTime: MESSAGE_CACHE_TIME,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+  }
+}
+
+export function prefetchConversationMessages(queryClient: QueryClient, conversationId: string) {
+  return queryClient.prefetchInfiniteQuery(conversationMessagesQueryOptions(conversationId))
+}
+
+/** Giữ cửa sổ 3 trang (-1, 0, +1) quanh vùng đang đọc và tải sẵn 2 trang cũ. */
+export function useConversationMessagesQuery(conversationId: string | null, enabled = true) {
+  const queryClient = useQueryClient()
+  const { t } = useTranslation()
+  const initialPrefetches = useRef(new Set<string>())
+  const activeConversationId = useRef(conversationId)
+  const windowGeneration = useRef(0)
+  const query = useInfiniteQuery({
+    ...conversationMessagesQueryOptions(conversationId ?? 'none'),
     enabled: Boolean(conversationId) && enabled,
-    staleTime: 1000 * 60, // 1 phút
   })
   const liveMessagesQuery = useQuery<MessageResponse[]>({
     queryKey: CHAT_QUERY_KEYS.liveMessages(conversationId ?? 'none'),
@@ -166,6 +182,9 @@ export function useConversationMessagesQuery(conversationId: string | null, enab
     enabled: Boolean(conversationId) && enabled,
     initialData: [],
     staleTime: Infinity,
+    gcTime: MESSAGE_CACHE_TIME,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
   })
   const { data, fetchNextPage, isFetchingNextPage } = query
   const latestRequests = useRef(new Map<string, Promise<void>>())
