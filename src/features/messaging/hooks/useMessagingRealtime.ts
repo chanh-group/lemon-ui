@@ -8,6 +8,7 @@ import {
   connectChatSocket,
   disconnectChatSocket,
   getChatSocket,
+  isChatSocketReady,
   type SocketConnectionStatus,
 } from '@/lib/socket'
 import { CHAT_QUERY_KEYS, type MessagePageParam } from '@/features/messaging/hooks/useMessages'
@@ -123,7 +124,7 @@ export function useChatRealtime(activeConversationId: string | null) {
   const [connectionStatus, setConnectionStatus] = useState<SocketConnectionStatus | null>(() => {
     if (status !== 'authenticated') return null
     const socket = getChatSocket()
-    return socket.connected ? 'connected' : socket.active ? 'connecting' : 'disconnected'
+    return isChatSocketReady() ? 'connected' : socket.active ? 'connecting' : 'disconnected'
   })
   const userId = user?.id
 
@@ -136,13 +137,14 @@ export function useChatRealtime(activeConversationId: string | null) {
 
   // 1. Quản lý kết nối socket theo trạng thái đăng nhập
   useEffect(() => {
-    if (status !== 'authenticated' || !userId) {
+    if (status === 'anonymous') {
       disconnectChatSocket()
       return
     }
+    if (status !== 'authenticated') return
 
     connectChatSocket()
-  }, [status, userId])
+  }, [status])
 
   // 2. Đăng ký realtime event listeners
   useEffect(() => {
@@ -277,7 +279,7 @@ export function useChatRealtime(activeConversationId: string | null) {
       if (activeConversationId) void verifyConversation(activeConversationId)
     }
 
-    const handleConnect = () => {
+    const handleReady = () => {
       setConnectionStatus('connected')
       refreshInbox()
       if (activeConversationId) {
@@ -285,6 +287,9 @@ export function useChatRealtime(activeConversationId: string | null) {
       } else {
         setConversationAccess('allowed')
       }
+    }
+    const handleConnect = () => {
+      // Chờ sự kiện 'ready' khi backend đã join đủ các room nghiệp vụ
     }
     const handleDisconnect = () => {
       refreshedInboxOnConnection.current = false
@@ -298,13 +303,14 @@ export function useChatRealtime(activeConversationId: string | null) {
     const handleReconnectAttempt = () => setConnectionStatus('connecting')
 
     socket.on('connect', handleConnect)
+    socket.on('ready', handleReady)
     socket.on('disconnect', handleDisconnect)
     socket.on('connect_error', handleConnectError)
     socket.io.on('reconnect_attempt', handleReconnectAttempt)
-    if (socket.connected && activeConversationId) {
+    if (isChatSocketReady() && activeConversationId) {
       refreshInbox()
       void verifyConversation(activeConversationId)
-    } else if (socket.connected) {
+    } else if (isChatSocketReady()) {
       refreshInbox()
     }
 
@@ -624,6 +630,7 @@ export function useChatRealtime(activeConversationId: string | null) {
       timersForEffect.clear()
       setPartnerTypingMap({})
       socket.off('connect', handleConnect)
+      socket.off('ready', handleReady)
       socket.off('disconnect', handleDisconnect)
       socket.off('connect_error', handleConnectError)
       socket.io.off('reconnect_attempt', handleReconnectAttempt)

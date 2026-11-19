@@ -132,7 +132,7 @@ export function MainPane({
                 </span>
                 <span className="text-sm font-semibold text-foreground">{label}</span>
                 {badge !== undefined && badge > 0 && (
-                  <span className="grid min-w-5 place-items-center rounded-full bg-primary px-1.5 text-[11px] leading-5 font-bold text-primary-foreground">
+                  <span className="grid min-w-5 place-items-center rounded-full bg-red-500 px-1.5 text-[11px] leading-5 font-bold text-white shadow-xs">
                     {badge > 9 ? '9+' : badge}
                   </span>
                 )}
