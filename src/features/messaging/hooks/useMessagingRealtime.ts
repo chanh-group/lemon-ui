@@ -11,7 +11,11 @@ import {
   isChatSocketReady,
   type SocketConnectionStatus,
 } from '@/lib/socket'
-import { CHAT_QUERY_KEYS, type MessagePageParam } from '@/features/messaging/hooks/useMessages'
+import {
+  applyRealtimeReaction,
+  CHAT_QUERY_KEYS,
+  type MessagePageParam,
+} from '@/features/messaging/hooks/useMessages'
 import { getConversationMessages } from '@/features/messaging/api/message.api'
 import { getConversationById, getGroupMembers } from '@/features/conversation/api/conversation.api'
 import { updateConversationLastMessage } from '@/features/conversation/utils/chat.mapper'
@@ -645,25 +649,7 @@ export function useChatRealtime(activeConversationId: string | null) {
 
     // F. Cập nhật cảm xúc tin nhắn (Điểm A)
     const handleMessageReaction = (payload: MessageReactionPayload) => {
-      const convId = payload.conversationId
-      queryClient.setQueryData<InfiniteData<MessageTimelineResponse, MessagePageParam>>(
-        CHAT_QUERY_KEYS.messages(convId),
-        (old) => {
-          if (!old) return old
-          return {
-            ...old,
-            pages: old.pages.map((page) => ({
-              ...page,
-              items: page.items.map((m) =>
-                m.id === payload.messageId ? { ...m, reactions: payload.reactions } : m,
-              ),
-            })),
-          }
-        },
-      )
-      queryClient.setQueryData<MessageResponse[]>(CHAT_QUERY_KEYS.liveMessages(convId), (old) =>
-        old?.map((m) => (m.id === payload.messageId ? { ...m, reactions: payload.reactions } : m)),
-      )
+      applyRealtimeReaction(queryClient, payload)
     }
 
     socket.on('message:new', handleNewMessage)

@@ -29,6 +29,7 @@ import {
 } from '@/features/conversation/hooks/useConversations'
 import { useChatRealtime } from '@/features/messaging/hooks/useMessagingRealtime'
 import { useStoriesList } from '@/features/story/hooks/useStories'
+import { getStoryById } from '@/features/story/api/stories.api'
 import {
   buildDayGroupsFromMessages,
   mapMessageResponse,
@@ -219,6 +220,7 @@ export function ChatShell() {
                 senderId: target.senderId,
                 kind: target.kind,
                 body: target.deletedAt ? null : target.body,
+                attachments: target.deletedAt ? undefined : target.attachments,
                 deletedAt: target.deletedAt,
                 storyPreview: target.deletedAt ? null : target.storyPreview,
               }
@@ -440,6 +442,19 @@ export function ChatShell() {
             conversation={selected}
             isVisible={!isMdDown || tab === 'messages'}
             onOpenStory={partnerStory ? () => setConversationStory(partnerStory) : undefined}
+            onLoadMessage={messagesQuery.loadMessageWindow}
+            onOpenStoryReply={(storyId) => {
+              void getStoryById(storyId, user?.id)
+                .then((story) => {
+                  const known = allStories.find((item) => item.id === storyId)
+                  setConversationStory(
+                    known
+                      ? { ...known, ...story, name: known.name, authorAvatar: known.authorAvatar }
+                      : story,
+                  )
+                })
+                .catch(() => toast.error(t('chat.replyUnavailable')))
+            }}
             groups={groups}
             messagesLoading={messagesQuery.isPending}
             messagesError={
@@ -557,8 +572,12 @@ export function ChatShell() {
       {conversationStory && (
         <StoryViewer
           key={conversationStory.id}
-          story={allStories.find((story) => story.id === conversationStory.id) ?? conversationStory}
-          stories={partnerStories}
+          story={conversationStory}
+          stories={
+            partnerStories.some((story) => story.id === conversationStory.id)
+              ? partnerStories
+              : [conversationStory]
+          }
           onSelectStory={setConversationStory}
           onClose={() => setConversationStory(null)}
         />

@@ -21,19 +21,18 @@ export function TextStoryEditor({ onDiscard, onShare, isSharing }: TextStoryEdit
       {/* Canvas tin — gõ thẳng lên như Facebook */}
       <div
         className={cn(
-          'flex aspect-[9/16] w-[min(100%,460px,calc(56.25dvh-90px))] shrink-0 flex-col rounded-2xl bg-linear-to-br p-4 shadow-xl',
+          'relative flex aspect-[9/16] w-[min(100%,460px,calc(56.25dvh-90px))] shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-linear-to-br p-8 text-center shadow-xl',
           TEXT_STORY_BG,
         )}
       >
-        <p className="text-[11px] font-medium text-white/80">{t('chat.storyPreview')}</p>
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder={t('chat.addTextHint')}
           aria-label={t('chat.addTextHint')}
-          rows={8}
+          rows={1}
           maxLength={140}
-          className="my-2 w-full flex-1 resize-none bg-transparent text-center text-2xl font-bold text-white outline-none placeholder:font-semibold placeholder:text-white/70"
+          className="max-h-full w-full resize-none overflow-y-auto bg-transparent text-center text-2xl font-bold text-white drop-shadow-md outline-none placeholder:font-semibold placeholder:text-white/70 [field-sizing:content]"
         />
       </div>
 

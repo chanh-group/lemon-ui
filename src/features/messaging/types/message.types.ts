@@ -77,6 +77,7 @@ export interface MessageReplyTarget {
   kind: MessageResponse['kind']
   body: string | null
   deletedAt: string | null
+  attachments?: MessageAttachmentItem[]
   storyPreview?: StoryPreview | null
 }
 

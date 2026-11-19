@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { ImagePlusIcon as MediaData } from '@hugeicons/core-free-icons'
 import { createIcon } from '@/components/icons/hugeIcon'
@@ -24,10 +25,16 @@ interface MediaStoryActorProps {
   /** Nhận kèm captionText để gửi API. */
   onShare: (file: File, captionText: string, durationMs?: number) => void
   isSharing: boolean
+  controlsTarget?: HTMLElement
 }
 
 /** Editor tin ảnh/video: chọn file (object URL), caption, xem trước 9:16. */
-export function MediaStoryEditor({ onDiscard, onShare, isSharing }: MediaStoryActorProps) {
+export function MediaStoryEditor({
+  onDiscard,
+  onShare,
+  isSharing,
+  controlsTarget,
+}: MediaStoryActorProps) {
   const { t } = useTranslation()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -141,162 +148,173 @@ export function MediaStoryEditor({ onDiscard, onShare, isSharing }: MediaStoryAc
     }
   }
 
-  return (
-    <div className="@container min-h-full">
-      <div className="grid min-h-full grid-cols-1 @3xl:grid-cols-[19rem_1fr]">
-        {/* Cột điều khiển */}
-        <div className="min-h-0 space-y-4 overflow-y-auto border-b border-border p-4 @3xl:border-b-0 @3xl:border-r">
-          {/* Chọn file ảnh/video */}
-          <label
-            htmlFor="stories-media-file"
-            className="flex cursor-pointer items-center gap-3 rounded-2xl border border-dashed border-border p-3 text-left transition-colors hover:bg-muted"
-          >
-            <span className="grid size-9 shrink-0 place-items-center rounded-full bg-muted text-brand-ink">
-              <Media className="size-4.5" aria-hidden="true" />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-semibold text-foreground">
-                {file ? file.name : t('chat.chooseMedia')}
-              </span>
-              <span className="block truncate text-xs text-muted-foreground">
-                {t('chat.chooseMediaHint')}
-              </span>
-            </span>
-            <input
-              ref={fileInputRef}
-              id="stories-media-file"
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime"
-              className="sr-only"
-              disabled={isProcessing || isSharing}
-              onChange={(e) => handleFile(e.target.files?.[0])}
-            />
+  const controls = (
+    <div className="space-y-4 border-b border-border p-4">
+      {/* Chọn file ảnh/video */}
+      <label
+        htmlFor="stories-media-file"
+        className="flex cursor-pointer items-center gap-3 rounded-2xl border border-dashed border-border p-3 text-left transition-colors hover:bg-muted"
+      >
+        <span className="grid size-9 shrink-0 place-items-center rounded-full bg-muted text-brand-ink">
+          <Media className="size-4.5" aria-hidden="true" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-semibold text-foreground">
+            {file ? file.name : t('chat.chooseMedia')}
+          </span>
+          <span className="block truncate text-xs text-muted-foreground">
+            {t('chat.chooseMediaHint')}
+          </span>
+        </span>
+        <input
+          ref={fileInputRef}
+          id="stories-media-file"
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime"
+          className="sr-only"
+          disabled={isProcessing || isSharing}
+          onChange={(e) => handleFile(e.target.files?.[0])}
+        />
+      </label>
+
+      {fileError && (
+        <p role="alert" className="text-sm text-red-500">
+          {fileError}
+        </p>
+      )}
+      {isVideo && isVideoDurationKnown(duration) && duration > STORY_MAX_VIDEO_SECONDS && (
+        <div className="space-y-2 text-sm text-foreground">
+          <label htmlFor="story-trim-start" className="block font-semibold">
+            {t('chat.storyTrimHint')}
           </label>
-
-          {fileError && (
-            <p role="alert" className="text-sm text-red-500">
-              {fileError}
-            </p>
-          )}
-          {isVideo && isVideoDurationKnown(duration) && duration > STORY_MAX_VIDEO_SECONDS && (
-            <div className="space-y-2 text-sm text-foreground">
-              <label htmlFor="story-trim-start" className="block font-semibold">
-                {t('chat.storyTrimHint')}
-              </label>
-              <input
-                id="story-trim-start"
-                type="range"
-                min={0}
-                max={maxTrimStartSeconds(duration)}
-                step={0.1}
-                value={trimStart}
-                disabled={isProcessing || isSharing}
-                onChange={(event) => {
-                  const start = Number(event.target.value)
-                  setTrimStart(start)
-                  if (videoRef.current) videoRef.current.currentTime = start
-                }}
-                className="w-full accent-primary"
-              />
-              <p>
-                {t('chat.storyTrimRange', {
-                  start: trimStart.toFixed(1),
-                  end: Math.min(duration, trimStart + STORY_MAX_TRIM_SECONDS).toFixed(1),
-                })}
-              </p>
-            </div>
-          )}
           <input
-            maxLength={500}
-            value={caption}
-            onChange={(e) => setCaption(e.target.value)}
-            placeholder={t('chat.storyCaptionPlaceholder')}
-            aria-label={t('chat.storyCaptionPlaceholder')}
-            className="w-full rounded-2xl border border-border bg-card px-4 py-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-ring"
+            id="story-trim-start"
+            type="range"
+            min={0}
+            max={maxTrimStartSeconds(duration)}
+            step={0.1}
+            value={trimStart}
+            disabled={isProcessing || isSharing}
+            onChange={(event) => {
+              const start = Number(event.target.value)
+              setTrimStart(start)
+              if (videoRef.current) videoRef.current.currentTime = start
+            }}
+            className="w-full accent-primary"
           />
+          <p>
+            {t('chat.storyTrimRange', {
+              start: trimStart.toFixed(1),
+              end: Math.min(duration, trimStart + STORY_MAX_TRIM_SECONDS).toFixed(1),
+            })}
+          </p>
         </div>
+      )}
+      <input
+        maxLength={500}
+        value={caption}
+        onChange={(e) => setCaption(e.target.value)}
+        placeholder={t('chat.storyCaptionPlaceholder')}
+        aria-label={t('chat.storyCaptionPlaceholder')}
+        className="w-full rounded-2xl border border-border bg-card px-4 py-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-ring"
+      />
+    </div>
+  )
 
-        {/* Xem trước */}
-        <div className="flex min-h-0 flex-col items-center justify-center gap-3 bg-background p-4">
-          {objectUrl && !isVideo && (
-            <img
-              src={objectUrl}
-              alt={caption || t('chat.storyPreview')}
-              className="aspect-[9/16] w-[min(100%,460px,calc(56.25dvh-90px))] shrink-0 rounded-2xl object-cover shadow-xl"
-            />
-          )}
-          {objectUrl && isVideo && (
-            <video
-              ref={videoRef}
-              src={objectUrl}
-              onLoadedMetadata={(event) => {
-                const value = event.currentTarget.duration
-                setDuration(isVideoDurationKnown(value) ? value : null)
-              }}
-              onError={() => {
-                setDuration(null)
-                setUnreadable(true)
-                setFileError(t('chat.storyVideoInvalid'))
-              }}
-              onTimeUpdate={(event) => {
-                if (
-                  isVideoDurationKnown(duration) &&
-                  duration > STORY_MAX_VIDEO_SECONDS &&
-                  event.currentTarget.currentTime >= trimStart + STORY_MAX_TRIM_SECONDS
-                ) {
-                  event.currentTarget.pause()
-                  event.currentTarget.currentTime = trimStart
-                }
-              }}
-              className="aspect-[9/16] w-[min(100%,460px,calc(56.25dvh-90px))] shrink-0 rounded-2xl object-cover shadow-xl"
-              playsInline
-              controls
-            />
-          )}
-          {!objectUrl ? (
+  return (
+    <div className="min-h-full">
+      {controlsTarget ? createPortal(controls, controlsTarget) : controls}
+      {/* Xem trước */}
+      <div className="flex min-h-full flex-col items-center justify-center gap-3 bg-background p-4">
+        {objectUrl && (
+          <div className="relative aspect-[9/16] w-[min(100%,460px,calc(56.25dvh-90px))] shrink-0 overflow-hidden rounded-2xl bg-card shadow-xl">
+            {!isVideo && (
+              <img
+                src={objectUrl}
+                alt={caption || t('chat.storyPreview')}
+                className="h-full w-full object-contain"
+              />
+            )}
+            {objectUrl && isVideo && (
+              <video
+                ref={videoRef}
+                src={objectUrl}
+                onLoadedMetadata={(event) => {
+                  const value = event.currentTarget.duration
+                  setDuration(isVideoDurationKnown(value) ? value : null)
+                }}
+                onError={() => {
+                  setDuration(null)
+                  setUnreadable(true)
+                  setFileError(t('chat.storyVideoInvalid'))
+                }}
+                onTimeUpdate={(event) => {
+                  if (
+                    isVideoDurationKnown(duration) &&
+                    duration > STORY_MAX_VIDEO_SECONDS &&
+                    event.currentTarget.currentTime >= trimStart + STORY_MAX_TRIM_SECONDS
+                  ) {
+                    event.currentTarget.pause()
+                    event.currentTarget.currentTime = trimStart
+                  }
+                }}
+                className="h-full w-full object-contain"
+                playsInline
+                controls
+              />
+            )}
+            {caption.trim() && (
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-background/75 to-transparent px-4 pb-16 pt-8">
+                <p className="whitespace-pre-wrap break-words text-center text-sm font-medium text-foreground">
+                  {caption.trim()}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+        {!objectUrl ? (
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="flex aspect-[9/16] w-[min(100%,460px,calc(56.25dvh-90px))] shrink-0 flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border bg-muted/40 text-muted-foreground transition-colors hover:border-ring hover:text-foreground"
+          >
+            <span className="grid size-14 place-items-center rounded-full bg-card ring-1 ring-border">
+              <Media className="size-7 text-brand-ink" aria-hidden="true" />
+            </span>
+            {t('chat.chooseMedia')}
+          </button>
+        ) : null}
+
+        <div className="flex w-[min(100%,460px,calc(56.25dvh-90px))] shrink-0 items-center justify-between gap-2 pb-2">
+          <button
+            type="button"
+            onClick={onDiscard}
+            disabled={isSharing}
+            className="rounded-xl bg-muted px-4 py-2 text-sm font-semibold text-muted-foreground transition-colors hover:bg-border hover:text-foreground"
+          >
+            {t('chat.discard')}
+          </button>
+          {isProcessing && (
             <button
               type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="flex aspect-[9/16] w-[min(100%,460px,calc(56.25dvh-90px))] shrink-0 flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border bg-muted/40 text-muted-foreground transition-colors hover:border-ring hover:text-foreground"
-            >
-              <span className="grid size-14 place-items-center rounded-full bg-card ring-1 ring-border">
-                <Media className="size-7 text-brand-ink" aria-hidden="true" />
-              </span>
-              {t('chat.chooseMedia')}
-            </button>
-          ) : null}
-
-          <div className="flex w-[min(100%,460px,calc(56.25dvh-90px))] shrink-0 items-center justify-between gap-2 pb-2">
-            <button
-              type="button"
-              onClick={onDiscard}
-              disabled={isSharing}
+              onClick={() => controllerRef.current?.abort()}
               className="rounded-xl bg-muted px-4 py-2 text-sm font-semibold text-muted-foreground transition-colors hover:bg-border hover:text-foreground"
             >
-              {t('chat.discard')}
+              {t('chat.cancel')}
             </button>
-            {isProcessing && (
-              <button
-                type="button"
-                onClick={() => controllerRef.current?.abort()}
-                className="rounded-xl bg-muted px-4 py-2 text-sm font-semibold text-muted-foreground transition-colors hover:bg-border hover:text-foreground"
-              >
-                {t('chat.cancel')}
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={share}
-              disabled={!canShare || isSharing || isProcessing}
-              className="flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground shadow-sm transition-all hover:opacity-90 active:scale-95 disabled:cursor-not-allowed disabled:opacity-45"
-            >
-              {isSharing
-                ? t('chat.pending')
-                : isProcessing
-                  ? t('chat.storyProcessing', { progress })
-                  : t('chat.shareStory')}
-            </button>
-          </div>
+          )}
+          <button
+            type="button"
+            onClick={share}
+            disabled={!canShare || isSharing || isProcessing}
+            className="flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground shadow-sm transition-all hover:opacity-90 active:scale-95 disabled:cursor-not-allowed disabled:opacity-45"
+          >
+            {isSharing
+              ? t('chat.pending')
+              : isProcessing
+                ? t('chat.storyProcessing', { progress })
+                : t('chat.shareStory')}
+          </button>
         </div>
       </div>
     </div>
