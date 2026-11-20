@@ -214,7 +214,7 @@ export function StoriesArchivePage() {
           if (!open && !remove.isPending) setStoryToDelete(null)
         }}
       >
-        <DialogContent>
+        <DialogContent className="text-foreground">
           <DialogHeader>
             <DialogTitle>{t('chat.deleteStoryConfirm')}</DialogTitle>
           </DialogHeader>
@@ -237,13 +237,13 @@ export function StoriesArchivePage() {
                   await remove.mutateAsync(storyToDelete.id)
                   setStoryToDelete(null)
                   toast.success(t('chat.storyDeleted'))
-                } catch (error) {
-                  toast.error(error instanceof Error ? error.message : t('chat.archiveLoadError'))
+                } catch {
+                  toast.error(t('chat.storyActionError'))
                 }
               }}
-              className="rounded-xl bg-destructive px-4 py-2 text-white disabled:opacity-50"
+              className="rounded-xl bg-destructive px-4 py-2 text-destructive-foreground disabled:opacity-50"
             >
-              {remove.isPending ? t('chat.pending') : t('chat.deleteStory')}
+              {t('chat.deleteStory')}
             </button>
           </div>
         </DialogContent>
