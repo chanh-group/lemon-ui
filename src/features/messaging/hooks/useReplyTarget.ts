@@ -23,10 +23,10 @@ export function useReplyTarget(
   // A null initial target is the payload saying "gone" — render it, never fetch.
   const queryEnabled = Boolean(
     enabled &&
-      conversationId &&
-      replyToId &&
-      initialTarget !== null &&
-      !isReplyTargetComplete(initialTarget),
+    conversationId &&
+    replyToId &&
+    initialTarget !== null &&
+    !isReplyTargetComplete(initialTarget),
   )
 
   const query = useQuery({

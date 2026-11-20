@@ -246,7 +246,10 @@ export function MessageReplyBubbleQuote({
         ))}
       <span className="min-w-0 flex-1">
         <span
-          className={cn('block truncate', quote.availability !== 'available' && 'italic opacity-80')}
+          className={cn(
+            'block truncate',
+            quote.availability !== 'available' && 'italic opacity-80',
+          )}
         >
           {isLoading ? '...' : quote.label}
         </span>
