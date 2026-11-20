@@ -71,15 +71,33 @@ export interface MessageResponse {
   deletedAt: string | null
 }
 
+export type ReplyContentCategory = 'MESSAGE' | 'ATTACHMENT' | 'VOICE' | 'STORY' | 'UNKNOWN'
+
+export interface ReplyAttachmentPreview {
+  id: string
+  kind: 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE'
+  fileName: string
+  mimeType: string
+  width?: number | null
+  height?: number | null
+  durationMs?: number | null
+  previewUrl?: string
+}
+
 export interface MessageReplyTarget {
   id: string
   senderId: string
+  sender?: { id: string; username: string; fullName: string; avatarUrl: string | null }
   kind: MessageResponse['kind']
   body: string | null
   deletedAt: string | null
   attachments?: MessageAttachmentItem[]
   storyPreview?: StoryPreview | null
+  contentCategory?: ReplyContentCategory
+  previewAttachment?: ReplyAttachmentPreview
 }
+
+export type ReplyTargetResponse = MessageReplyTarget
 
 export interface MessageTimelineResponse {
   items: MessageResponse[]

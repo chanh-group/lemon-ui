@@ -1,0 +1,118 @@
+import type { MessageReplyTarget, ReplyContentCategory } from '../types/message.types'
+
+export type ReplyAvailability = 'loading' | 'available' | 'removed' | 'unavailable'
+
+export interface ResolvedReplyQuote {
+  availability: ReplyAvailability
+  category: ReplyContentCategory
+  label: string
+  text?: string
+  thumbnailUrl?: string
+  canNavigate: boolean
+}
+
+/**
+ * Infer contentCategory when backend has not yet provided it (e.g. rolling deploy or optimistic state).
+ */
+export function inferReplyCategory(target: MessageReplyTarget): ReplyContentCategory {
+  if (target.contentCategory) return target.contentCategory
+  if (target.kind === 'STORY_REPLY' || target.kind === 'STORY_REACTION' || target.storyPreview) {
+    return 'STORY'
+  }
+  if (target.previewAttachment) {
+    return target.previewAttachment.kind === 'AUDIO' ? 'VOICE' : 'ATTACHMENT'
+  }
+  if (target.attachments && target.attachments.length > 0) {
+    return target.attachments.every((a) => a.kind === 'AUDIO') ? 'VOICE' : 'ATTACHMENT'
+  }
+  if (target.kind === 'AUDIO') return 'VOICE'
+  if (target.kind === 'IMAGE' || target.kind === 'VIDEO' || target.kind === 'FILE') {
+    return 'ATTACHMENT'
+  }
+  if (target.kind === 'TEXT') return 'MESSAGE'
+  return 'UNKNOWN'
+}
+
+/**
+ * Resolve UI quote presentation for a message reply target.
+ * Note: bubble quote NEVER shows "Replying to [name]".
+ */
+export function resolveReplyQuote(
+  target: MessageReplyTarget | null | undefined,
+  t: (key: string, options?: Record<string, unknown>) => string,
+): ResolvedReplyQuote {
+  if (!target) {
+    return {
+      availability: 'unavailable',
+      category: 'UNKNOWN',
+      label: t('chat.replyUnavailableContent'),
+      canNavigate: false,
+    }
+  }
+
+  const category = inferReplyCategory(target)
+
+  if (target.deletedAt) {
+    let label = t('chat.replyUnavailableContent')
+    switch (category) {
+      case 'MESSAGE':
+        label = t('chat.replyRemovedMessage')
+        break
+      case 'ATTACHMENT':
+        label = t('chat.replyRemovedAttachment')
+        break
+      case 'VOICE':
+        label = t('chat.replyRemovedVoice')
+        break
+      case 'STORY':
+        label = t('chat.replyUnavailableStory')
+        break
+      case 'UNKNOWN':
+      default:
+        label = t('chat.replyUnavailableContent')
+        break
+    }
+    return {
+      availability: 'removed',
+      category,
+      label,
+      canNavigate: true,
+    }
+  }
+
+  // Active message
+  let thumbnailUrl: string | undefined
+  if (target.previewAttachment?.previewUrl) {
+    thumbnailUrl = target.previewAttachment.previewUrl
+  } else if (target.attachments?.[0]?.kind === 'IMAGE') {
+    thumbnailUrl = target.attachments[0].previewUrl || target.attachments[0].downloadUrl
+  } else if (target.storyPreview) {
+    thumbnailUrl = target.storyPreview.mediaUrl || undefined
+  }
+  if (!thumbnailUrl || thumbnailUrl.trim() === '') {
+    thumbnailUrl = undefined
+  }
+
+  let text: string | undefined = target.body ?? undefined
+  if (!text) {
+    if (category === 'VOICE') {
+      text = t('chat.callVoiceLabel')
+    } else if (category === 'STORY' && target.storyPreview?.caption) {
+      text = target.storyPreview.caption
+    } else if (category === 'ATTACHMENT') {
+      text =
+        target.previewAttachment?.fileName ||
+        target.attachments?.[0]?.fileName ||
+        t('chat.attachment')
+    }
+  }
+
+  return {
+    availability: 'available',
+    category,
+    label: text || t('chat.attachment'),
+    text,
+    thumbnailUrl,
+    canNavigate: true,
+  }
+}

@@ -38,6 +38,9 @@ const ForwardIcon = createIcon(ForwardData)
 import { UserAvatar } from '@/components/common/UserAvatar'
 import { useAuth } from '@/features/auth/api'
 import { TypingIndicator } from './TypingIndicator'
+import { resolveReplyQuote } from '@/features/messaging/utils/replyQuote'
+import { useReplyTarget } from '@/features/messaging/hooks/useReplyTarget'
+import type { MessageReplyTarget } from '@/features/messaging/types/message.types'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import type {
@@ -166,28 +169,94 @@ function StoryReplyQuote({
     staleTime: 60_000,
   })
   const media = useStoryMedia(story.data ?? { id: preview.id })
-  const mediaUrl = story.data?.mediaUrl ?? media.data
+  const queryMediaUrl = story.data?.mediaUrl ?? media.data
+  const fallbackMediaUrl = preview.mediaUrl
+  const effectiveMediaUrl = (queryMediaUrl || fallbackMediaUrl || '').trim()
+  const isTextStory =
+    story.data?.kind === 'TEXT' || preview.kind === 'TEXT' || preview.kind === 'text'
+  const isVideo = story.data?.mediaType === 'video' || preview.kind === 'VIDEO'
+  const isUnavailable = story.isError
+
   return (
     <button
       type="button"
       onClick={() => onOpen?.(preview.id)}
       className="mb-2 flex max-w-full items-center gap-2 rounded-lg bg-muted/50 p-1.5 text-left text-xs hover:bg-muted"
     >
-      <span className="flex h-16 w-10 shrink-0 items-center justify-center overflow-hidden rounded bg-muted text-center text-[8px]">
-        {story.data?.kind === 'TEXT' ? (
-          <span className="line-clamp-4 break-all">{story.data.caption}</span>
-        ) : mediaUrl ? (
-          story.data?.mediaType === 'video' ? (
-            <video src={mediaUrl} muted preload="metadata" className="h-full w-full object-cover" />
+      {isTextStory ? (
+        <span
+          className="flex aspect-square size-12 shrink-0 items-center justify-center rounded p-1 text-center text-[8px] font-medium leading-tight text-foreground shadow-xs"
+          style={{
+            backgroundColor: story.data?.background || preview.background || '#2a2a2a',
+          }}
+        >
+          <span className="line-clamp-3 break-words">
+            {story.data?.caption || preview.caption || ''}
+          </span>
+        </span>
+      ) : (
+        <span className="flex aspect-square size-12 shrink-0 items-center justify-center overflow-hidden rounded bg-muted text-center text-[8px]">
+          {effectiveMediaUrl ? (
+            isVideo ? (
+              <video
+                src={effectiveMediaUrl}
+                muted
+                preload="metadata"
+                className="size-full object-cover"
+              />
+            ) : (
+              <img src={effectiveMediaUrl} alt="" className="size-full object-cover" />
+            )
           ) : (
-            <img src={mediaUrl} alt="" className="h-full w-full object-cover" />
-          )
-        ) : null}
+            <span className="text-muted-foreground text-[10px]">Story</span>
+          )}
+        </span>
+      )}
+      <span className="min-w-0 flex-1">
+        <span
+          className={cn(
+            'block truncate font-medium text-xs text-foreground',
+            isUnavailable && 'italic opacity-80 text-muted-foreground',
+          )}
+        >
+          {isUnavailable
+            ? t('chat.replyUnavailableStory')
+            : preview.caption || story.data?.caption || t('chat.storyLabel', 'Tin')}
+        </span>
       </span>
-      <span className="min-w-0">
-        <span className="block text-[11px] text-muted-foreground">{t('chat.replyToStory')}</span>
-        <span className="block truncate">
-          {story.isError ? t('chat.replyUnavailable') : preview.caption || t('chat.unnamedStory')}
+    </button>
+  )
+}
+
+function MessageReplyBubbleQuote({
+  conversationId,
+  replyToId,
+  initialTarget,
+  onJumpToMessage,
+}: {
+  conversationId?: string
+  replyToId: string
+  initialTarget?: MessageReplyTarget | null
+  onJumpToMessage?: (messageId: string) => void
+}) {
+  const { t } = useTranslation()
+  const { target, isLoading } = useReplyTarget(conversationId, replyToId, initialTarget)
+  const quote = resolveReplyQuote(target, t)
+
+  return (
+    <button
+      type="button"
+      onClick={() => onJumpToMessage?.(replyToId)}
+      className="mb-1 flex max-w-full items-center gap-2 rounded border-l-2 border-muted-foreground/30 bg-muted/40 px-2 py-1 text-left text-[11px] text-muted-foreground hover:bg-muted/70"
+    >
+      {quote.thumbnailUrl && (
+        <img src={quote.thumbnailUrl} alt="" className="size-9 shrink-0 rounded object-cover" />
+      )}
+      <span className="min-w-0 flex-1">
+        <span
+          className={cn('block truncate', quote.availability === 'removed' && 'italic opacity-80')}
+        >
+          {isLoading ? '...' : quote.label}
         </span>
       </span>
     </button>
@@ -195,6 +264,7 @@ function StoryReplyQuote({
 }
 
 const MessageRowView = memo(function MessageRowView({
+  conversationId,
   group,
   messageIndex,
   senderLabel,
@@ -214,6 +284,7 @@ const MessageRowView = memo(function MessageRowView({
   onRetryMessage,
   highlighted,
 }: {
+  conversationId?: string
   group: MessageGroup
   messageIndex: number
   senderLabel: string
@@ -240,8 +311,6 @@ const MessageRowView = memo(function MessageRowView({
   const isFirst = messageIndex === 0
   const isLast = messageIndex === total - 1
   const authorName = group.sender ?? senderLabel
-  const replyTargetName =
-    msg.replyTarget?.senderId === currentUserId ? t('chat.you') : isGroup ? null : senderLabel
   const hasAttachments = Boolean(msg.attachments && msg.attachments.length > 0)
   const firstAttachment = hasAttachments ? msg.attachments![0] : undefined
 
@@ -418,37 +487,12 @@ const MessageRowView = memo(function MessageRowView({
           )}
 
           {!msg.deletedAt && msg.replyToId && (
-            <button
-              type="button"
-              onClick={() => onJumpToMessage?.(msg.replyToId!)}
-              className="mb-1 flex max-w-full items-center gap-2 rounded border-l-2 border-muted-foreground/30 bg-muted/40 px-2 py-1 text-left text-[11px] text-muted-foreground hover:bg-muted/70"
-            >
-              {msg.replyTarget?.attachments?.[0]?.kind === 'IMAGE' && (
-                <img
-                  src={
-                    msg.replyTarget.attachments[0].previewUrl ||
-                    msg.replyTarget.attachments[0].downloadUrl
-                  }
-                  alt=""
-                  className="size-9 shrink-0 rounded object-cover"
-                />
-              )}
-              <span className="min-w-0">
-                <span className="block">
-                  {replyTargetName
-                    ? t('chat.replyingTo', { name: replyTargetName })
-                    : t('chat.replyMessage')}
-                </span>
-                <span className="block truncate">
-                  {!msg.replyTarget || msg.replyTarget.deletedAt
-                    ? t('chat.replyUnavailable')
-                    : msg.replyTarget.body ||
-                      (msg.replyTarget.storyPreview
-                        ? t('chat.replyToStory')
-                        : t('chat.attachment'))}
-                </span>
-              </span>
-            </button>
+            <MessageReplyBubbleQuote
+              conversationId={conversationId}
+              replyToId={msg.replyToId}
+              initialTarget={msg.replyTarget}
+              onJumpToMessage={onJumpToMessage}
+            />
           )}
 
           {!msg.deletedAt && msg.storyPreview && (
@@ -928,6 +972,7 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
       />
     ) : (
       <MessageRowView
+        conversationId={conversationId}
         group={row.group}
         messageIndex={row.messageIndex}
         senderLabel={senderLabel}
