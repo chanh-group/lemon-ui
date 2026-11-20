@@ -5,6 +5,7 @@ import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/infrastructure/api/errors'
 import { queryKeys } from '@/infrastructure/query/keys'
+import type { MessageResponse } from '@/features/messaging/types/message.types'
 import { CHAT_QUERY_KEYS } from './useMessages'
 import { useChatRealtime } from './useMessagingRealtime'
 
@@ -44,18 +45,20 @@ vi.mock('@/features/messaging/utils/messageSync', () => ({
 
 function createSocket() {
   const listeners = new Map<string, Set<(value?: unknown) => void>>()
+  const on = vi.fn((event: string, listener: (value?: unknown) => void) => {
+    const handlers = listeners.get(event) ?? new Set()
+    handlers.add(listener)
+    listeners.set(event, handlers)
+  })
+  const off = vi.fn((event: string, listener: (value?: unknown) => void) => {
+    listeners.get(event)?.delete(listener)
+  })
   return {
     connected: false,
     active: false,
     io: { on: vi.fn(), off: vi.fn() },
-    on(event: string, listener: (value?: unknown) => void) {
-      const handlers = listeners.get(event) ?? new Set()
-      handlers.add(listener)
-      listeners.set(event, handlers)
-    },
-    off(event: string, listener: (value?: unknown) => void) {
-      listeners.get(event)?.delete(listener)
-    },
+    on,
+    off,
     emit(event: string, value?: unknown) {
       listeners.get(event)?.forEach((listener) => listener(value))
     },
@@ -210,6 +213,64 @@ describe('useChatRealtime reconnect access', () => {
     expect(result.current.conversationAccess).toBe('allowed')
     expect(mocks.getConversation).not.toHaveBeenCalled()
     await waitFor(() => expect(mocks.fetchMissedMessages).toHaveBeenCalled())
+  })
+
+  it('keeps socket listeners bound while switching conversations', () => {
+    const friend1 = { id: 'friend-1', kind: 'DIRECT', isGroup: false }
+    const friend2 = { id: 'friend-2', kind: 'DIRECT', isGroup: false }
+    queryClient.setQueryData(CHAT_QUERY_KEYS.conversations, [friend1, friend2])
+
+    const { rerender } = renderHook(({ convId }: { convId: string }) => useChatRealtime(convId), {
+      wrapper,
+      initialProps: { convId: friend1.id },
+    })
+    const listenerCount = socket.on.mock.calls.length
+
+    rerender({ convId: friend2.id })
+
+    expect(socket.on).toHaveBeenCalledTimes(listenerCount)
+    expect(socket.off).not.toHaveBeenCalled()
+  })
+
+  it('deduplicates an in-flight missed-message sync and updates read state locally', async () => {
+    const friend1 = { id: 'friend-1', kind: 'DIRECT', isGroup: false, unreadCount: 2 }
+    const friend2 = { id: 'friend-2', kind: 'DIRECT', isGroup: false, unreadCount: 1 }
+    queryClient.setQueryData(CHAT_QUERY_KEYS.conversations, [friend1, friend2])
+    queryClient.setQueryData(CHAT_QUERY_KEYS.messages(friend1.id), {
+      pages: [{ items: [{ id: 'm-1' }], hasMore: false }],
+      pageParams: [undefined],
+    })
+    let resolveMissed!: (messages: MessageResponse[]) => void
+    mocks.fetchMissedMessages.mockImplementation(
+      () => new Promise<MessageResponse[]>((resolve) => (resolveMissed = resolve)),
+    )
+
+    const { rerender } = renderHook(({ convId }: { convId: string }) => useChatRealtime(convId), {
+      wrapper,
+      initialProps: { convId: friend1.id },
+    })
+    await waitFor(() => expect(mocks.fetchMissedMessages).toHaveBeenCalledTimes(1))
+
+    rerender({ convId: friend2.id })
+    rerender({ convId: friend1.id })
+    expect(mocks.fetchMissedMessages).toHaveBeenCalledTimes(1)
+
+    act(() => {
+      socket.emit('read:updated', {
+        conversationId: friend1.id,
+        userId: 'viewer',
+        lastReadMessageId: 'm-1',
+        readAt: '2026-11-20T00:00:00.000Z',
+      })
+    })
+    expect(
+      queryClient.getQueryData<(typeof friend1)[]>(CHAT_QUERY_KEYS.conversations)?.[0],
+    ).toEqual({
+      ...friend1,
+      unreadCount: 0,
+    })
+
+    await act(async () => resolveMissed([]))
   })
 
   it('purges stale message cache when switching to a group with an epoch mismatch', async () => {

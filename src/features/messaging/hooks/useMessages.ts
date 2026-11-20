@@ -162,6 +162,10 @@ function conversationMessagesQueryOptions(conversationId: string) {
 }
 
 export function prefetchConversationMessages(queryClient: QueryClient, conversationId: string) {
+  const state = queryClient.getQueryState(CHAT_QUERY_KEYS.messages(conversationId))
+  if (state?.dataUpdatedAt && Date.now() - state.dataUpdatedAt < MESSAGE_STALE_TIME) {
+    return Promise.resolve()
+  }
   return queryClient.prefetchInfiniteQuery(conversationMessagesQueryOptions(conversationId))
 }
 
@@ -691,8 +695,11 @@ export function useMarkReadMutation() {
       lastReadMessageId: string
     }) => markConversationRead(conversationId, lastReadMessageId),
     onSuccess: (_, { conversationId }) => {
-      void queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.conversations })
-      void queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.conversation(conversationId) })
+      queryClient.setQueryData<ConversationResponse[]>(CHAT_QUERY_KEYS.conversations, (old) =>
+        old?.map((conversation) =>
+          conversation.id === conversationId ? { ...conversation, unreadCount: 0 } : conversation,
+        ),
+      )
     },
     onError: (error) => {
       toast.error(error instanceof Error ? error.message : t('chat.markReadError'))
