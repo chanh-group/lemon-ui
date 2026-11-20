@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MessageComposer } from './MessageComposer'
+import { getConversationDraft, setConversationDraft } from '@/features/messaging/utils/draftStore'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -25,18 +26,8 @@ afterEach(() => {
 type Submit = NonNullable<Parameters<typeof MessageComposer>[0]['onSubmit']>
 
 function renderComposer(conversationId: string, onSubmit: Submit) {
-  function Harness() {
-    const [draft, setDraft] = useState('ok')
-    return (
-      <MessageComposer
-        conversationId={conversationId}
-        draft={draft}
-        onDraftChange={setDraft}
-        onSubmit={onSubmit}
-      />
-    )
-  }
-  render(<Harness />)
+  setConversationDraft(conversationId, 'ok')
+  render(<MessageComposer conversationId={conversationId} onSubmit={onSubmit} />)
   return screen.getByRole('textbox') as HTMLInputElement
 }
 
@@ -135,5 +126,35 @@ describe('MessageComposer pending send', () => {
     // Keydown standard Enter without composition
     fireEvent.keyDown(input, { key: 'Enter', shiftKey: false, isComposing: false })
     expect(onSubmit).toHaveBeenCalledOnce()
+  })
+})
+
+describe('MessageComposer draft persistence', () => {
+  it('persists the draft per conversation and restores it when switching', async () => {
+    const onSubmit = vi.fn().mockResolvedValue(true)
+    setConversationDraft('draft-conv-a', 'draft A')
+    setConversationDraft('draft-conv-b', 'draft B')
+
+    function Harness() {
+      const [conversationId, setConversationId] = useState('draft-conv-a')
+      return (
+        <>
+          <MessageComposer conversationId={conversationId} onSubmit={onSubmit} />
+          <button type="button" onClick={() => setConversationId('draft-conv-b')}>
+            switch
+          </button>
+        </>
+      )
+    }
+    render(<Harness />)
+    const input = screen.getByRole('textbox') as HTMLInputElement
+    expect(input.value).toBe('draft A')
+
+    fireEvent.change(input, { target: { value: 'draft A typed' } })
+    expect(getConversationDraft('draft-conv-a')).toBe('draft A typed')
+
+    fireEvent.click(screen.getByRole('button', { name: 'switch' }))
+    await waitFor(() => expect(input.value).toBe('draft B'))
+    expect(getConversationDraft('draft-conv-b')).toBe('draft B')
   })
 })

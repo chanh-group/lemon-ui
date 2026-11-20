@@ -36,8 +36,6 @@ export interface PendingFile {
 
 interface MessageComposerProps {
   conversationId: string
-  draft?: string
-  onDraftChange?: (v: string) => void
   onSubmit: (
     text: string,
     attachments?: MessageAttachmentInput[],
@@ -54,8 +52,6 @@ interface MessageComposerProps {
 
 export function MessageComposer({
   conversationId,
-  draft: draftProp,
-  onDraftChange,
   onSubmit,
   disabled = false,
   isSending = false,
@@ -64,19 +60,14 @@ export function MessageComposer({
   replyToId,
 }: MessageComposerProps) {
   const { t } = useTranslation()
-  const isControlled = draftProp !== undefined
-  const [internalDraft, setInternalDraft] = useState(() =>
-    draftProp !== undefined ? draftProp : getConversationDraft(conversationId),
-  )
+  const [draft, setDraft] = useState(() => getConversationDraft(conversationId))
   const [prevConversationId, setPrevConversationId] = useState(conversationId)
 
-  if (!isControlled && conversationId !== prevConversationId) {
+  if (conversationId !== prevConversationId) {
     setPrevConversationId(conversationId)
-    const stored = getConversationDraft(conversationId)
-    setInternalDraft(stored)
+    setDraft(getConversationDraft(conversationId))
   }
 
-  const draft = isControlled ? draftProp : internalDraft
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -211,11 +202,8 @@ export function MessageComposer({
 
   const handleChange = (val: string) => {
     draftRef.current = val
-    if (!isControlled) {
-      setInternalDraft(val)
-      setConversationDraft(conversationId, val)
-    }
-    onDraftChange?.(val)
+    setDraft(val)
+    setConversationDraft(conversationId, val)
     if (val.trim()) {
       onTypingStart?.()
       if (typingTimer.current) clearTimeout(typingTimer.current)
@@ -334,11 +322,8 @@ export function MessageComposer({
     setPendingFiles((current) => current.filter((file) => !sentIds.has(file.id)))
     setIsUploadingAttachment(filesToSend.length > 0)
     draftRef.current = ''
-    if (!isControlled) {
-      setInternalDraft('')
-      setConversationDraft(conversationId, '')
-    }
-    onDraftChange?.('')
+    setDraft('')
+    setConversationDraft(conversationId, '')
 
     try {
       const submitted = await onSubmit(
@@ -355,12 +340,12 @@ export function MessageComposer({
         })
         requestAnimationFrame(() => inputRef.current?.focus())
       } else {
-        draftRef.current = textToSend
-        if (!isControlled) {
-          setInternalDraft(textToSend)
+        // Restore the failed text only when nothing was typed while the send was in flight.
+        if (!draftRef.current) {
+          draftRef.current = textToSend
+          setDraft(textToSend)
           setConversationDraft(conversationId, textToSend)
         }
-        onDraftChange?.(textToSend)
         setPendingFiles((current) => [...filesToSend, ...current])
       }
     } catch {
