@@ -102,6 +102,10 @@ export function MediaStoryEditor({
 
   const isVideo = file?.type.startsWith('video') ?? false
   const canShare = Boolean(file) && !unreadable
+  const showTrim = isVideo && isVideoDurationKnown(duration) && duration > STORY_MAX_VIDEO_SECONDS
+  const frameWidth = showTrim
+    ? 'w-[min(100%,460px,calc(56.25dvh-135px))]'
+    : 'w-[min(100%,460px,calc(56.25dvh-90px))]'
 
   const share = async () => {
     if (!file || !canShare || isProcessing || isSharing) return
@@ -182,34 +186,6 @@ export function MediaStoryEditor({
           {fileError}
         </p>
       )}
-      {isVideo && isVideoDurationKnown(duration) && duration > STORY_MAX_VIDEO_SECONDS && (
-        <div className="space-y-2 text-sm text-foreground">
-          <label htmlFor="story-trim-start" className="block font-semibold">
-            {t('chat.storyTrimHint')}
-          </label>
-          <input
-            id="story-trim-start"
-            type="range"
-            min={0}
-            max={maxTrimStartSeconds(duration)}
-            step={0.1}
-            value={trimStart}
-            disabled={isProcessing || isSharing}
-            onChange={(event) => {
-              const start = Number(event.target.value)
-              setTrimStart(start)
-              if (videoRef.current) videoRef.current.currentTime = start
-            }}
-            className="w-full accent-primary"
-          />
-          <p>
-            {t('chat.storyTrimRange', {
-              start: trimStart.toFixed(1),
-              end: Math.min(duration, trimStart + STORY_MAX_TRIM_SECONDS).toFixed(1),
-            })}
-          </p>
-        </div>
-      )}
       <input
         maxLength={500}
         value={caption}
@@ -222,12 +198,14 @@ export function MediaStoryEditor({
   )
 
   return (
-    <div className="min-h-full">
+    <div className="flex min-h-full flex-col md:h-full">
       {controlsTarget ? createPortal(controls, controlsTarget) : controls}
       {/* Xem trước */}
-      <div className="flex min-h-full flex-col items-center justify-center gap-3 bg-background p-4">
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 overflow-y-auto bg-background p-4 [justify-content:safe_center]">
         {objectUrl && (
-          <div className="relative aspect-[9/16] w-[min(100%,460px,calc(56.25dvh-90px))] shrink-0 overflow-hidden rounded-2xl bg-card shadow-xl">
+          <div
+            className={`relative aspect-[9/16] ${frameWidth} shrink-0 overflow-hidden rounded-2xl bg-card shadow-xl`}
+          >
             {!isVideo && (
               <img
                 src={objectUrl}
@@ -276,7 +254,7 @@ export function MediaStoryEditor({
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="flex aspect-[9/16] w-[min(100%,460px,calc(56.25dvh-90px))] shrink-0 flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border bg-muted/40 text-muted-foreground transition-colors hover:border-ring hover:text-foreground"
+            className={`flex aspect-[9/16] ${frameWidth} shrink-0 flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border bg-muted/40 text-muted-foreground transition-colors hover:border-ring hover:text-foreground`}
           >
             <span className="grid size-14 place-items-center rounded-full bg-card ring-1 ring-border">
               <Media className="size-7 text-brand-ink" aria-hidden="true" />
@@ -285,7 +263,35 @@ export function MediaStoryEditor({
           </button>
         ) : null}
 
-        <div className="flex w-[min(100%,460px,calc(56.25dvh-90px))] shrink-0 items-center justify-between gap-2 pb-2">
+        {showTrim && (
+          <div className={`${frameWidth} space-y-2 text-sm text-foreground`}>
+            <label htmlFor="story-trim-start" className="block font-semibold">
+              {t('chat.storyTrimHint')}
+            </label>
+            <input
+              id="story-trim-start"
+              type="range"
+              min={0}
+              max={maxTrimStartSeconds(duration)}
+              step={0.1}
+              value={trimStart}
+              disabled={isProcessing || isSharing}
+              onChange={(event) => {
+                const start = Number(event.target.value)
+                setTrimStart(start)
+                if (videoRef.current) videoRef.current.currentTime = start
+              }}
+              className="w-full accent-primary"
+            />
+            <p>
+              {t('chat.storyTrimRange', {
+                start: trimStart.toFixed(1),
+                end: Math.min(duration, trimStart + STORY_MAX_TRIM_SECONDS).toFixed(1),
+              })}
+            </p>
+          </div>
+        )}
+        <div className={`flex ${frameWidth} shrink-0 items-center justify-between gap-2 pb-2`}>
           <button
             type="button"
             onClick={onDiscard}

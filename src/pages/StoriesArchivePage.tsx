@@ -1,4 +1,13 @@
 import { useState } from 'react'
+import { Trash2 } from 'lucide-react'
+import { toast } from 'sonner'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ArchiveIcon, ArrowLeft01Icon } from '@hugeicons/core-free-icons'
@@ -6,7 +15,11 @@ import { createIcon } from '@/components/icons/hugeIcon'
 import { ROUTES } from '@/config/constants'
 import { StoryViewer } from '@/features/story/components/StoryViewer'
 import { SideNav } from '@/features/shell/components/SideNav'
-import { useArchivedStories, useStoryMedia } from '@/features/story/hooks/useStories'
+import {
+  useArchivedStories,
+  useDeleteStory,
+  useStoryMedia,
+} from '@/features/story/hooks/useStories'
 import { resolveArchiveAuthor } from '@/features/story/utils/storyAuthor'
 import type { StoryEntry } from '@/features/story/types/story.types'
 import { TEXT_STORY_BG } from '@/features/story/data/storiesData'
@@ -30,6 +43,8 @@ export function StoriesArchivePage() {
     queryFn: getStorageUsage,
   })
   const [selectedStory, setSelectedStory] = useState<StoryEntry | null>(null)
+  const [storyToDelete, setStoryToDelete] = useState<StoryEntry | null>(null)
+  const remove = useDeleteStory()
 
   const formatDate = (value?: string) => {
     if (!value || Number.isNaN(Date.parse(value))) return t('chat.archivedStory')
@@ -117,7 +132,7 @@ export function StoriesArchivePage() {
             {isLoading ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                 {Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} className="aspect-[9/16] rounded-xl bg-muted animate-pulse" />
+                  <div key={i} className="aspect-9/16 rounded-xl bg-muted animate-pulse" />
                 ))}
               </div>
             ) : isError && !data ? (
@@ -141,38 +156,47 @@ export function StoriesArchivePage() {
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                 {items.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => setSelectedStory(item)}
-                    className="group relative flex aspect-[9/16] flex-col justify-between overflow-hidden rounded-xl bg-neutral-900 border border-white/10 shadow-md text-left transition-transform hover:scale-[1.02] cursor-pointer"
-                  >
-                    {/* Media or Text Background */}
-                    <div className="absolute inset-0">
-                      {item.kind === 'MEDIA' ? (
-                        <ArchiveMedia story={item} />
-                      ) : (
-                        <div
-                          className={cn(
-                            'h-full w-full flex items-center justify-center p-3 text-center text-xs font-bold text-white bg-linear-to-br',
-                            item.background || TEXT_STORY_BG,
-                          )}
-                        >
-                          <span className="line-clamp-4">
-                            {item.caption || t('chat.archiveTextStory')}
-                          </span>
-                        </div>
-                      )}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/40" />
-                    </div>
+                  <div key={item.id} className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedStory(item)}
+                      className="group relative flex w-full aspect-9/16 flex-col justify-between overflow-hidden rounded-xl bg-neutral-900 border border-white/10 shadow-md text-left transition-transform hover:scale-[1.02] cursor-pointer"
+                    >
+                      {/* Media or Text Background */}
+                      <div className="absolute inset-0">
+                        {item.kind === 'MEDIA' ? (
+                          <ArchiveMedia story={item} />
+                        ) : (
+                          <div
+                            className={cn(
+                              'h-full w-full flex items-center justify-center p-3 text-center text-xs font-bold text-white bg-linear-to-br',
+                              item.background || TEXT_STORY_BG,
+                            )}
+                          >
+                            <span className="line-clamp-4">
+                              {item.caption || t('chat.archiveTextStory')}
+                            </span>
+                          </div>
+                        )}
+                        <div className="absolute inset-0 bg-linear-to-t from-black/80 via-transparent to-black/40" />
+                      </div>
 
-                    {/* Top date badge */}
-                    <div className="relative z-10 p-2.5">
-                      <span className="text-[11px] font-semibold text-white/90 drop-shadow-md">
-                        {item.time}
-                      </span>
-                    </div>
-                  </button>
+                      {/* Top date badge */}
+                      <div className="relative z-10 p-2.5">
+                        <span className="text-[11px] font-semibold text-white/90 drop-shadow-md">
+                          {item.time}
+                        </span>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setStoryToDelete(item)}
+                      aria-label={`${t('chat.deleteStory')}: ${item.caption?.trim().slice(0, 30) || item.time}`}
+                      className="absolute right-2 top-2 z-20 grid size-10 place-items-center rounded-full bg-black/70 text-white hover:bg-black focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                    >
+                      <Trash2 size={18} aria-hidden="true" />
+                    </button>
+                  </div>
                 ))}
               </div>
             )}
@@ -190,6 +214,46 @@ export function StoriesArchivePage() {
         </div>
       </div>
 
+      <Dialog
+        open={Boolean(storyToDelete)}
+        onOpenChange={(open) => {
+          if (!open && !remove.isPending) setStoryToDelete(null)
+        }}
+      >
+        <DialogContent className="text-foreground" showCloseButton={!remove.isPending}>
+          <DialogHeader>
+            <DialogTitle>{t('chat.deleteStoryConfirm')}</DialogTitle>
+          </DialogHeader>
+          <DialogDescription>{t('chat.archiveDeleteHint')}</DialogDescription>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              disabled={remove.isPending}
+              onClick={() => setStoryToDelete(null)}
+              className="rounded-xl bg-muted px-4 py-2"
+            >
+              {t('chat.cancel')}
+            </button>
+            <button
+              type="button"
+              disabled={remove.isPending}
+              onClick={async () => {
+                if (!storyToDelete || remove.isPending) return
+                try {
+                  await remove.mutateAsync(storyToDelete.id)
+                  setStoryToDelete(null)
+                  toast.success(t('chat.storyDeleted'))
+                } catch {
+                  toast.error(t('chat.storyActionError'))
+                }
+              }}
+              className="rounded-xl bg-destructive px-4 py-2 text-destructive-foreground disabled:opacity-50"
+            >
+              {t('chat.deleteStory')}
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
       {selectedStory && (
         <StoryViewer
           key={selectedStory.id}
