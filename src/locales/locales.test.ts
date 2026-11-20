@@ -176,4 +176,30 @@ describe('Localization Integrity & Avatar Text Tests', () => {
       expect(typeof viChat[key]).toBe('string')
     }
   })
+
+  it('matches exact removed-content reply labels and story counts for EN and VI', async () => {
+    const i18n = createInstance()
+    await i18n.init({
+      lng: 'vi',
+      resources: { vi: { translation: vi }, en: { translation: en } },
+      interpolation: { escapeValue: false },
+    })
+
+    expect(i18n.t('chat.replyRemovedMessage')).toBe('Đã gỡ tin nhắn')
+    expect(i18n.t('chat.replyRemovedAttachment')).toBe('Tệp đính kèm đã gỡ')
+    expect(i18n.t('chat.replyRemovedVoice')).toBe('Tệp thoại đã gỡ')
+    expect(i18n.t('chat.replyUnavailableStory')).toBe('Tin không còn nữa')
+    expect(i18n.t('chat.replyUnavailableContent')).toBe('Nội dung không khả dụng')
+    expect(i18n.t('chat.voiceNoteLabel')).toBe('Tệp thoại')
+    expect(i18n.t('chat.storyCount', { count: 2 })).toBe('2 tin')
+
+    await i18n.changeLanguage('en')
+    expect(i18n.t('chat.replyRemovedMessage')).toBe('Message removed')
+    expect(i18n.t('chat.replyRemovedAttachment')).toBe('Attachment removed')
+    expect(i18n.t('chat.replyRemovedVoice')).toBe('Voice note removed')
+    expect(i18n.t('chat.replyUnavailableStory')).toBe('Story no longer available')
+    expect(i18n.t('chat.replyUnavailableContent')).toBe('Content unavailable')
+    expect(i18n.t('chat.voiceNoteLabel')).toBe('Voice note')
+    expect(i18n.t('chat.storyCount', { count: 2 })).toBe('2 stories')
+  })
 })

@@ -15,11 +15,8 @@ import { ConversationInfoPanel } from './ConversationInfoPanel'
 import { MessageList, type MessageListHandle } from './MessageList'
 import { MessageComposer, type PendingFile } from './MessageComposer'
 import type { MessageScrollPosition } from '@/features/messaging/utils/messageScrollPosition'
-import {
-  clearConversationDraft,
-  getConversationDraft,
-  setConversationDraft,
-} from '@/features/messaging/utils/draftStore'
+import { clearConversationDraft } from '@/features/messaging/utils/draftStore'
+import { ApiError } from '@/infrastructure/api/errors'
 
 interface ConversationViewProps {
   conversation: Conversation
@@ -98,11 +95,6 @@ export function ConversationView({
 }: ConversationViewProps) {
   const { t } = useTranslation()
   const [initialRestorePosition] = useState(restorePosition)
-  const [draft, setDraftState] = useState(() => getConversationDraft(conversation.id))
-  const handleDraftChange = (nextDraft: string) => {
-    setDraftState(nextDraft)
-    setConversationDraft(conversation.id, nextDraft)
-  }
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null)
   const [isInfoOpen, setIsInfoOpen] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -182,17 +174,34 @@ export function ConversationView({
 
   const jumpToMessage = async (messageId: string) => {
     const request = ++targetRequest.current
-    setTargetMessageId(null)
-    atBottomRef.current = false
-    setAtBottom(false)
-    setShowJump(true)
-    if (messageListRef.current?.scrollToMessage(messageId)) return
+    if (messageListRef.current?.scrollToMessage(messageId)) {
+      atBottomRef.current = false
+      setAtBottom(false)
+      setShowJump(true)
+      setTargetMessageId(null)
+      return
+    }
     try {
       if (!onLoadMessage) throw new Error('Message unavailable')
       await onLoadMessage(messageId)
-      if (request === targetRequest.current) setTargetMessageId(messageId)
-    } catch {
-      if (request === targetRequest.current) toast.error(t('chat.replyUnavailable'))
+      if (request === targetRequest.current) {
+        atBottomRef.current = false
+        setAtBottom(false)
+        setShowJump(true)
+        setTargetMessageId(messageId)
+      }
+    } catch (err: unknown) {
+      if (request === targetRequest.current) {
+        setTargetMessageId(null)
+        if (err instanceof ApiError && (err.status === 404 || err.code === 'MESSAGE_NOT_FOUND')) {
+          toast.info(t('chat.replyUnavailableContent'))
+          return
+        }
+        if (err instanceof ApiError && (err.status === 403 || err.code === 'NOT_PARTICIPANT')) {
+          return
+        }
+        toast.error(t('chat.messagesLoadError'))
+      }
     }
   }
 
@@ -293,7 +302,6 @@ export function ConversationView({
     const sent = await onSend(text, attachments, pendingFiles, replyToId ?? null, clientMsgId)
     if (!sent) return false
     clearConversationDraft(conversation.id)
-    setDraftState('')
     setReplyingTo(null)
     await goToLatest()
     return true
@@ -452,8 +460,6 @@ export function ConversationView({
         )}
         <MessageComposer
           conversationId={conversation.id}
-          draft={draft}
-          onDraftChange={handleDraftChange}
           onSubmit={submit}
           replyToId={replyingTo?.id}
           disabled={messagesLoading || Boolean(messagesError)}

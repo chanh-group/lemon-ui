@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
+import { ApiError } from '@/infrastructure/api/errors'
 import { BrandMark } from '@/components/common/BrandMark'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { cn } from '@/lib/utils'
@@ -453,7 +454,19 @@ export function ChatShell() {
                       : story,
                   )
                 })
-                .catch(() => toast.error(t('chat.replyUnavailable')))
+                .catch((err: unknown) => {
+                  if (
+                    err instanceof ApiError &&
+                    (err.status === 404 ||
+                      err.code === 'STORY_NOT_FOUND' ||
+                      err.status === 403 ||
+                      err.code === 'STORY_VIEW_FORBIDDEN')
+                  ) {
+                    toast.info(t('chat.replyUnavailableStory'))
+                    return
+                  }
+                  toast.error(t('chat.storyMediaError'))
+                })
             }}
             groups={groups}
             messagesLoading={messagesQuery.isPending}

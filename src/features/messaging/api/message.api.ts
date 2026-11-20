@@ -1,6 +1,7 @@
 import { api } from '@/infrastructure/api/client'
 import type {
   MessageReactionItem,
+  MessageReplyTarget,
   MessageResponse,
   MessageTimelineResponse,
   SendMessageDto,
@@ -77,6 +78,19 @@ export async function reactToMessage(
   const res = await api.post<{ messageId: string; reactions: MessageReactionItem[] }>(
     `/messages/${messageId}/react`,
     { emoji },
+  )
+  return res.data
+}
+
+/** Lấy thông tin reply target được ủy quyền cho tin nhắn cụ thể. */
+export async function getReplyTarget(
+  conversationId: string,
+  messageId: string,
+  signal?: AbortSignal,
+): Promise<MessageReplyTarget> {
+  const res = await api.get<MessageReplyTarget>(
+    `/conversations/${conversationId}/messages/${messageId}/reply-target`,
+    { signal },
   )
   return res.data
 }
