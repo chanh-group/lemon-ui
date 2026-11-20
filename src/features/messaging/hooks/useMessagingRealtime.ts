@@ -26,6 +26,7 @@ import type {
   MessageResponse,
   MessageRevokedPayload,
   MessageTimelineResponse,
+  ReadUpdatedPayload,
   TypingEventPayload,
 } from '@/features/messaging/types/message.types'
 import type { ConversationResponse } from '@/features/conversation/types/conversation.types'
@@ -34,6 +35,8 @@ import { ROUTES } from '@/config/constants'
 import { ApiError } from '@/infrastructure/api/errors'
 
 const TYPING_STALE_TIMEOUT_MS = 4_500
+const SYNC_MISSED_MESSAGES_FRESH_MS = 60_000
+const CONVERSATIONS_INVALIDATION_DELAY_MS = 300
 
 export type PartnerTypingMap = Record<string, string[]>
 
@@ -120,6 +123,14 @@ export function useChatRealtime(activeConversationId: string | null) {
   const verificationGeneration = useRef(0)
   const verificationAbort = useRef<AbortController | null>(null)
   const retryVerification = useRef<(() => void) | null>(null)
+  const verifyActiveConversationRef = useRef<((conversationId: string) => void) | null>(null)
+  const activeConversationIdRef = useRef(activeConversationId)
+  const userIdRef = useRef(user?.id)
+  const translationRef = useRef(t)
+  const navigateRef = useRef(navigate)
+  const conversationsInvalidateTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const inFlightSyncRequests = useRef(new Map<string, Promise<void>>())
+  const lastSyncedMap = useRef(new Map<string, number>())
   const revokedConversationIds = useRef(new Set<string>())
   const [conversationAccess, setConversationAccess] = useState<
     'verifying' | 'allowed' | 'revoked' | 'retryable-error'
@@ -133,6 +144,13 @@ export function useChatRealtime(activeConversationId: string | null) {
     return isChatSocketReady() ? 'connected' : socket.active ? 'connecting' : 'disconnected'
   })
   const userId = user?.id
+
+  useEffect(() => {
+    activeConversationIdRef.current = activeConversationId
+    userIdRef.current = userId
+    translationRef.current = t
+    navigateRef.current = navigate
+  }, [activeConversationId, navigate, t, userId])
 
   // 1. Quản lý kết nối socket theo trạng thái đăng nhập
   useEffect(() => {
@@ -151,6 +169,13 @@ export function useChatRealtime(activeConversationId: string | null) {
 
     const socket = getChatSocket()
     const timersForEffect = typingExpiryTimers.current
+    const debouncedInvalidateConversations = () => {
+      if (conversationsInvalidateTimer.current) return
+      conversationsInvalidateTimer.current = setTimeout(() => {
+        conversationsInvalidateTimer.current = null
+        void queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.conversations })
+      }, CONVERSATIONS_INVALIDATION_DELAY_MS)
+    }
     const refreshInbox = () => {
       if (refreshedInboxOnConnection.current) return
       refreshedInboxOnConnection.current = true
@@ -177,28 +202,60 @@ export function useChatRealtime(activeConversationId: string | null) {
         return next
       })
     }
-    const syncMissedMessages = async (conversationId: string) => {
-      const timeline = queryClient.getQueryData<
-        InfiniteData<MessageTimelineResponse, MessagePageParam>
-      >(CHAT_QUERY_KEYS.messages(conversationId))
-      const cursor = reconnectCursor(timeline?.pages ?? [])
-      if (!cursor) {
-        void queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.messages(conversationId) })
-        return
+    const syncMissedMessages = (conversationId: string, force = false): Promise<void> => {
+      const inFlight = inFlightSyncRequests.current.get(conversationId)
+      if (inFlight) return inFlight
+      if (
+        !force &&
+        isChatSocketReady() &&
+        Date.now() - (lastSyncedMap.current.get(conversationId) ?? 0) <
+          SYNC_MISSED_MESSAGES_FRESH_MS
+      ) {
+        return Promise.resolve()
       }
 
-      const missed = await fetchMissedMessages(cursor, (after) =>
-        getConversationMessages(conversationId, undefined, 20, after),
-      )
+      const request = (async () => {
+        const timeline = queryClient.getQueryData<
+          InfiniteData<MessageTimelineResponse, MessagePageParam>
+        >(CHAT_QUERY_KEYS.messages(conversationId))
+        const cursor = reconnectCursor(timeline?.pages ?? [])
+        if (!cursor) {
+          await queryClient.invalidateQueries({
+            queryKey: CHAT_QUERY_KEYS.messages(conversationId),
+          })
+          lastSyncedMap.current.set(conversationId, Date.now())
+          return
+        }
 
-      if (missed.length > 0) {
-        queryClient.setQueryData<MessageResponse[]>(
-          CHAT_QUERY_KEYS.liveMessages(conversationId),
-          (old) => mergeMessagesByTime(missed, old ?? []),
+        const missed = await fetchMissedMessages(cursor, (after) =>
+          getConversationMessages(conversationId, undefined, 20, after),
         )
-      }
-      // Không invalidate timeline: missed đã nằm trong liveMessages, còn refetch
-      // infinite query sẽ tải lại mọi trang đã load và presign lại toàn bộ media.
+
+        if (missed.length > 0) {
+          queryClient.setQueryData<MessageResponse[]>(
+            CHAT_QUERY_KEYS.liveMessages(conversationId),
+            (old) => mergeMessagesByTime(missed, old ?? []),
+          )
+        }
+        // Không invalidate timeline: missed đã nằm trong liveMessages, còn refetch
+        // infinite query sẽ tải lại mọi trang đã load và presign lại toàn bộ media.
+        lastSyncedMap.current.set(conversationId, Date.now())
+      })()
+
+      inFlightSyncRequests.current.set(conversationId, request)
+      void request.then(
+        () => {
+          if (inFlightSyncRequests.current.get(conversationId) === request) {
+            inFlightSyncRequests.current.delete(conversationId)
+          }
+        },
+        () => {
+          if (inFlightSyncRequests.current.get(conversationId) === request) {
+            inFlightSyncRequests.current.delete(conversationId)
+          }
+        },
+      )
+      return request
     }
 
     const clearRemovedConversation = (conversationId: string) => {
@@ -214,9 +271,9 @@ export function useChatRealtime(activeConversationId: string | null) {
       queryClient.setQueryData<ConversationResponse[]>(CHAT_QUERY_KEYS.conversations, (old) =>
         old?.filter((conversation) => conversation.id !== conversationId),
       )
-      if (activeConversationId === conversationId) {
+      if (activeConversationIdRef.current === conversationId) {
         setConversationAccess('revoked')
-        navigate(ROUTES.messages)
+        navigateRef.current(ROUTES.messages)
       }
     }
 
@@ -258,17 +315,16 @@ export function useChatRealtime(activeConversationId: string | null) {
           if (generation !== verificationGeneration.current) return
           queryClient.setQueryData(queryKeys.chat.groupMembers(conversationId), members)
         }
-        await queryClient.refetchQueries({
-          queryKey: CHAT_QUERY_KEYS.conversations,
-          type: 'active',
-        })
+        queryClient.setQueryData<ConversationResponse[]>(CHAT_QUERY_KEYS.conversations, (current) =>
+          current?.map((item) => (item.id === conversationId ? conversation : item)),
+        )
         if (generation !== verificationGeneration.current) return
         conversationTrustMap.current.set(conversationId, {
           verifiedAt: Date.now(),
           joinGeneration: conversation.joinGeneration,
         })
-        setConversationAccess('allowed')
-        await syncMissedMessages(conversationId)
+        if (activeConversationIdRef.current === conversationId) setConversationAccess('allowed')
+        await syncMissedMessages(conversationId, true)
       } catch (error: unknown) {
         if (generation !== verificationGeneration.current) return
         if (abortController.signal.aborted) return
@@ -277,17 +333,20 @@ export function useChatRealtime(activeConversationId: string | null) {
           return
         }
         if (!options.background) {
-          setConversationAccess('retryable-error')
-          toast.error(t('chat.messagesLoadError'))
+          if (activeConversationIdRef.current === conversationId) {
+            setConversationAccess('retryable-error')
+            toast.error(translationRef.current('chat.messagesLoadError'))
+          }
         }
       } finally {
         if (verificationAbort.current === abortController) verificationAbort.current = null
       }
     }
     retryVerification.current = () => {
-      if (!activeConversationId) return
-      conversationTrustMap.current.delete(activeConversationId)
-      void verifyConversation(activeConversationId)
+      const currentConversationId = activeConversationIdRef.current
+      if (!currentConversationId) return
+      conversationTrustMap.current.delete(currentConversationId)
+      void verifyConversation(currentConversationId)
     }
 
     const verifyActiveConversation = (conversationId: string) => {
@@ -300,7 +359,7 @@ export function useChatRealtime(activeConversationId: string | null) {
       )
       const cachedConversation = inboxConversation ?? cachedDetail
 
-      // 1. Direct chat (1-1 bạn bè): cho phép tức thì từ cache, background re-verify định kỳ
+      // 1. Direct chat (1-1 bạn bè): cho phép tức thì từ cache; reconnect mới xác thực lại
       if (cachedConversation && cachedConversation.kind === 'DIRECT') {
         const trust = conversationTrustMap.current.get(conversationId)
         if (!trust) {
@@ -308,9 +367,6 @@ export function useChatRealtime(activeConversationId: string | null) {
         }
         setConversationAccess('allowed')
         void syncMissedMessages(conversationId).catch(() => {})
-        if (!trust || Date.now() - trust.verifiedAt >= 5 * 60_000) {
-          void verifyConversation(conversationId, { background: true })
-        }
         return
       }
 
@@ -342,12 +398,15 @@ export function useChatRealtime(activeConversationId: string | null) {
 
       void verifyConversation(conversationId)
     }
+    verifyActiveConversationRef.current = verifyActiveConversation
 
     const handleReady = () => {
       setConnectionStatus('connected')
       refreshInbox()
-      if (activeConversationId) {
-        void verifyConversation(activeConversationId)
+      lastSyncedMap.current.clear()
+      const currentConversationId = activeConversationIdRef.current
+      if (currentConversationId) {
+        void verifyConversation(currentConversationId)
       } else {
         setConversationAccess('allowed')
       }
@@ -359,7 +418,8 @@ export function useChatRealtime(activeConversationId: string | null) {
       refreshedInboxOnConnection.current = false
       setConnectionStatus('disconnected')
       conversationTrustMap.current.clear()
-      if (activeConversationId) setConversationAccess('verifying')
+      lastSyncedMap.current.clear()
+      if (activeConversationIdRef.current) setConversationAccess('verifying')
       timersForEffect.forEach((timer) => clearTimeout(timer))
       timersForEffect.clear()
       setPartnerTypingMap({})
@@ -372,11 +432,9 @@ export function useChatRealtime(activeConversationId: string | null) {
     socket.on('disconnect', handleDisconnect)
     socket.on('connect_error', handleConnectError)
     socket.io.on('reconnect_attempt', handleReconnectAttempt)
-    if (isChatSocketReady() && activeConversationId) {
+    if (isChatSocketReady()) {
       refreshInbox()
-      verifyActiveConversation(activeConversationId)
-    } else if (isChatSocketReady()) {
-      refreshInbox()
+      if (!activeConversationIdRef.current) setConversationAccess('allowed')
     }
 
     const handleMessageCorrelated = ({
@@ -398,11 +456,11 @@ export function useChatRealtime(activeConversationId: string | null) {
     const handleNewMessage = (msg: MessageResponse) => {
       const convId = msg.conversationId
       if (revokedConversationIds.current.has(convId)) return
-      if (msg.senderId !== userId) removeTypingMember(convId, msg.senderId)
+      if (msg.senderId !== userIdRef.current) removeTypingMember(convId, msg.senderId)
 
       // Cập nhật messages cache nếu đang có dữ liệu trong cache
       if (
-        convId === activeConversationId ||
+        convId === activeConversationIdRef.current ||
         queryClient.getQueryData(CHAT_QUERY_KEYS.messages(convId))
       ) {
         const timeline = queryClient.getQueryData<
@@ -446,14 +504,14 @@ export function useChatRealtime(activeConversationId: string | null) {
             return {
               ...updateConversationLastMessage(conversation, msg),
               unreadCount:
-                msg.senderId === userId
+                msg.senderId === userIdRef.current
                   ? conversation.unreadCount
                   : (conversation.unreadCount || 0) + 1,
             }
           }),
         )
       } else {
-        void queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.conversations })
+        debouncedInvalidateConversations()
       }
     }
 
@@ -495,7 +553,7 @@ export function useChatRealtime(activeConversationId: string | null) {
           ),
       )
 
-      void queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.conversations })
+      debouncedInvalidateConversations()
     }
 
     // C. Tin nhắn bị thu hồi
@@ -567,7 +625,7 @@ export function useChatRealtime(activeConversationId: string | null) {
           ),
       )
 
-      void queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.conversations })
+      debouncedInvalidateConversations()
       void queryClient.invalidateQueries({
         queryKey: CHAT_QUERY_KEYS.mediaArchive(revoked.conversationId),
       })
@@ -595,20 +653,20 @@ export function useChatRealtime(activeConversationId: string | null) {
         CHAT_QUERY_KEYS.liveMessages(conversationId),
         (old) => old?.filter((message) => message.id !== messageId),
       )
-      void queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.conversations })
+      debouncedInvalidateConversations()
       void queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.mediaArchive(conversationId) })
     }
 
     // D. Đối phương đang gõ phím
     const handleTyping = (data: TypingEventPayload) => {
-      if (data.userId === userId) return
+      if (data.userId === userIdRef.current) return
 
       const timerKey = `${data.conversationId}:${data.userId}`
       const oldTimer = timersForEffect.get(timerKey)
       if (oldTimer) clearTimeout(oldTimer)
       timersForEffect.delete(timerKey)
 
-      setPartnerTypingMap((prev) => updateTypingUsers(prev, data, userId))
+      setPartnerTypingMap((prev) => updateTypingUsers(prev, data, userIdRef.current))
 
       if (data.isTyping) {
         const timer = setTimeout(() => {
@@ -619,14 +677,20 @@ export function useChatRealtime(activeConversationId: string | null) {
       }
     }
 
-    const handleReadUpdated = (event: { userId: string }) => {
-      if (event.userId === userId) {
-        void queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.conversations })
+    const handleReadUpdated = (event: ReadUpdatedPayload) => {
+      if (event.userId === userIdRef.current) {
+        queryClient.setQueryData<ConversationResponse[]>(CHAT_QUERY_KEYS.conversations, (current) =>
+          current?.map((conversation) =>
+            conversation.id === event.conversationId
+              ? { ...conversation, unreadCount: 0 }
+              : conversation,
+          ),
+        )
       }
     }
 
     const handleConversationChanged = (event: { conversationId?: string }) => {
-      void queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.conversations })
+      debouncedInvalidateConversations()
       if (event.conversationId) {
         void queryClient.invalidateQueries({
           queryKey: queryKeys.chat.conversation(event.conversationId),
@@ -638,7 +702,7 @@ export function useChatRealtime(activeConversationId: string | null) {
     }
     const handleMemberRemoved = (event: { conversationId: string; userId: string }) => {
       handleConversationChanged(event)
-      if (event.userId === userId) clearRemovedConversation(event.conversationId)
+      if (event.userId === userIdRef.current) clearRemovedConversation(event.conversationId)
       else removeTypingMember(event.conversationId, event.userId)
     }
     const handleConversationDisbanded = (event: { conversationId: string }) => {
@@ -671,6 +735,11 @@ export function useChatRealtime(activeConversationId: string | null) {
       verificationAbort.current?.abort()
       verificationAbort.current = null
       retryVerification.current = null
+      verifyActiveConversationRef.current = null
+      if (conversationsInvalidateTimer.current) {
+        clearTimeout(conversationsInvalidateTimer.current)
+        conversationsInvalidateTimer.current = null
+      }
       timersForEffect.forEach((timer) => clearTimeout(timer))
       timersForEffect.clear()
       setPartnerTypingMap({})
@@ -694,8 +763,17 @@ export function useChatRealtime(activeConversationId: string | null) {
       socket.off('member:removed', handleMemberRemoved)
       socket.off('conversation:disbanded', handleConversationDisbanded)
     }
-  }, [status, activeConversationId, userId, queryClient, t, navigate])
+  }, [status, userId, queryClient])
 
+  useEffect(() => {
+    if (status !== 'authenticated') return
+    if (!activeConversationId) {
+      return
+    }
+    verifyActiveConversationRef.current?.(activeConversationId)
+  }, [activeConversationId, status])
+
+  const visibleConversationAccess = activeConversationId ? conversationAccess : 'allowed'
   const typingUserCount = activeConversationId
     ? (partnerTypingMap[activeConversationId]?.length ?? 0)
     : 0
@@ -705,7 +783,7 @@ export function useChatRealtime(activeConversationId: string | null) {
     typingUserCount,
     typingUserIds: activeConversationId ? (partnerTypingMap[activeConversationId] ?? []) : [],
     connectionStatus,
-    conversationAccess,
+    conversationAccess: visibleConversationAccess,
     retryConversationAccess: () => retryVerification.current?.(),
   }
 }

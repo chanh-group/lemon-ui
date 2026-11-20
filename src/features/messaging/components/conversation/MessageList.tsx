@@ -166,7 +166,8 @@ function StoryReplyQuote({
     queryKey: queryKeys.chat.storyReply(preview.id),
     queryFn: () => getStoryById(preview.id),
     retry: false,
-    staleTime: 60_000,
+    staleTime: 10 * 60_000,
+    gcTime: 30 * 60_000,
   })
   const media = useStoryMedia(story.data ?? { id: preview.id })
   const queryMediaUrl = story.data?.mediaUrl ?? media.data

@@ -229,7 +229,7 @@ export function useStoryMedia(story: { id: string; kind?: string; mediaUrl?: str
     queryFn: () => getStoryMediaUrl(story.id),
     enabled:
       story.kind?.toUpperCase() === 'MEDIA' && !story.mediaUrl && !story.id.startsWith('story-'),
-    staleTime: 60_000,
+    staleTime: 4 * 60_000,
   })
 }
 

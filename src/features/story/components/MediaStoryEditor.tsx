@@ -9,15 +9,10 @@ import {
   STORY_MAX_VIDEO_INPUT_BYTES,
   STORY_MAX_VIDEO_SECONDS,
 } from '../constants'
-import {
-  clampTrimStart,
-  isVideoDurationKnown,
-  maxTrimStartSeconds,
-  planStoryVideo,
-  toStoryDurationMs,
-} from '../utils/storyVideo'
+import { isVideoDurationKnown, planStoryVideo, toStoryDurationMs } from '../utils/storyVideo'
 import { processStoryVideo } from '../utils/storyVideoProcessor'
 import { readVideoDuration } from '../utils/readVideoDuration'
+import { VideoTrimmer } from './VideoTrimmer'
 const Media = createIcon(MediaData)
 
 interface MediaStoryActorProps {
@@ -46,6 +41,8 @@ export function MediaStoryEditor({
   const [fileError, setFileError] = useState('')
   const [duration, setDuration] = useState<number | null>(null)
   const [trimStart, setTrimStart] = useState(0)
+  const [trimEnd, setTrimEnd] = useState(0)
+  const [playhead, setPlayhead] = useState(0)
   const [isProcessing, setIsProcessing] = useState(false)
   const [progress, setProgress] = useState(0)
   const [unreadable, setUnreadable] = useState(false)
@@ -72,6 +69,8 @@ export function MediaStoryEditor({
     const max = video ? STORY_MAX_VIDEO_INPUT_BYTES : STORY_MAX_MEDIA_BYTES
     setDuration(null)
     setTrimStart(0)
+    setTrimEnd(0)
+    setPlayhead(0)
     setProgress(0)
     setUnreadable(false)
     if (!allowed.includes(selected.type) || selected.size === 0) {
@@ -102,13 +101,20 @@ export function MediaStoryEditor({
 
   const isVideo = file?.type.startsWith('video') ?? false
   const canShare = Boolean(file) && !unreadable
+  const showTrimmer =
+    isVideo && Boolean(objectUrl) && isVideoDurationKnown(duration) && duration >= 1
+  const hasCustomTrim =
+    isVideo && isVideoDurationKnown(duration) && (trimStart > 0 || trimEnd < duration - 0.01)
+  const frameWidth = showTrimmer
+    ? 'w-[min(100%,460px,calc(56.25dvh-135px))]'
+    : 'w-[min(100%,460px,calc(56.25dvh-90px))]'
 
   const share = async () => {
     if (!file || !canShare || isProcessing || isSharing) return
     const plan = isVideo
       ? planStoryVideo({ sizeBytes: file.size, durationSeconds: duration })
       : 'share'
-    if (plan === 'share') {
+    if (plan === 'share' && !hasCustomTrim) {
       onShare(
         file,
         caption.trim(),
@@ -122,10 +128,13 @@ export function MediaStoryEditor({
     const controller = new AbortController()
     controllerRef.current = controller
     try {
-      const startSeconds = plan === 'trim' ? clampTrimStart(duration!, trimStart) : 0
+      const startSeconds = hasCustomTrim || plan === 'trim' ? trimStart : 0
       const output = await processStoryVideo({
         file,
         startSeconds,
+        endSeconds: isVideoDurationKnown(duration)
+          ? Math.min(trimEnd, startSeconds + STORY_MAX_TRIM_SECONDS)
+          : undefined,
         signal: controller.signal,
         onProgress: (ratio) => {
           if (activeRef.current) setProgress(Math.round(ratio * 100))
@@ -182,34 +191,6 @@ export function MediaStoryEditor({
           {fileError}
         </p>
       )}
-      {isVideo && isVideoDurationKnown(duration) && duration > STORY_MAX_VIDEO_SECONDS && (
-        <div className="space-y-2 text-sm text-foreground">
-          <label htmlFor="story-trim-start" className="block font-semibold">
-            {t('chat.storyTrimHint')}
-          </label>
-          <input
-            id="story-trim-start"
-            type="range"
-            min={0}
-            max={maxTrimStartSeconds(duration)}
-            step={0.1}
-            value={trimStart}
-            disabled={isProcessing || isSharing}
-            onChange={(event) => {
-              const start = Number(event.target.value)
-              setTrimStart(start)
-              if (videoRef.current) videoRef.current.currentTime = start
-            }}
-            className="w-full accent-primary"
-          />
-          <p>
-            {t('chat.storyTrimRange', {
-              start: trimStart.toFixed(1),
-              end: Math.min(duration, trimStart + STORY_MAX_TRIM_SECONDS).toFixed(1),
-            })}
-          </p>
-        </div>
-      )}
       <input
         maxLength={500}
         value={caption}
@@ -222,12 +203,14 @@ export function MediaStoryEditor({
   )
 
   return (
-    <div className="min-h-full">
+    <div className="flex min-h-full flex-col md:h-full">
       {controlsTarget ? createPortal(controls, controlsTarget) : controls}
       {/* Xem trước */}
-      <div className="flex min-h-full flex-col items-center justify-center gap-3 bg-background p-4">
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 overflow-y-auto bg-background p-4 [justify-content:safe_center]">
         {objectUrl && (
-          <div className="relative aspect-[9/16] w-[min(100%,460px,calc(56.25dvh-90px))] shrink-0 overflow-hidden rounded-2xl bg-card shadow-xl">
+          <div
+            className={`relative aspect-[9/16] ${frameWidth} shrink-0 overflow-hidden rounded-2xl bg-card shadow-xl`}
+          >
             {!isVideo && (
               <img
                 src={objectUrl}
@@ -242,6 +225,8 @@ export function MediaStoryEditor({
                 onLoadedMetadata={(event) => {
                   const value = event.currentTarget.duration
                   setDuration(isVideoDurationKnown(value) ? value : null)
+                  if (isVideoDurationKnown(value))
+                    setTrimEnd(value <= STORY_MAX_VIDEO_SECONDS ? value : STORY_MAX_TRIM_SECONDS)
                 }}
                 onError={() => {
                   setDuration(null)
@@ -249,12 +234,12 @@ export function MediaStoryEditor({
                   setFileError(t('chat.storyVideoInvalid'))
                 }}
                 onTimeUpdate={(event) => {
+                  setPlayhead(event.currentTarget.currentTime)
                   if (
-                    isVideoDurationKnown(duration) &&
-                    duration > STORY_MAX_VIDEO_SECONDS &&
-                    event.currentTarget.currentTime >= trimStart + STORY_MAX_TRIM_SECONDS
+                    hasCustomTrim &&
+                    (event.currentTarget.currentTime >= trimEnd ||
+                      event.currentTarget.currentTime < trimStart)
                   ) {
-                    event.currentTarget.pause()
                     event.currentTarget.currentTime = trimStart
                   }
                 }}
@@ -276,7 +261,7 @@ export function MediaStoryEditor({
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="flex aspect-[9/16] w-[min(100%,460px,calc(56.25dvh-90px))] shrink-0 flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border bg-muted/40 text-muted-foreground transition-colors hover:border-ring hover:text-foreground"
+            className={`flex aspect-[9/16] ${frameWidth} shrink-0 flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border bg-muted/40 text-muted-foreground transition-colors hover:border-ring hover:text-foreground`}
           >
             <span className="grid size-14 place-items-center rounded-full bg-card ring-1 ring-border">
               <Media className="size-7 text-brand-ink" aria-hidden="true" />
@@ -285,7 +270,29 @@ export function MediaStoryEditor({
           </button>
         ) : null}
 
-        <div className="flex w-[min(100%,460px,calc(56.25dvh-90px))] shrink-0 items-center justify-between gap-2 pb-2">
+        {showTrimmer && objectUrl !== null && (
+          <div className={`${frameWidth} shrink-0`}>
+            <VideoTrimmer
+              key={objectUrl}
+              url={objectUrl}
+              duration={duration}
+              start={trimStart}
+              end={trimEnd}
+              disabled={isProcessing || isSharing}
+              currentTime={playhead}
+              onSeek={(time) => {
+                if (videoRef.current) videoRef.current.currentTime = time
+                setPlayhead(time)
+              }}
+              onChange={(start, end) => {
+                setTrimStart(start)
+                setTrimEnd(end)
+                if (start !== trimStart && videoRef.current) videoRef.current.currentTime = start
+              }}
+            />
+          </div>
+        )}
+        <div className={`flex ${frameWidth} shrink-0 items-center justify-between gap-2 pb-2`}>
           <button
             type="button"
             onClick={onDiscard}

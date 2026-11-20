@@ -79,7 +79,7 @@ export function ImageLightboxModal({ attachment, onClose }: ImageLightboxModalPr
       role="dialog"
       aria-modal="true"
       onClick={onClose}
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 backdrop-blur-md transition-opacity duration-200 animate-in fade-in"
+      className="fixed inset-0 z-100 flex items-center justify-center bg-black/85 backdrop-blur-md transition-opacity duration-200 animate-in fade-in"
     >
       {/* Top Header Controls */}
       <div

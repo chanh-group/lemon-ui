@@ -394,7 +394,6 @@
     "soundAlertsDesc": "Phát chuông thông báo khi có tin nhắn mới",
     "previewAlerts": "Xem trước tin nhắn",
     "previewAlertsDesc": "Hiển thị nội dung xem trước trong thông báo",
-    "save": "Lưu",
     "changePasswordTitle": "Đổi mật khẩu",
     "changePasswordSubtitle": "Dùng ít nhất 8 ký tự, gồm ít nhất một chữ cái và một chữ số.",
     "currentPassword": "Mật khẩu hiện tại",
@@ -613,7 +612,10 @@
     "storyVideoInvalid": "Không đọc được video này. Hãy chọn tệp khác.",
     "storyStorage": "Dung lượng kho tin",
     "storyStorageUsage": "Đã dùng {{used}} / {{limit}} MiB",
-    "storyStorageError": "Không thể tải dung lượng kho tin."
+    "storyStorageError": "Không thể tải dung lượng kho tin.",
+    "storyTrimStart": "Điểm bắt đầu",
+    "storyTrimEnd": "Điểm kết thúc",
+    "storyTrimPlayhead": "Vị trí phát"
   },
   "theme": {
     "toLight": "Chuyển sang chế độ sáng",
