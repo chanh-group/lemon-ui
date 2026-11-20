@@ -180,6 +180,7 @@
     "conversationsLoadError": "Không thể tải danh sách cuộc trò chuyện",
     "messagesLoadError": "Không thể tải tin nhắn",
     "failedMessage": "Không thể gửi tin nhắn",
+    "sending": "Đang gửi",
     "searchUsersError": "Không thể tìm người dùng",
     "sent": "Đã gửi",
     "read": "Đã đọc",

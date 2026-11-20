@@ -16,14 +16,12 @@ export interface ResolvedReplyQuote {
  */
 export function inferReplyCategory(target: MessageReplyTarget): ReplyContentCategory {
   if (target.contentCategory) return target.contentCategory
-  if (target.kind === 'STORY_REPLY' || target.kind === 'STORY_REACTION' || target.storyPreview) {
-    return 'STORY'
+  if (target.kind === 'STORY_REPLY' || target.kind === 'STORY_REACTION') return 'STORY'
+  if (target.attachments && target.attachments.length > 0) {
+    return target.attachments.every((a) => a.kind === 'AUDIO') ? 'VOICE' : 'ATTACHMENT'
   }
   if (target.previewAttachment) {
     return target.previewAttachment.kind === 'AUDIO' ? 'VOICE' : 'ATTACHMENT'
-  }
-  if (target.attachments && target.attachments.length > 0) {
-    return target.attachments.every((a) => a.kind === 'AUDIO') ? 'VOICE' : 'ATTACHMENT'
   }
   if (target.kind === 'AUDIO') return 'VOICE'
   if (target.kind === 'IMAGE' || target.kind === 'VIDEO' || target.kind === 'FILE') {

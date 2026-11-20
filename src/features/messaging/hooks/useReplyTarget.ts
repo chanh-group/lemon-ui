@@ -31,10 +31,7 @@ export function useReplyTarget(
         return await getReplyTarget(conversationId!, replyToId!, signal)
       } catch (err: unknown) {
         if (err instanceof ApiError && (err.status === 404 || err.code === 'MESSAGE_NOT_FOUND')) {
-          return {
-            ...UNAVAILABLE_TARGET_SENTINEL,
-            id: replyToId!,
-          }
+          return UNAVAILABLE_TARGET_SENTINEL
         }
         throw err
       }
@@ -44,16 +41,12 @@ export function useReplyTarget(
     gcTime: 10 * 60 * 1000,
     retry: false,
     initialData: initialTarget ?? undefined,
+    // Incomplete seeds must not count as fresh or TanStack skips fetching the preview.
+    initialDataUpdatedAt: 0,
   })
 
   const target = query.data ?? initialTarget ?? null
-  const isUnavailable =
-    target === UNAVAILABLE_TARGET_SENTINEL ||
-    (Boolean(target) &&
-      target?.id === replyToId &&
-      target?.contentCategory === 'UNKNOWN' &&
-      !target?.body &&
-      !target?.deletedAt)
+  const isUnavailable = target === UNAVAILABLE_TARGET_SENTINEL
 
   return {
     target: isUnavailable ? null : target,

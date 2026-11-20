@@ -629,7 +629,7 @@ const MessageRowView = memo(function MessageRowView({
               (msg.status === 'sending' ? (
                 <Clock
                   className="size-3.5 text-muted-foreground animate-pulse"
-                  aria-label={t('chat.sending', 'Đang gửi')}
+                  aria-label={t('chat.sending')}
                 />
               ) : msg.status === 'uncertain' || msg.status === 'failed' ? (
                 <button

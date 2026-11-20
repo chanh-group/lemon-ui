@@ -192,6 +192,7 @@ export function ConversationView({
       }
     } catch (err: unknown) {
       if (request === targetRequest.current) {
+        setTargetMessageId(null)
         if (err instanceof ApiError && (err.status === 404 || err.code === 'MESSAGE_NOT_FOUND')) {
           toast.info(t('chat.replyUnavailableContent'))
           return

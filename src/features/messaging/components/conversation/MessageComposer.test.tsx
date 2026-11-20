@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { useState } from 'react'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MessageComposer } from './MessageComposer'
 import { getConversationDraft, setConversationDraft } from '@/features/messaging/utils/draftStore'
@@ -49,8 +49,10 @@ describe('MessageComposer pending send', () => {
     expect(onSubmit).toHaveBeenCalledWith('ok', undefined, undefined, undefined, expect.any(String))
     fireEvent.change(input, { target: { value: 'ok' } })
 
-    request.resolve(true)
-    await waitFor(() => expect(input.value).toBe('ok'))
+    await act(async () => {
+      request.resolve(true)
+    })
+    expect(input.value).toBe('ok')
     expect(screen.queryByText(/Tin chưa gửi được/)).toBeNull()
   })
 
@@ -66,9 +68,11 @@ describe('MessageComposer pending send', () => {
     const originalClientId = onSubmit.mock.calls[0][4]
     expect(originalClientId).toBeTruthy()
     fireEvent.change(input, { target: { value: 'new draft' } })
-    request.resolve(false)
+    await act(async () => {
+      request.resolve(false)
+    })
 
-    await waitFor(() => expect(input.value).toBe('new draft'))
+    expect(input.value).toBe('new draft')
     expect(screen.queryByText(/Tin chưa gửi được/)).toBeNull()
   })
 
@@ -86,9 +90,11 @@ describe('MessageComposer pending send', () => {
     await screen.findByText('notes.txt')
     fireEvent.click(screen.getByRole('button', { name: 'chat.sendMessage' }))
     fireEvent.change(input, { target: { value: 'later' } })
-    request.resolve(false)
+    await act(async () => {
+      request.resolve(false)
+    })
 
-    await waitFor(() => expect(input.value).toBe('later'))
+    expect(input.value).toBe('later')
     expect(screen.queryByText(/Tin chưa gửi được/)).toBeNull()
   })
 
