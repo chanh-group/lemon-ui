@@ -458,6 +458,7 @@
     "replyRemovedVoice": "Tệp thoại đã gỡ",
     "replyUnavailableStory": "Tin đã thu hồi hoặc hết hạn",
     "replyUnavailableContent": "Nội dung không khả dụng",
+    "voiceNoteLabel": "Tệp thoại",
     "storyCount": "{{count}} tin",
     "storyCount_one": "{{count}} tin",
     "storyCount_other": "{{count}} tin",

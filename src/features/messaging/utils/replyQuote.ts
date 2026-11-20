@@ -34,6 +34,24 @@ export function inferReplyCategory(target: MessageReplyTarget): ReplyContentCate
 }
 
 /**
+ * Whether the initial target already carries everything the quote needs (skip refetch).
+ */
+export function isReplyTargetComplete(target: MessageReplyTarget | null | undefined): boolean {
+  if (!target) return false
+  if (target.deletedAt) return Boolean(target.contentCategory)
+  if (target.contentCategory) {
+    return target.contentCategory !== 'ATTACHMENT' || Boolean(target.previewAttachment)
+  }
+  // Legacy backend without contentCategory: refetch only when quote data is missing.
+  return (
+    target.kind === 'TEXT' ||
+    Boolean(target.storyPreview) ||
+    Boolean(target.previewAttachment?.previewUrl) ||
+    Boolean(target.attachments?.[0]?.previewUrl)
+  )
+}
+
+/**
  * Resolve UI quote presentation for a message reply target.
  * Note: bubble quote NEVER shows "Replying to [name]".
  */
@@ -96,9 +114,9 @@ export function resolveReplyQuote(
   let text: string | undefined = target.body ?? undefined
   if (!text) {
     if (category === 'VOICE') {
-      text = t('chat.callVoiceLabel')
-    } else if (category === 'STORY' && target.storyPreview?.caption) {
-      text = target.storyPreview.caption
+      text = t('chat.voiceNoteLabel')
+    } else if (category === 'STORY') {
+      text = target.storyPreview?.caption || t('chat.unnamedStory')
     } else if (category === 'ATTACHMENT') {
       text =
         target.previewAttachment?.fileName ||
@@ -110,7 +128,7 @@ export function resolveReplyQuote(
   return {
     availability: 'available',
     category,
-    label: text || t('chat.attachment'),
+    label: text || t('chat.replyUnavailableContent'),
     text,
     thumbnailUrl,
     canNavigate: true,

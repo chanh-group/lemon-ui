@@ -175,6 +175,9 @@ export function ConversationView({
   const jumpToMessage = async (messageId: string) => {
     const request = ++targetRequest.current
     if (messageListRef.current?.scrollToMessage(messageId)) {
+      atBottomRef.current = false
+      setAtBottom(false)
+      setShowJump(true)
       setTargetMessageId(null)
       return
     }

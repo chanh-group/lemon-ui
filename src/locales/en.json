@@ -458,6 +458,7 @@
     "replyRemovedVoice": "Voice note removed",
     "replyUnavailableStory": "Story unavailable",
     "replyUnavailableContent": "Content unavailable",
+    "voiceNoteLabel": "Voice note",
     "storyCount": "{{count}} stories",
     "storyCount_one": "{{count}} story",
     "storyCount_other": "{{count}} stories",

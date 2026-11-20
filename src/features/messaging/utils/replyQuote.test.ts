@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createInstance } from 'i18next'
 import en from '@/locales/en.json'
 import vi from '@/locales/vi.json'
-import { resolveReplyQuote, inferReplyCategory } from './replyQuote'
+import { resolveReplyQuote, inferReplyCategory, isReplyTargetComplete } from './replyQuote'
 import type { MessageReplyTarget } from '../types/message.types'
 
 describe('replyQuote pure helper', () => {
@@ -172,5 +172,49 @@ describe('replyQuote pure helper', () => {
 
     const resolved = resolveReplyQuote(targetWithEmptyUrl, t)
     expect(resolved.thumbnailUrl).toBeUndefined()
+  })
+})
+
+describe('isReplyTargetComplete', () => {
+  const base = {
+    id: 'm1',
+    senderId: 'u1',
+    kind: 'TEXT',
+    body: 'caption',
+    deletedAt: null,
+  } as const
+
+  it('needs a refetch for active attachment targets without a preview', () => {
+    expect(isReplyTargetComplete({ ...base, contentCategory: 'ATTACHMENT' })).toBe(false)
+    expect(
+      isReplyTargetComplete({
+        ...base,
+        contentCategory: 'ATTACHMENT',
+        previewAttachment: { id: 'a1', kind: 'IMAGE', fileName: 'p.jpg', mimeType: 'image/jpeg' },
+      }),
+    ).toBe(true)
+  })
+
+  it('needs no refetch for text, story and voice targets carrying their quote data', () => {
+    expect(isReplyTargetComplete({ ...base, contentCategory: 'MESSAGE' })).toBe(true)
+    expect(
+      isReplyTargetComplete({
+        ...base,
+        kind: 'STORY_REPLY',
+        contentCategory: 'STORY',
+        storyPreview: { id: 's1', kind: 'IMAGE', caption: null, background: null },
+      }),
+    ).toBe(true)
+    expect(isReplyTargetComplete({ ...base, kind: 'AUDIO', contentCategory: 'VOICE' })).toBe(true)
+  })
+
+  it('requires a category for tombstones and falls back to the legacy heuristic', () => {
+    expect(isReplyTargetComplete({ ...base, deletedAt: '2026-01-01' })).toBe(false)
+    expect(
+      isReplyTargetComplete({ ...base, deletedAt: '2026-01-01', contentCategory: 'MESSAGE' }),
+    ).toBe(true)
+    expect(isReplyTargetComplete(base)).toBe(true)
+    expect(isReplyTargetComplete({ ...base, kind: 'IMAGE', body: null })).toBe(false)
+    expect(isReplyTargetComplete(null)).toBe(false)
   })
 })

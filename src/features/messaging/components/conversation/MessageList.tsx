@@ -222,7 +222,7 @@ function StoryReplyQuote({
         >
           {isUnavailable
             ? t('chat.replyUnavailableStory')
-            : preview.caption || story.data?.caption || t('chat.storyLabel', 'Tin')}
+            : preview.caption || story.data?.caption || t('chat.unnamedStory')}
         </span>
       </span>
     </button>

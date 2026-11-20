@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { queryKeys } from '@/infrastructure/query/keys'
 import { getReplyTarget } from '../api/message.api'
+import { isReplyTargetComplete } from '../utils/replyQuote'
 import type { MessageReplyTarget } from '../types/message.types'
 import { ApiError } from '@/infrastructure/api/errors'
 
@@ -19,16 +20,9 @@ export function useReplyTarget(
   initialTarget?: MessageReplyTarget | null,
   enabled = true,
 ) {
-  const isTargetComplete = Boolean(
-    initialTarget &&
-    (initialTarget.deletedAt
-      ? Boolean(initialTarget.contentCategory)
-      : initialTarget.kind === 'TEXT' ||
-        Boolean(initialTarget.previewAttachment?.previewUrl) ||
-        Boolean(initialTarget.attachments?.[0]?.previewUrl)),
+  const queryEnabled = Boolean(
+    enabled && conversationId && replyToId && !isReplyTargetComplete(initialTarget),
   )
-
-  const queryEnabled = Boolean(enabled && conversationId && replyToId && !isTargetComplete)
 
   const query = useQuery({
     queryKey: queryKeys.chat.replyTarget(conversationId ?? '', replyToId ?? ''),

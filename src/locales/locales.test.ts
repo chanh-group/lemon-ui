@@ -190,6 +190,7 @@ describe('Localization Integrity & Avatar Text Tests', () => {
     expect(i18n.t('chat.replyRemovedVoice')).toBe('Tệp thoại đã gỡ')
     expect(i18n.t('chat.replyUnavailableStory')).toBe('Tin đã thu hồi hoặc hết hạn')
     expect(i18n.t('chat.replyUnavailableContent')).toBe('Nội dung không khả dụng')
+    expect(i18n.t('chat.voiceNoteLabel')).toBe('Tệp thoại')
     expect(i18n.t('chat.storyCount', { count: 2 })).toBe('2 tin')
 
     await i18n.changeLanguage('en')
@@ -198,6 +199,7 @@ describe('Localization Integrity & Avatar Text Tests', () => {
     expect(i18n.t('chat.replyRemovedVoice')).toBe('Voice note removed')
     expect(i18n.t('chat.replyUnavailableStory')).toBe('Story unavailable')
     expect(i18n.t('chat.replyUnavailableContent')).toBe('Content unavailable')
+    expect(i18n.t('chat.voiceNoteLabel')).toBe('Voice note')
     expect(i18n.t('chat.storyCount', { count: 2 })).toBe('2 stories')
   })
 })
