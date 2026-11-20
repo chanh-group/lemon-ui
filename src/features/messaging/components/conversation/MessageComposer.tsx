@@ -14,6 +14,7 @@ import type { MessageAttachmentInput } from '@/features/messaging/types/message.
 import { formatBytes, isImage } from '@/features/file/utils/fileTypes'
 import { compressVideoIfNeeded } from '@/features/file/utils/videoCompressor'
 import { generateUUID } from '@/lib/utils'
+import { getConversationDraft, setConversationDraft } from '@/features/messaging/utils/draftStore'
 
 const Paperclip = createIcon(PaperclipData)
 const Send = createIcon(SendData)
@@ -35,8 +36,8 @@ export interface PendingFile {
 
 interface MessageComposerProps {
   conversationId: string
-  draft: string
-  onDraftChange: (v: string) => void
+  draft?: string
+  onDraftChange?: (v: string) => void
   onSubmit: (
     text: string,
     attachments?: MessageAttachmentInput[],
@@ -52,8 +53,8 @@ interface MessageComposerProps {
 }
 
 export function MessageComposer({
-  conversationId: _conversationId,
-  draft,
+  conversationId,
+  draft: draftProp,
   onDraftChange,
   onSubmit,
   disabled = false,
@@ -63,6 +64,19 @@ export function MessageComposer({
   replyToId,
 }: MessageComposerProps) {
   const { t } = useTranslation()
+  const isControlled = draftProp !== undefined
+  const [internalDraft, setInternalDraft] = useState(() =>
+    draftProp !== undefined ? draftProp : getConversationDraft(conversationId),
+  )
+  const [prevConversationId, setPrevConversationId] = useState(conversationId)
+
+  if (!isControlled && conversationId !== prevConversationId) {
+    setPrevConversationId(conversationId)
+    const stored = getConversationDraft(conversationId)
+    setInternalDraft(stored)
+  }
+
+  const draft = isControlled ? draftProp : internalDraft
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -79,12 +93,12 @@ export function MessageComposer({
   const streamRef = useRef<MediaStream | null>(null)
 
   useEffect(() => {
-    pendingFilesRef.current = pendingFiles
-  }, [pendingFiles])
-
-  useEffect(() => {
     draftRef.current = draft
   }, [draft])
+
+  useEffect(() => {
+    pendingFilesRef.current = pendingFiles
+  }, [pendingFiles])
 
   useEffect(() => {
     return () => {
@@ -196,7 +210,12 @@ export function MessageComposer({
   }
 
   const handleChange = (val: string) => {
-    onDraftChange(val)
+    draftRef.current = val
+    if (!isControlled) {
+      setInternalDraft(val)
+      setConversationDraft(conversationId, val)
+    }
+    onDraftChange?.(val)
     if (val.trim()) {
       onTypingStart?.()
       if (typingTimer.current) clearTimeout(typingTimer.current)
@@ -296,7 +315,7 @@ export function MessageComposer({
   }
 
   const handleSubmit = async () => {
-    const text = draft.trim()
+    const text = draftRef.current.trim()
     if (!text && pendingFiles.length === 0) return
     if (disabled || isSending || submittingRef.current) return
 
@@ -315,7 +334,11 @@ export function MessageComposer({
     setPendingFiles((current) => current.filter((file) => !sentIds.has(file.id)))
     setIsUploadingAttachment(filesToSend.length > 0)
     draftRef.current = ''
-    onDraftChange('')
+    if (!isControlled) {
+      setInternalDraft('')
+      setConversationDraft(conversationId, '')
+    }
+    onDraftChange?.('')
 
     try {
       const submitted = await onSubmit(
@@ -333,7 +356,11 @@ export function MessageComposer({
         requestAnimationFrame(() => inputRef.current?.focus())
       } else {
         draftRef.current = textToSend
-        onDraftChange(textToSend)
+        if (!isControlled) {
+          setInternalDraft(textToSend)
+          setConversationDraft(conversationId, textToSend)
+        }
+        onDraftChange?.(textToSend)
         setPendingFiles((current) => [...filesToSend, ...current])
       }
     } catch {
@@ -452,6 +479,7 @@ export function MessageComposer({
               onPaste={handlePaste}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
+                  if (e.nativeEvent.isComposing || e.keyCode === 229) return
                   e.preventDefault()
                   handleSubmit()
                 }

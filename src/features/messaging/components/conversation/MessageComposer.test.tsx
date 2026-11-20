@@ -119,4 +119,21 @@ describe('MessageComposer pending send', () => {
     await waitFor(() => expect(onSubmit).toHaveBeenCalledOnce())
     expect(revoke).not.toHaveBeenCalledWith('blob:failed-image')
   })
+
+  it('ignores Enter key while IME composition is active or keyCode is 229', async () => {
+    const onSubmit = vi.fn().mockResolvedValue(true)
+    const input = renderComposer('ime-test', onSubmit)
+
+    // Keydown with isComposing = true
+    fireEvent.keyDown(input, { key: 'Enter', shiftKey: false, isComposing: true })
+    expect(onSubmit).not.toHaveBeenCalled()
+
+    // Keydown with keyCode = 229
+    fireEvent.keyDown(input, { key: 'Enter', shiftKey: false, keyCode: 229 })
+    expect(onSubmit).not.toHaveBeenCalled()
+
+    // Keydown standard Enter without composition
+    fireEvent.keyDown(input, { key: 'Enter', shiftKey: false, isComposing: false })
+    expect(onSubmit).toHaveBeenCalledOnce()
+  })
 })
