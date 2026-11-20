@@ -1,7 +1,13 @@
 import { useState } from 'react'
 import { Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ArchiveIcon, ArrowLeft01Icon } from '@hugeicons/core-free-icons'
@@ -185,7 +191,7 @@ export function StoriesArchivePage() {
                     <button
                       type="button"
                       onClick={() => setStoryToDelete(item)}
-                      aria-label={`${t('chat.deleteStory')}: ${item.time}`}
+                      aria-label={`${t('chat.deleteStory')}: ${item.caption?.trim().slice(0, 30) || item.time}`}
                       className="absolute right-2 top-2 z-20 grid size-10 place-items-center rounded-full bg-black/70 text-white hover:bg-black focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                     >
                       <Trash2 size={18} aria-hidden="true" />
@@ -214,11 +220,11 @@ export function StoriesArchivePage() {
           if (!open && !remove.isPending) setStoryToDelete(null)
         }}
       >
-        <DialogContent className="text-foreground">
+        <DialogContent className="text-foreground" showCloseButton={!remove.isPending}>
           <DialogHeader>
             <DialogTitle>{t('chat.deleteStoryConfirm')}</DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-muted-foreground">{t('chat.archiveDeleteHint')}</p>
+          <DialogDescription>{t('chat.archiveDeleteHint')}</DialogDescription>
           <div className="flex justify-end gap-2">
             <button
               type="button"
@@ -232,7 +238,7 @@ export function StoriesArchivePage() {
               type="button"
               disabled={remove.isPending}
               onClick={async () => {
-                if (!storyToDelete) return
+                if (!storyToDelete || remove.isPending) return
                 try {
                   await remove.mutateAsync(storyToDelete.id)
                   setStoryToDelete(null)

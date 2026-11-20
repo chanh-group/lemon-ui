@@ -23,37 +23,53 @@ vi.mock('@/features/story/api/stories.api', () => ({
 }))
 vi.mock('@/features/shell/components/SideNav', () => ({ SideNav: () => <div /> }))
 vi.mock('@/features/story/components/StoryViewer', () => ({ StoryViewer: () => <div /> }))
-vi.mock('@/features/story/hooks/useStories', () => ({
-  useArchivedStories: () => ({
-    data: {
-      pages: [
-        {
-          items: [
-            {
-              id: 's1',
-              name: 'Story',
-              createdAt: '2026-01-01T00:00:00.000Z',
-              viewed: false,
-              online: false,
-              mine: true,
-              kind: 'MEDIA',
-              mediaUrl: 'blob:test',
-              mediaType: 'image',
-            },
-          ],
+vi.mock('@/features/story/hooks/useStories', async () => {
+  const { useState } = await import('react')
+  return {
+    useArchivedStories: () => ({
+      data: {
+        pages: [
+          {
+            items: [
+              {
+                id: 's1',
+                name: 'Story',
+                createdAt: '2026-01-01T00:00:00.000Z',
+                viewed: false,
+                online: false,
+                mine: true,
+                kind: 'MEDIA',
+                mediaUrl: 'blob:test',
+                mediaType: 'image',
+              },
+            ],
+          },
+        ],
+      },
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+      hasNextPage: false,
+      fetchNextPage: vi.fn(),
+      isFetchingNextPage: false,
+    }),
+    useStoryMedia: () => ({ data: null }),
+    useDeleteStory: () => {
+      const [isPending, setPending] = useState(false)
+      return {
+        isPending,
+        mutateAsync: async (id: string) => {
+          setPending(true)
+          try {
+            await mutateAsync(id)
+          } finally {
+            setPending(false)
+          }
         },
-      ],
+      }
     },
-    isLoading: false,
-    isError: false,
-    refetch: vi.fn(),
-    hasNextPage: false,
-    fetchNextPage: vi.fn(),
-    isFetchingNextPage: false,
-  }),
-  useStoryMedia: () => ({ data: null }),
-  useDeleteStory: () => ({ mutateAsync, isPending: false }),
-}))
+  }
+})
 
 afterEach(() => {
   cleanup()
@@ -69,11 +85,14 @@ function renderPage() {
   )
 }
 
+const openDeleteDialog = () =>
+  fireEvent.click(screen.getByRole('button', { name: /^chat\.deleteStory:/ }))
+
 describe('stories archive delete flow', () => {
   it('deletes the story after confirmation and reports success', async () => {
     mutateAsync.mockResolvedValueOnce(undefined)
     renderPage()
-    fireEvent.click(screen.getByRole('button', { name: /^chat\.deleteStory:/ }))
+    openDeleteDialog()
     expect(screen.getByText('chat.deleteStoryConfirm')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'chat.deleteStory' }))
     await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith('s1'))
@@ -84,16 +103,34 @@ describe('stories archive delete flow', () => {
   it('keeps the dialog open and reports failure when deletion fails', async () => {
     mutateAsync.mockRejectedValueOnce(new Error('boom'))
     renderPage()
-    fireEvent.click(screen.getByRole('button', { name: /^chat\.deleteStory:/ }))
+    openDeleteDialog()
     fireEvent.click(screen.getByRole('button', { name: 'chat.deleteStory' }))
     await waitFor(() => expect(toastError).toHaveBeenCalledWith('chat.storyActionError'))
     expect(mutateAsync).toHaveBeenCalledWith('s1')
     expect(screen.getByText('chat.deleteStoryConfirm')).toBeTruthy()
   })
 
+  it('locks the dialog and blocks double-submit while deletion is pending', async () => {
+    let resolveDelete!: () => void
+    mutateAsync.mockReturnValueOnce(new Promise<void>((resolve) => (resolveDelete = resolve)))
+    renderPage()
+    openDeleteDialog()
+    fireEvent.click(screen.getByRole('button', { name: 'chat.deleteStory' }))
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1))
+    const confirm = screen.getByRole('button', { name: 'chat.deleteStory' })
+    expect((confirm as HTMLButtonElement).disabled).toBe(true)
+    expect(screen.queryByRole('button', { name: 'Close' })).toBeNull()
+    fireEvent.click(confirm)
+    fireEvent.click(confirm)
+    expect(mutateAsync).toHaveBeenCalledTimes(1)
+    resolveDelete()
+    await waitFor(() => expect(screen.queryByText('chat.deleteStoryConfirm')).toBeNull())
+    expect(toastSuccess).toHaveBeenCalledWith('chat.storyDeleted')
+  })
+
   it('closes the dialog without deleting when cancelled', () => {
     renderPage()
-    fireEvent.click(screen.getByRole('button', { name: /^chat\.deleteStory:/ }))
+    openDeleteDialog()
     fireEvent.click(screen.getByRole('button', { name: 'chat.cancel' }))
     expect(screen.queryByText('chat.deleteStoryConfirm')).toBeNull()
     expect(mutateAsync).not.toHaveBeenCalled()
