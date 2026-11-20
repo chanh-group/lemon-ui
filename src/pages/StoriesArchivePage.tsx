@@ -132,7 +132,7 @@ export function StoriesArchivePage() {
             {isLoading ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                 {Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} className="aspect-[9/16] rounded-xl bg-muted animate-pulse" />
+                  <div key={i} className="aspect-9/16 rounded-xl bg-muted animate-pulse" />
                 ))}
               </div>
             ) : isError && !data ? (
@@ -160,7 +160,7 @@ export function StoriesArchivePage() {
                     <button
                       type="button"
                       onClick={() => setSelectedStory(item)}
-                      className="group relative flex w-full aspect-[9/16] flex-col justify-between overflow-hidden rounded-xl bg-neutral-900 border border-white/10 shadow-md text-left transition-transform hover:scale-[1.02] cursor-pointer"
+                      className="group relative flex w-full aspect-9/16 flex-col justify-between overflow-hidden rounded-xl bg-neutral-900 border border-white/10 shadow-md text-left transition-transform hover:scale-[1.02] cursor-pointer"
                     >
                       {/* Media or Text Background */}
                       <div className="absolute inset-0">
@@ -178,7 +178,7 @@ export function StoriesArchivePage() {
                             </span>
                           </div>
                         )}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/40" />
+                        <div className="absolute inset-0 bg-linear-to-t from-black/80 via-transparent to-black/40" />
                       </div>
 
                       {/* Top date badge */}
