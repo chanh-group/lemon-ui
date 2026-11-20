@@ -101,14 +101,19 @@ export function MediaStoryEditor({
 
   const isVideo = file?.type.startsWith('video') ?? false
   const canShare = Boolean(file) && !unreadable
+  const showTrimmer =
+    isVideo && Boolean(objectUrl) && isVideoDurationKnown(duration) && duration >= 1
+  const hasCustomTrim =
+    isVideo && isVideoDurationKnown(duration) && (trimStart > 0 || trimEnd < duration - 0.01)
+  const frameWidth = showTrimmer
+    ? 'w-[min(100%,460px,calc(56.25dvh-135px))]'
+    : 'w-[min(100%,460px,calc(56.25dvh-90px))]'
 
   const share = async () => {
     if (!file || !canShare || isProcessing || isSharing) return
     const plan = isVideo
       ? planStoryVideo({ sizeBytes: file.size, durationSeconds: duration })
       : 'share'
-    const hasCustomTrim =
-      isVideo && isVideoDurationKnown(duration) && (trimStart > 0 || trimEnd < duration - 0.01)
     if (plan === 'share' && !hasCustomTrim) {
       onShare(
         file,
@@ -201,9 +206,11 @@ export function MediaStoryEditor({
     <div className="min-h-full">
       {controlsTarget ? createPortal(controls, controlsTarget) : controls}
       {/* Xem trước */}
-      <div className="flex min-h-full flex-col items-center justify-center gap-3 bg-background p-4">
+      <div className="flex min-h-full flex-col items-center justify-center gap-3 overflow-y-auto bg-background p-4 [justify-content:safe_center]">
         {objectUrl && (
-          <div className="relative aspect-[9/16] w-[min(100%,460px,calc(56.25dvh-90px))] shrink-0 overflow-hidden rounded-2xl bg-card shadow-xl">
+          <div
+            className={`relative aspect-[9/16] ${frameWidth} shrink-0 overflow-hidden rounded-2xl bg-card shadow-xl`}
+          >
             {!isVideo && (
               <img
                 src={objectUrl}
@@ -228,10 +235,7 @@ export function MediaStoryEditor({
                 }}
                 onTimeUpdate={(event) => {
                   setPlayhead(event.currentTarget.currentTime)
-                  if (
-                    isVideoDurationKnown(duration) &&
-                    event.currentTarget.currentTime >= trimEnd
-                  ) {
+                  if (hasCustomTrim && event.currentTarget.currentTime >= trimEnd) {
                     event.currentTarget.currentTime = trimStart
                   }
                 }}
@@ -253,7 +257,7 @@ export function MediaStoryEditor({
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="flex aspect-[9/16] w-[min(100%,460px,calc(56.25dvh-90px))] shrink-0 flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border bg-muted/40 text-muted-foreground transition-colors hover:border-ring hover:text-foreground"
+            className={`flex aspect-[9/16] ${frameWidth} shrink-0 flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border bg-muted/40 text-muted-foreground transition-colors hover:border-ring hover:text-foreground`}
           >
             <span className="grid size-14 place-items-center rounded-full bg-card ring-1 ring-border">
               <Media className="size-7 text-brand-ink" aria-hidden="true" />
@@ -262,8 +266,8 @@ export function MediaStoryEditor({
           </button>
         ) : null}
 
-        {isVideo && objectUrl && isVideoDurationKnown(duration) && duration >= 1 && (
-          <div className="w-[min(100%,460px,calc(56.25dvh-90px))]">
+        {showTrimmer && objectUrl !== null && (
+          <div className={frameWidth}>
             <VideoTrimmer
               url={objectUrl}
               duration={duration}
@@ -283,7 +287,7 @@ export function MediaStoryEditor({
             />
           </div>
         )}
-        <div className="flex w-[min(100%,460px,calc(56.25dvh-90px))] shrink-0 items-center justify-between gap-2 pb-2">
+        <div className={`flex ${frameWidth} shrink-0 items-center justify-between gap-2 pb-2`}>
           <button
             type="button"
             onClick={onDiscard}

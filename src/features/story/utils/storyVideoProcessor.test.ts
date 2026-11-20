@@ -98,6 +98,24 @@ describe('processStoryVideo', () => {
     expect(media.dispose).toHaveBeenCalledOnce()
   })
 
+  it('passes a custom trim end through to the conversion', async () => {
+    await processStoryVideo({ file: file(), startSeconds: 5, endSeconds: 25 })
+    expect(media.init).toHaveBeenCalledWith(
+      expect.objectContaining({ trim: { start: 5, end: 25 } }),
+    )
+  })
+
+  it.each([
+    { startSeconds: 5, endSeconds: 5 },
+    { startSeconds: 10, endSeconds: 3 },
+    { startSeconds: -1, endSeconds: 10 },
+    { startSeconds: 0, endSeconds: STORY_MAX_TRIM_SECONDS + 1 },
+    { startSeconds: Number.NaN, endSeconds: 10 },
+  ])('rejects the invalid trim range %o without starting conversion', async (range) => {
+    await expect(processStoryVideo({ file: file(), ...range })).rejects.toThrow(RangeError)
+    expect(media.init).not.toHaveBeenCalled()
+  })
+
   it.each([true, false])(
     'checks AAC support and registers a fallback only when needed (%s)',
     async (supported) => {
