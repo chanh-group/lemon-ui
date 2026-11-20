@@ -457,7 +457,7 @@ export function ProfileSettings() {
                   <span
                     className={
                       user.bio
-                        ? 'block break-words text-sm text-foreground whitespace-pre-wrap'
+                        ? 'block wrap-break-words text-sm text-foreground whitespace-pre-wrap'
                         : 'block truncate text-sm text-muted-foreground'
                     }
                   >

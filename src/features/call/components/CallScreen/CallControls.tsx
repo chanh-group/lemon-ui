@@ -92,7 +92,7 @@ function ControlButton({
           <Icon className={cn(size === 'lg' ? 'size-7' : 'size-6')} aria-hidden="true" />
         </button>
       </span>
-      <span className="max-w-[4.75rem] text-center text-[11px] leading-tight font-medium text-white/65">
+      <span className="max-w-19 text-center text-[11px] leading-tight font-medium text-white/65">
         {label}
       </span>
     </div>

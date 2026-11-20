@@ -261,11 +261,11 @@ export function CallScreen({
 
       {/* Lớp tối để chữ và nút luôn đọc được trên video/voice stage. */}
       <div
-        className="pointer-events-none absolute inset-x-0 top-0 z-20 h-40 bg-gradient-to-b from-black/65 via-black/25 to-transparent"
+        className="pointer-events-none absolute inset-x-0 top-0 z-20 h-40 bg-linear-to-b from-black/65 via-black/25 to-transparent"
         aria-hidden="true"
       />
       <div
-        className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-72 bg-gradient-to-t from-black/80 via-black/40 to-transparent"
+        className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-72 bg-linear-to-t from-black/80 via-black/40 to-transparent"
         aria-hidden="true"
       />
 
@@ -311,7 +311,7 @@ export function CallScreen({
       <footer className="relative z-30 mt-auto px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:px-6">
         <div
           className={cn(
-            'mx-auto w-full max-w-xl rounded-[2rem] px-3 py-4 sm:px-6',
+            'mx-auto w-full max-w-xl rounded-4xl px-3 py-4 sm:px-6',
             phase === 'ended'
               ? 'bg-transparent'
               : 'border border-white/10 bg-black/25 shadow-[0_20px_60px_-25px_rgba(0,0,0,0.9)] backdrop-blur-xl',
