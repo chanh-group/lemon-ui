@@ -20,8 +20,13 @@ export function useReplyTarget(
   initialTarget?: MessageReplyTarget | null,
   enabled = true,
 ) {
+  // A null initial target is the payload saying "gone" — render it, never fetch.
   const queryEnabled = Boolean(
-    enabled && conversationId && replyToId && !isReplyTargetComplete(initialTarget),
+    enabled &&
+      conversationId &&
+      replyToId &&
+      initialTarget !== null &&
+      !isReplyTargetComplete(initialTarget),
   )
 
   const query = useQuery({
@@ -46,7 +51,8 @@ export function useReplyTarget(
   })
 
   const target = query.data ?? initialTarget ?? null
-  const isUnavailable = target === UNAVAILABLE_TARGET_SENTINEL
+  const isUnavailable =
+    target === UNAVAILABLE_TARGET_SENTINEL || (initialTarget === null && !query.data)
 
   return {
     target: isUnavailable ? null : target,

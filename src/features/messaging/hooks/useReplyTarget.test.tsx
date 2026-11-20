@@ -71,15 +71,25 @@ describe('useReplyTarget', () => {
     expect(result.current.isLoading).toBe(false)
   })
 
-  it('maps a 404 target to the unavailable sentinel', async () => {
+  it('fetches stripped targets and maps a 404 to the unavailable sentinel', async () => {
     mockedGetReplyTarget.mockRejectedValue(new ApiError('MESSAGE_NOT_FOUND', 404, 'not found'))
 
-    const { result } = renderHook(() => useReplyTarget('conv-1', 'msg-2', null), {
+    const { result } = renderHook(() => useReplyTarget('conv-1', 'msg-2'), {
       wrapper: createWrapper(),
     })
 
     await waitFor(() => expect(result.current.isUnavailable).toBe(true))
     expect(result.current.target).toBeNull()
+  })
+
+  it('renders a null initial target as gone without fetching', async () => {
+    const { result } = renderHook(() => useReplyTarget('conv-1', 'msg-5', null), {
+      wrapper: createWrapper(),
+    })
+
+    await waitFor(() => expect(result.current.isUnavailable).toBe(true))
+    expect(result.current.target).toBeNull()
+    expect(mockedGetReplyTarget).not.toHaveBeenCalled()
   })
 
   it('keeps a real target with unknown content navigable instead of marking it unavailable', async () => {

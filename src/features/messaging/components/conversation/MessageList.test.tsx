@@ -1,10 +1,7 @@
 // @vitest-environment happy-dom
-import type { ReactNode } from 'react'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MessageReplyBubbleQuote, StoryReplyQuote } from './MessageList'
-import { getStoryById } from '@/features/story/api/stories.api'
 import { useReplyTarget } from '@/features/messaging/hooks/useReplyTarget'
 import type { MessageReplyTarget } from '@/features/messaging/types/message.types'
 
@@ -12,15 +9,10 @@ vi.mock('react-i18next', async (importOriginal) => ({
   ...(await importOriginal()),
   useTranslation: () => ({ t: (key: string) => key }),
 }))
-vi.mock('@/features/story/api/stories.api', () => ({ getStoryById: vi.fn() }))
-vi.mock('@/features/story/hooks/useStories', () => ({
-  useStoryMedia: () => ({ data: null }),
-}))
 vi.mock('@/features/messaging/hooks/useReplyTarget', () => ({
   useReplyTarget: vi.fn(),
 }))
 
-const mockedGetStoryById = getStoryById as unknown as ReturnType<typeof vi.fn>
 const mockedUseReplyTarget = useReplyTarget as unknown as ReturnType<typeof vi.fn>
 
 afterEach(() => {
@@ -28,48 +20,35 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
-function wrapper({ children }: { children: ReactNode }) {
-  return <QueryClientProvider client={new QueryClient()}>{children}</QueryClientProvider>
-}
-
-const preview = {
+const alivePreview = {
   id: 's1',
   kind: 'IMAGE' as const,
-  caption: 'At the beach',
-  mediaUrl: null,
-  background: null,
-}
-
-const aliveStory = {
-  id: 's1',
-  kind: 'MEDIA',
-  mediaType: 'image',
-  mediaUrl: null,
+  bucket: 'stories',
+  objectKey: 's1.jpg',
   caption: 'At the beach',
   background: null,
+  mediaUrl: 'https://r2/s1.jpg',
 }
 
 describe('StoryReplyQuote', () => {
-  it('shows the gone label and stays inert when the story is expired', async () => {
-    mockedGetStoryById.mockRejectedValue(new Error('404'))
+  it('shows the gone label and stays inert when the story preview is redacted', () => {
     const onOpen = vi.fn()
 
-    render(<StoryReplyQuote preview={preview} onOpen={onOpen} />, { wrapper })
+    render(<StoryReplyQuote preview={null} onOpen={onOpen} />)
 
-    expect(await screen.findByText('chat.replyUnavailableStory')).toBeTruthy()
-    expect(screen.queryByText('At the beach')).toBeNull()
+    expect(screen.getByText('chat.replyUnavailableStory')).toBeTruthy()
     expect(screen.queryByRole('button')).toBeNull()
     fireEvent.click(screen.getByText('chat.replyUnavailableStory'))
     expect(onOpen).not.toHaveBeenCalled()
   })
 
-  it('shows the story caption and opens the story when it is alive', async () => {
-    mockedGetStoryById.mockResolvedValue(aliveStory)
+  it('renders caption and media from the payload and opens the story when alive', () => {
     const onOpen = vi.fn()
 
-    render(<StoryReplyQuote preview={preview} onOpen={onOpen} />, { wrapper })
+    render(<StoryReplyQuote preview={alivePreview} onOpen={onOpen} />)
 
-    expect(await screen.findByText('At the beach')).toBeTruthy()
+    expect(screen.getByText('At the beach')).toBeTruthy()
+    expect(document.querySelector('img')?.getAttribute('src')).toBe('https://r2/s1.jpg')
     fireEvent.click(screen.getByRole('button'))
     expect(onOpen).toHaveBeenCalledWith('s1')
   })
@@ -82,16 +61,15 @@ describe('MessageReplyBubbleQuote', () => {
     kind: 'STORY_REPLY',
     body: 'Bạn nam kdc à',
     deletedAt: null,
-    storyPreview: preview,
+    storyPreview: alivePreview,
   }
 
-  it('replaces dead story content with the gone label and cannot navigate', async () => {
+  it('renders the gone label for a redacted story target and cannot navigate', () => {
     mockedUseReplyTarget.mockReturnValue({
-      target: storyTarget,
+      target: { ...storyTarget, storyPreview: null },
       isLoading: false,
       isUnavailable: false,
     })
-    mockedGetStoryById.mockRejectedValue(new Error('404'))
     const onJumpToMessage = vi.fn()
 
     render(
@@ -100,23 +78,21 @@ describe('MessageReplyBubbleQuote', () => {
         replyToId="m1"
         onJumpToMessage={onJumpToMessage}
       />,
-      { wrapper },
     )
 
-    expect(await screen.findByText('chat.replyUnavailableStory')).toBeTruthy()
+    expect(screen.getByText('chat.replyUnavailableStory')).toBeTruthy()
     expect(screen.queryByText('At the beach')).toBeNull()
     expect(screen.queryByText('Bạn nam kdc à')).toBeNull()
     fireEvent.click(screen.getByRole('button'))
     expect(onJumpToMessage).not.toHaveBeenCalled()
   })
 
-  it('quotes the story caption and navigates when the story is alive', async () => {
+  it('quotes the story caption with its media from the payload and navigates when alive', () => {
     mockedUseReplyTarget.mockReturnValue({
       target: storyTarget,
       isLoading: false,
       isUnavailable: false,
     })
-    mockedGetStoryById.mockResolvedValue(aliveStory)
     const onJumpToMessage = vi.fn()
 
     render(
@@ -125,11 +101,28 @@ describe('MessageReplyBubbleQuote', () => {
         replyToId="m1"
         onJumpToMessage={onJumpToMessage}
       />,
-      { wrapper },
     )
 
-    expect(await screen.findByText('At the beach')).toBeTruthy()
+    expect(screen.getByText('At the beach')).toBeTruthy()
+    expect(document.querySelector('img')?.getAttribute('src')).toBe('https://r2/s1.jpg')
     fireEvent.click(screen.getByRole('button'))
     expect(onJumpToMessage).toHaveBeenCalledWith('m1')
+  })
+
+  it('renders the unavailable label without navigation when the target is gone', () => {
+    mockedUseReplyTarget.mockReturnValue({ target: null, isLoading: false, isUnavailable: true })
+    const onJumpToMessage = vi.fn()
+
+    render(
+      <MessageReplyBubbleQuote
+        conversationId="c1"
+        replyToId="m1"
+        onJumpToMessage={onJumpToMessage}
+      />,
+    )
+
+    expect(screen.getByText('chat.replyUnavailableContent')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button'))
+    expect(onJumpToMessage).not.toHaveBeenCalled()
   })
 })

@@ -11,10 +11,6 @@ import {
   type RefObject,
 } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useQuery } from '@tanstack/react-query'
-import { queryKeys } from '@/infrastructure/query/keys'
-import { getStoryById } from '@/features/story/api/stories.api'
-import { useStoryMedia } from '@/features/story/hooks/useStories'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import {
   CheckCheckIcon as CheckCheckData,
@@ -158,33 +154,22 @@ export function StoryReplyQuote({
   preview,
   onOpen,
 }: {
-  preview: NonNullable<ChatMessage['storyPreview']>
+  preview: ChatMessage['storyPreview']
   onOpen?: (id: string) => void
 }) {
   const { t } = useTranslation()
-  const story = useQuery({
-    queryKey: queryKeys.chat.storyReply(preview.id),
-    queryFn: () => getStoryById(preview.id),
-    retry: false,
-    staleTime: 10 * 60_000,
-    gcTime: 30 * 60_000,
-  })
-  const media = useStoryMedia(story.data ?? { id: preview.id })
-  const queryMediaUrl = story.data?.mediaUrl ?? media.data
-  const fallbackMediaUrl = preview.mediaUrl
-  const effectiveMediaUrl = (queryMediaUrl || fallbackMediaUrl || '').trim()
-  const isTextStory =
-    story.data?.kind === 'TEXT' || preview.kind === 'TEXT' || preview.kind === 'text'
-  const isVideo = story.data?.mediaType === 'video' || preview.kind === 'VIDEO'
-  const isUnavailable = story.isError
 
-  if (isUnavailable) {
+  if (!preview) {
     return (
       <div className="mb-2 max-w-full rounded-lg bg-muted/50 p-1.5 text-left text-xs italic text-muted-foreground">
         {t('chat.replyUnavailableStory')}
       </div>
     )
   }
+
+  const isTextStory = preview.kind === 'TEXT' || preview.kind === 'text'
+  const isVideo = preview.kind === 'VIDEO'
+  const mediaUrl = preview.mediaUrl?.trim() || undefined
 
   return (
     <button
@@ -195,26 +180,17 @@ export function StoryReplyQuote({
       {isTextStory ? (
         <span
           className="flex aspect-square size-12 shrink-0 items-center justify-center rounded p-1 text-center text-[8px] font-medium leading-tight text-foreground shadow-xs"
-          style={{
-            backgroundColor: story.data?.background || preview.background || '#2a2a2a',
-          }}
+          style={{ backgroundColor: preview.background || '#2a2a2a' }}
         >
-          <span className="line-clamp-3 break-words">
-            {story.data?.caption || preview.caption || ''}
-          </span>
+          <span className="line-clamp-3 break-words">{preview.caption || ''}</span>
         </span>
       ) : (
         <span className="flex aspect-square size-12 shrink-0 items-center justify-center overflow-hidden rounded bg-muted text-center text-[8px]">
-          {effectiveMediaUrl ? (
+          {mediaUrl ? (
             isVideo ? (
-              <video
-                src={effectiveMediaUrl}
-                muted
-                preload="metadata"
-                className="size-full object-cover"
-              />
+              <video src={mediaUrl} muted preload="metadata" className="size-full object-cover" />
             ) : (
-              <img src={effectiveMediaUrl} alt="" className="size-full object-cover" />
+              <img src={mediaUrl} alt="" className="size-full object-cover" />
             )
           ) : (
             <span className="text-muted-foreground text-[10px]">Story</span>
@@ -223,7 +199,7 @@ export function StoryReplyQuote({
       )}
       <span className="min-w-0 flex-1">
         <span className="block truncate font-medium text-xs text-foreground">
-          {preview.caption || story.data?.caption || t('chat.unnamedStory')}
+          {preview.caption || t('chat.unnamedStory')}
         </span>
       </span>
     </button>
@@ -244,52 +220,35 @@ export function MessageReplyBubbleQuote({
   const { t } = useTranslation()
   const { target, isLoading } = useReplyTarget(conversationId, replyToId, initialTarget)
   const quote = resolveReplyQuote(target, t)
-  const storyPreview = target?.storyPreview
-  const story = useQuery({
-    queryKey: queryKeys.chat.storyReply(storyPreview?.id ?? ''),
-    queryFn: () => getStoryById(storyPreview!.id),
-    enabled: Boolean(storyPreview),
-    retry: false,
-    staleTime: 10 * 60_000,
-    gcTime: 30 * 60_000,
-  })
-  const media = useStoryMedia(story.data ?? { id: storyPreview?.id ?? '' })
-  // A dead story (expired/removed) replaces the quoted story content entirely.
-  const storyGone = Boolean(storyPreview) && story.isError
-  const thumbnailUrl = storyGone
-    ? undefined
-    : quote.thumbnailUrl || story.data?.mediaUrl || media.data || undefined
-  const isVideo = storyPreview?.kind === 'VIDEO' || story.data?.mediaType === 'video'
+  const isVideo =
+    target?.storyPreview?.kind === 'VIDEO' || target?.previewAttachment?.kind === 'VIDEO'
 
   return (
     <button
       type="button"
-      onClick={storyGone ? undefined : () => onJumpToMessage?.(replyToId)}
-      aria-disabled={storyGone}
+      onClick={quote.canNavigate ? () => onJumpToMessage?.(replyToId) : undefined}
+      aria-disabled={!quote.canNavigate}
       className={cn(
         'mb-1 flex max-w-full items-center gap-2 rounded border-l-2 border-muted-foreground/30 bg-muted/40 px-2 py-1 text-left text-[11px] text-muted-foreground hover:bg-muted/70',
-        storyGone && 'cursor-default hover:bg-muted/40',
+        !quote.canNavigate && 'cursor-default hover:bg-muted/40',
       )}
     >
-      {thumbnailUrl &&
+      {quote.thumbnailUrl &&
         (isVideo ? (
           <video
-            src={thumbnailUrl}
+            src={quote.thumbnailUrl}
             muted
             preload="metadata"
             className="size-9 shrink-0 rounded object-cover"
           />
         ) : (
-          <img src={thumbnailUrl} alt="" className="size-9 shrink-0 rounded object-cover" />
+          <img src={quote.thumbnailUrl} alt="" className="size-9 shrink-0 rounded object-cover" />
         ))}
       <span className="min-w-0 flex-1">
         <span
-          className={cn(
-            'block truncate',
-            (quote.availability === 'removed' || storyGone) && 'italic opacity-80',
-          )}
+          className={cn('block truncate', quote.availability !== 'available' && 'italic opacity-80')}
         >
-          {storyGone ? t('chat.replyUnavailableStory') : isLoading ? '...' : quote.label}
+          {isLoading ? '...' : quote.label}
         </span>
       </span>
     </button>
@@ -528,8 +487,8 @@ const MessageRowView = memo(function MessageRowView({
             />
           )}
 
-          {!msg.deletedAt && msg.storyPreview && (
-            <StoryReplyQuote preview={msg.storyPreview} onOpen={onOpenStoryReply} />
+          {!msg.deletedAt && (msg.storyPreview || msg.storyId) && (
+            <StoryReplyQuote preview={msg.storyPreview ?? null} onOpen={onOpenStoryReply} />
           )}
 
           {msg.deletedAt ? (

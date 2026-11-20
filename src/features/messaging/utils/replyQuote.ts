@@ -96,6 +96,16 @@ export function resolveReplyQuote(
     }
   }
 
+  // Story content is gone (redacted at serialization): tombstone without navigation.
+  if (category === 'STORY' && !target.storyPreview) {
+    return {
+      availability: 'unavailable',
+      category,
+      label: t('chat.replyUnavailableStory'),
+      canNavigate: false,
+    }
+  }
+
   // Active message
   let thumbnailUrl: string | undefined
   if (target.previewAttachment?.previewUrl) {

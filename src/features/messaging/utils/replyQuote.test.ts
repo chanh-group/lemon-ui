@@ -250,6 +250,27 @@ describe('replyQuote pure helper', () => {
     expect(resolved.thumbnailUrl).toBe('https://r2/pic.jpg')
     expect(resolved.label).toBe('pic.jpg')
   })
+
+  it('renders a redacted story target as gone without navigation', async () => {
+    const tVi = await createT('vi')
+    const tEn = await createT('en')
+    const goneStory: MessageReplyTarget = {
+      id: 'm-gone',
+      senderId: 'u1',
+      kind: 'STORY_REPLY',
+      body: 'Bạn nam kdc à',
+      deletedAt: null,
+      storyPreview: null,
+    }
+    expect(resolveReplyQuote(goneStory, tVi)).toMatchObject({
+      availability: 'unavailable',
+      category: 'STORY',
+      label: 'Tin không còn nữa',
+      canNavigate: false,
+    })
+    expect(resolveReplyQuote(goneStory, tEn).label).toBe('Story no longer available')
+    expect(resolveReplyQuote(goneStory, tVi).thumbnailUrl).toBeUndefined()
+  })
 })
 
 describe('isReplyTargetComplete', () => {
