@@ -33,7 +33,7 @@ import { ROUTES } from '@/config/constants'
 import { useAuth } from '@/features/auth/api'
 import { useFriendRequests } from '@/features/friend/hooks/useFriends'
 import { getConversationPreview } from '@/features/conversation/utils/chat.mapper'
-import { groupStoriesByAuthor } from '@/features/story/utils/storyGroups'
+import { groupStories } from '@/features/story/utils/storyGroups'
 import { storyDisplayName, storyTime } from '@/features/story/data/storiesData'
 import type { CallEntry } from '@/features/call/types/call.types'
 import type { ChatTab } from '@/types/common'
@@ -482,8 +482,10 @@ function StoriesTab({ stories, activeStoryId, onOpenStory, onOpenCreate }: Stori
   const { t } = useTranslation()
   const { user } = useAuth()
   const userName = user?.fullName ?? user?.username ?? 'Lemon User'
-  const myStory = stories.find((s) => s.mine)
-  const friendStories = groupStoriesByAuthor(stories.filter((s) => !s.mine))
+  const myStoryGroups = groupStories(stories.filter((s) => s.mine))
+  const myGroup = myStoryGroups[0]
+  const myStory = myGroup?.displayStory
+  const friendStories = groupStories(stories.filter((s) => !s.mine))
 
   return (
     <ul className="flex flex-col gap-0.5">
@@ -495,15 +497,20 @@ function StoriesTab({ stories, activeStoryId, onOpenStory, onOpenCreate }: Stori
           aria-label={myStory ? t('chat.yourStory') : t('chat.createStoryTitle')}
           className={cn(
             'chat-item group flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-all duration-150',
-            myStory && myStory.id === activeStoryId
+            myGroup && myGroup.stories.some((item) => item.id === activeStoryId)
               ? 'bg-muted ring-1 ring-border shadow-xs'
               : 'hover:translate-x-0.5 hover:bg-muted',
           )}
         >
           <UserAvatar name={userName} src={user?.avatarUrl} className="size-11" />
           <span className="min-w-0 flex-1">
-            <span className="flex items-center gap-0.5 text-sm font-bold text-foreground">
+            <span className="flex items-center gap-1.5 text-sm font-bold text-foreground">
               <span className="truncate">{t('chat.myStories')}</span>
+              {myGroup && myGroup.count > 1 && (
+                <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                  {t('chat.storyCount', { count: myGroup.count })}
+                </span>
+              )}
               <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
             </span>
             <span className="mt-0.5 block truncate text-xs text-muted-foreground">
@@ -520,11 +527,11 @@ function StoriesTab({ stories, activeStoryId, onOpenStory, onOpenCreate }: Stori
             </span>
           )}
         </button>
-        {myStory && (
+        {myGroup && (
           <button
             type="button"
             aria-label={t('chat.yourStory')}
-            onClick={() => onOpenStory(myStory)}
+            onClick={() => onOpenStory(myGroup.startStory)}
             className="absolute left-3 top-2.5 size-11 rounded-full"
           />
         )}
@@ -547,14 +554,15 @@ function StoriesTab({ stories, activeStoryId, onOpenStory, onOpenCreate }: Stori
         </li>
       ) : (
         friendStories.map((group) => {
-          const s = group.find((item) => !item.viewed) ?? group[0]
-          const isSelected = group.some((item) => item.id === activeStoryId)
+          const s = group.startStory
+          const preview = group.displayStory
+          const isSelected = group.stories.some((item) => item.id === activeStoryId)
           return (
-            <li key={s.id}>
+            <li key={preview.id}>
               <button
                 type="button"
                 onClick={() => onOpenStory(s)}
-                aria-label={`${t('chat.storyOf', { name: s.name })}, ${storyTime(s, t('chat.now'))}`}
+                aria-label={`${t('chat.storyOf', { name: preview.name })}, ${storyTime(preview, t('chat.now'))}`}
                 className={cn(
                   'chat-item group flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-all duration-150',
                   isSelected
@@ -563,21 +571,28 @@ function StoriesTab({ stories, activeStoryId, onOpenStory, onOpenCreate }: Stori
                 )}
               >
                 <UserAvatar
-                  name={s.name}
-                  src={s.authorAvatar}
+                  name={preview.name}
+                  src={preview.authorAvatar}
                   className={cn(
                     'size-11',
-                    group.every((item) => item.viewed)
+                    group.viewed
                       ? 'ring-2 ring-border ring-offset-2 ring-offset-card'
                       : 'chat-story-ring',
                   )}
                 />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-semibold text-foreground">
-                    {storyDisplayName(s, t)}
+                  <span className="flex items-center gap-1.5">
+                    <span className="truncate text-sm font-semibold text-foreground">
+                      {storyDisplayName(preview, t)}
+                    </span>
+                    {group.count > 1 && (
+                      <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                        {t('chat.storyCount', { count: group.count })}
+                      </span>
+                    )}
                   </span>
                   <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-                    {storyTime(s, t('chat.now'))}
+                    {storyTime(preview, t('chat.now'))}
                   </span>
                 </span>
               </button>

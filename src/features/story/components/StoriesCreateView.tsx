@@ -33,6 +33,7 @@ import { TextStoryEditor } from './TextStoryEditor'
 import { MediaStoryEditor } from './MediaStoryEditor'
 import { StorySettingsModal } from './StorySettingsModal'
 import { storyDisplayName, storyTime } from '@/features/story/data/storiesData'
+import { groupStories } from '@/features/story/utils/storyGroups'
 
 type StoryStep = 'choose' | 'media' | 'text'
 
@@ -52,6 +53,7 @@ export function StoriesCreateView() {
   const backToStories = () => navigate(ROUTES.messages, { state: { tab: 'stories' } })
   const stories = useStoriesList(user?.id).data ?? []
   const myStories = stories.filter((s) => s.mine)
+  const myGroup = groupStories(myStories)[0]
   const showingEditor = step !== 'choose'
 
   const shareText = (payload: CreateTextStoryPayload) => {
@@ -127,8 +129,8 @@ export function StoriesCreateView() {
         <div className="flex items-center gap-3 border-b border-border px-4 py-3">
           <button
             type="button"
-            disabled={myStories.length === 0}
-            onClick={() => setViewingOwn(myStories[0])}
+            disabled={!myGroup}
+            onClick={() => myGroup && setViewingOwn(myGroup.startStory)}
             aria-label={t('chat.yourStory')}
             className="rounded-full disabled:cursor-default"
           >
@@ -160,40 +162,45 @@ export function StoriesCreateView() {
         )}
 
         {/* Tin đã chia sẻ của mình (nếu có) */}
-        {step !== 'media' && myStories.length > 0 && (
+        {step !== 'media' && myGroup && (
           <div className="min-h-0 flex-1 overflow-y-auto py-2">
             <p className="px-4 pb-1 pt-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
               {t('chat.sharedStories')}
             </p>
             <ul className="flex flex-col gap-0.5 px-2">
-              {myStories.map((s) => (
-                <li key={s.id}>
-                  <button
-                    type="button"
-                    onClick={() => setViewingOwn(s)}
-                    aria-label={`${t('chat.yourStory')}, ${storyTime(s, t('chat.now'))}`}
-                    className="flex w-full items-center gap-3 rounded-2xl px-2 py-2 text-left transition-colors hover:bg-muted"
-                  >
-                    <UserAvatar
-                      name={s.name || userName}
-                      src={s.authorAvatar ?? user?.avatarUrl}
-                      className="size-11"
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-semibold text-foreground">
-                        {storyDisplayName(s, t)}
+              <li key={myGroup.displayStory.id}>
+                <button
+                  type="button"
+                  onClick={() => setViewingOwn(myGroup.startStory)}
+                  aria-label={`${t('chat.yourStory')}, ${storyTime(myGroup.displayStory, t('chat.now'))}`}
+                  className="flex w-full items-center gap-3 rounded-2xl px-2 py-2 text-left transition-colors hover:bg-muted"
+                >
+                  <UserAvatar
+                    name={myGroup.displayStory.name || userName}
+                    src={myGroup.displayStory.authorAvatar ?? user?.avatarUrl}
+                    className="size-11"
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-1.5">
+                      <span className="truncate text-sm font-semibold text-foreground">
+                        {storyDisplayName(myGroup.displayStory, t)}
                       </span>
-                      <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-                        {storyTime(s, t('chat.now'))}
-                      </span>
+                      {myGroup.count > 1 && (
+                        <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                          {t('chat.storyCount', { count: myGroup.count })}
+                        </span>
+                      )}
                     </span>
-                    <ChevronRight
-                      className="size-4 shrink-0 text-muted-foreground"
-                      aria-hidden="true"
-                    />
-                  </button>
-                </li>
-              ))}
+                    <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                      {storyTime(myGroup.displayStory, t('chat.now'))}
+                    </span>
+                  </span>
+                  <ChevronRight
+                    className="size-4 shrink-0 text-muted-foreground"
+                    aria-hidden="true"
+                  />
+                </button>
+              </li>
             </ul>
           </div>
         )}
@@ -244,11 +251,11 @@ export function StoriesCreateView() {
         </div>
       )}
 
-      {viewingOwn && (
+      {viewingOwn && myGroup && (
         <StoryViewer
           key={viewingOwn.id}
-          story={myStories.find((s) => s.id === viewingOwn.id) ?? viewingOwn}
-          stories={myStories}
+          story={myGroup.stories.find((s) => s.id === viewingOwn.id) ?? viewingOwn}
+          stories={myGroup.stories}
           onSelectStory={setViewingOwn}
           onClose={() => setViewingOwn(null)}
         />
