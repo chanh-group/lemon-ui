@@ -394,7 +394,6 @@
     "soundAlertsDesc": "Play sound alert on new messages",
     "previewAlerts": "Message previews",
     "previewAlertsDesc": "Show message snippet in notifications",
-    "save": "Save",
     "changePasswordTitle": "Change password",
     "changePasswordSubtitle": "Use at least 8 characters with at least one letter and one number.",
     "currentPassword": "Current password",
@@ -605,7 +604,10 @@
     "storyVideoInvalid": "Cannot read this video. Choose another file.",
     "storyStorage": "Story storage",
     "storyStorageUsage": "{{used}} / {{limit}} MiB used",
-    "storyStorageError": "Unable to load story storage."
+    "storyStorageError": "Unable to load story storage.",
+    "storyTrimStart": "Start time",
+    "storyTrimEnd": "End time",
+    "storyTrimPlayhead": "Playback position"
   },
   "theme": {
     "toLight": "Switch to light mode",

@@ -9,15 +9,10 @@ import {
   STORY_MAX_VIDEO_INPUT_BYTES,
   STORY_MAX_VIDEO_SECONDS,
 } from '../constants'
-import {
-  clampTrimStart,
-  isVideoDurationKnown,
-  maxTrimStartSeconds,
-  planStoryVideo,
-  toStoryDurationMs,
-} from '../utils/storyVideo'
+import { isVideoDurationKnown, planStoryVideo, toStoryDurationMs } from '../utils/storyVideo'
 import { processStoryVideo } from '../utils/storyVideoProcessor'
 import { readVideoDuration } from '../utils/readVideoDuration'
+import { VideoTrimmer } from './VideoTrimmer'
 const Media = createIcon(MediaData)
 
 interface MediaStoryActorProps {
@@ -46,6 +41,8 @@ export function MediaStoryEditor({
   const [fileError, setFileError] = useState('')
   const [duration, setDuration] = useState<number | null>(null)
   const [trimStart, setTrimStart] = useState(0)
+  const [trimEnd, setTrimEnd] = useState(0)
+  const [playhead, setPlayhead] = useState(0)
   const [isProcessing, setIsProcessing] = useState(false)
   const [progress, setProgress] = useState(0)
   const [unreadable, setUnreadable] = useState(false)
@@ -72,6 +69,8 @@ export function MediaStoryEditor({
     const max = video ? STORY_MAX_VIDEO_INPUT_BYTES : STORY_MAX_MEDIA_BYTES
     setDuration(null)
     setTrimStart(0)
+    setTrimEnd(0)
+    setPlayhead(0)
     setProgress(0)
     setUnreadable(false)
     if (!allowed.includes(selected.type) || selected.size === 0) {
@@ -108,7 +107,9 @@ export function MediaStoryEditor({
     const plan = isVideo
       ? planStoryVideo({ sizeBytes: file.size, durationSeconds: duration })
       : 'share'
-    if (plan === 'share') {
+    const hasCustomTrim =
+      isVideo && isVideoDurationKnown(duration) && (trimStart > 0 || trimEnd < duration - 0.01)
+    if (plan === 'share' && !hasCustomTrim) {
       onShare(
         file,
         caption.trim(),
@@ -122,10 +123,13 @@ export function MediaStoryEditor({
     const controller = new AbortController()
     controllerRef.current = controller
     try {
-      const startSeconds = plan === 'trim' ? clampTrimStart(duration!, trimStart) : 0
+      const startSeconds = hasCustomTrim || plan === 'trim' ? trimStart : 0
       const output = await processStoryVideo({
         file,
         startSeconds,
+        endSeconds: isVideoDurationKnown(duration)
+          ? Math.min(trimEnd, startSeconds + STORY_MAX_TRIM_SECONDS)
+          : undefined,
         signal: controller.signal,
         onProgress: (ratio) => {
           if (activeRef.current) setProgress(Math.round(ratio * 100))
@@ -182,34 +186,6 @@ export function MediaStoryEditor({
           {fileError}
         </p>
       )}
-      {isVideo && isVideoDurationKnown(duration) && duration > STORY_MAX_VIDEO_SECONDS && (
-        <div className="space-y-2 text-sm text-foreground">
-          <label htmlFor="story-trim-start" className="block font-semibold">
-            {t('chat.storyTrimHint')}
-          </label>
-          <input
-            id="story-trim-start"
-            type="range"
-            min={0}
-            max={maxTrimStartSeconds(duration)}
-            step={0.1}
-            value={trimStart}
-            disabled={isProcessing || isSharing}
-            onChange={(event) => {
-              const start = Number(event.target.value)
-              setTrimStart(start)
-              if (videoRef.current) videoRef.current.currentTime = start
-            }}
-            className="w-full accent-primary"
-          />
-          <p>
-            {t('chat.storyTrimRange', {
-              start: trimStart.toFixed(1),
-              end: Math.min(duration, trimStart + STORY_MAX_TRIM_SECONDS).toFixed(1),
-            })}
-          </p>
-        </div>
-      )}
       <input
         maxLength={500}
         value={caption}
@@ -242,6 +218,8 @@ export function MediaStoryEditor({
                 onLoadedMetadata={(event) => {
                   const value = event.currentTarget.duration
                   setDuration(isVideoDurationKnown(value) ? value : null)
+                  if (isVideoDurationKnown(value))
+                    setTrimEnd(value <= STORY_MAX_VIDEO_SECONDS ? value : STORY_MAX_TRIM_SECONDS)
                 }}
                 onError={() => {
                   setDuration(null)
@@ -249,12 +227,11 @@ export function MediaStoryEditor({
                   setFileError(t('chat.storyVideoInvalid'))
                 }}
                 onTimeUpdate={(event) => {
+                  setPlayhead(event.currentTarget.currentTime)
                   if (
                     isVideoDurationKnown(duration) &&
-                    duration > STORY_MAX_VIDEO_SECONDS &&
-                    event.currentTarget.currentTime >= trimStart + STORY_MAX_TRIM_SECONDS
+                    event.currentTarget.currentTime >= trimEnd
                   ) {
-                    event.currentTarget.pause()
                     event.currentTarget.currentTime = trimStart
                   }
                 }}
@@ -285,6 +262,27 @@ export function MediaStoryEditor({
           </button>
         ) : null}
 
+        {isVideo && objectUrl && isVideoDurationKnown(duration) && duration >= 1 && (
+          <div className="w-[min(100%,460px,calc(56.25dvh-90px))]">
+            <VideoTrimmer
+              url={objectUrl}
+              duration={duration}
+              start={trimStart}
+              end={trimEnd}
+              disabled={isProcessing || isSharing}
+              currentTime={playhead}
+              onSeek={(time) => {
+                if (videoRef.current) videoRef.current.currentTime = time
+                setPlayhead(time)
+              }}
+              onChange={(start, end) => {
+                setTrimStart(start)
+                setTrimEnd(end)
+                if (videoRef.current) videoRef.current.currentTime = start
+              }}
+            />
+          </div>
+        )}
         <div className="flex w-[min(100%,460px,calc(56.25dvh-90px))] shrink-0 items-center justify-between gap-2 pb-2">
           <button
             type="button"
