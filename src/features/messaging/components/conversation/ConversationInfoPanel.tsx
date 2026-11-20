@@ -168,7 +168,7 @@ export function UserProfileCardContent({
 
       {/* Bio / Tiểu sử nếu có */}
       {bio && (
-        <p className="mt-3 max-w-[260px] text-xs text-muted-foreground italic px-2">{`"${bio}"`}</p>
+        <p className="mt-3 max-w-65 text-xs text-muted-foreground italic px-2">{`"${bio}"`}</p>
       )}
 
       {/* 2 Nút hành động cốt lõi: Hủy kết bạn & Chặn người dùng */}
@@ -678,7 +678,7 @@ export function ConversationInfoPanel({
       </div>
 
       {/* 1. Header Bar: Tiêu đề + Nút đóng X */}
-      <div className="flex h-[61px] shrink-0 items-center justify-between border-b border-border px-4 py-3">
+      <div className="flex h-15.25 shrink-0 items-center justify-between border-b border-border px-4 py-3">
         <h3 className="text-sm font-semibold text-foreground">{t('chat.conversationInfo')}</h3>
         <button
           type="button"
