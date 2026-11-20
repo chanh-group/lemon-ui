@@ -3,6 +3,7 @@ import { STORY_MAX_MEDIA_BYTES, STORY_MAX_TRIM_SECONDS } from '../constants'
 export interface ProcessStoryVideoInput {
   file: File
   startSeconds: number
+  endSeconds?: number
   signal?: AbortSignal
   onProgress?: (progress: number) => void
 }
@@ -34,10 +35,19 @@ function abortable<T>(promise: Promise<T>, signal?: AbortSignal, onLateValue?: (
 export async function processStoryVideo({
   file,
   startSeconds,
+  endSeconds = startSeconds + STORY_MAX_TRIM_SECONDS,
   signal,
   onProgress,
 }: ProcessStoryVideoInput): Promise<File> {
   if (signal?.aborted) throw abortError()
+  if (
+    !Number.isFinite(startSeconds) ||
+    !Number.isFinite(endSeconds) ||
+    startSeconds < 0 ||
+    endSeconds <= startSeconds ||
+    endSeconds - startSeconds > STORY_MAX_TRIM_SECONDS + 0.000001
+  )
+    throw new RangeError('Invalid trim range')
   const {
     Input,
     BlobSource,
@@ -72,7 +82,7 @@ export async function processStoryVideo({
       Conversion.init({
         input,
         output,
-        trim: { start: startSeconds, end: startSeconds + STORY_MAX_TRIM_SECONDS },
+        trim: { start: startSeconds, end: endSeconds },
         tracks: 'primary',
         copy: false,
         video: async (track) => {
