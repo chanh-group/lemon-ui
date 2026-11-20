@@ -188,7 +188,7 @@ export function useChatRealtime(activeConversationId: string | null) {
       }
 
       const missed = await fetchMissedMessages(cursor, (after) =>
-        getConversationMessages(conversationId, undefined, 50, after),
+        getConversationMessages(conversationId, undefined, 20, after),
       )
 
       if (missed.length > 0) {

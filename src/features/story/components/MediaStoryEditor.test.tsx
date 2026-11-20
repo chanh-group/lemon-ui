@@ -95,3 +95,32 @@ describe('media story editor share flow', () => {
     expect(video.currentTime).toBe(0.1)
   })
 })
+
+describe('media story editor layout', () => {
+  it('places the trimmer below the preview instead of in the portal', () => {
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:test')
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+    const sidebar = document.createElement('div')
+    document.body.appendChild(sidebar)
+    const view = render(
+      <MediaStoryEditor
+        onDiscard={vi.fn()}
+        onShare={vi.fn()}
+        isSharing={false}
+        controlsTarget={sidebar}
+      />,
+    )
+    const input = sidebar.querySelector('input[type=file]')!
+    fireEvent.change(input, {
+      target: { files: [new File(['video'], 'clip.mp4', { type: 'video/mp4' })] },
+    })
+    const video = view.container.querySelector('video')!
+    Object.defineProperty(video, 'duration', { configurable: true, value: 90 })
+    fireEvent.loadedMetadata(video)
+    const trimmer = screen.getByRole('slider', { name: 'chat.storyTrimStart' })
+    expect(sidebar.contains(trimmer)).toBe(false)
+    expect(view.container.contains(trimmer)).toBe(true)
+    expect(video.compareDocumentPosition(trimmer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    sidebar.remove()
+  })
+})

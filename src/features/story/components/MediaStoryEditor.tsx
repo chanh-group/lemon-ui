@@ -203,10 +203,10 @@ export function MediaStoryEditor({
   )
 
   return (
-    <div className="min-h-full">
+    <div className="flex min-h-full flex-col md:h-full">
       {controlsTarget ? createPortal(controls, controlsTarget) : controls}
       {/* Xem trước */}
-      <div className="flex min-h-full flex-col items-center justify-center gap-3 overflow-y-auto bg-background p-4 [justify-content:safe_center]">
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 overflow-y-auto bg-background p-4 [justify-content:safe_center]">
         {objectUrl && (
           <div
             className={`relative aspect-[9/16] ${frameWidth} shrink-0 overflow-hidden rounded-2xl bg-card shadow-xl`}

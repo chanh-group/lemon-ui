@@ -17,7 +17,7 @@ const conversationKeys = queryKeys.chat
 export function useConversationsQuery() {
   return useQuery<ConversationResponse[], Error, Conversation[]>({
     queryKey: conversationKeys.conversations,
-    queryFn: () => getConversations(50),
+    queryFn: () => getConversations(),
     select: (data) => data.map((item) => mapConversationResponse(item)),
     staleTime: 1000 * 30,
   })

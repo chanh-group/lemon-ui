@@ -37,7 +37,7 @@ export async function getFriendRequests(): Promise<{
   outgoing: FriendRequest[]
 }> {
   const res = await api.get<FriendRequestsPageResponse>('/friends/requests', {
-    params: { limit: 50 },
+    params: { limit: 20 },
   })
   return { incoming: res.data.incoming.items, outgoing: res.data.outgoing.items }
 }
