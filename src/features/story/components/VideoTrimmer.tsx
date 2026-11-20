@@ -14,6 +14,8 @@ interface Props {
   onChange: (start: number, end: number) => void
 }
 
+type Handle = 'start' | 'end' | 'playhead'
+
 export function VideoTrimmer({
   url,
   duration,
@@ -27,37 +29,44 @@ export function VideoTrimmer({
   const { t } = useTranslation()
   const [frames, setFrames] = useState<string[]>([])
   const trackRef = useRef<HTMLDivElement>(null)
-  const dragging = useRef<'start' | 'end' | 'playhead' | null>(null)
+  const dragging = useRef<{ id: number; kind: Handle } | null>(null)
   const pointerTime = (event: PointerEvent) => {
     const rect = trackRef.current?.getBoundingClientRect()
     if (!rect || !rect.width) return 0
     return Math.max(0, Math.min(duration, ((event.clientX - rect.left) / rect.width) * duration))
   }
-  const move = (kind: 'start' | 'end' | 'playhead', value: number) => {
-    if (kind === 'playhead') return onSeek(Math.max(start, Math.min(end, value)))
-    if (kind === 'start') {
-      if (duration > STORY_MAX_VIDEO_SECONDS) {
-        const next = Math.max(0, Math.min(duration - STORY_MAX_TRIM_SECONDS, value))
-        onChange(next, next + STORY_MAX_TRIM_SECONDS)
-      } else {
-        const next = Math.max(0, Math.min(end - 1, value))
-        onChange(next, Math.min(end, next + STORY_MAX_TRIM_SECONDS))
-      }
-    } else
-      onChange(
-        start,
-        Math.min(duration, Math.max(start + 1, Math.min(start + STORY_MAX_TRIM_SECONDS, value))),
-      )
+  const longVideo = duration > STORY_MAX_VIDEO_SECONDS
+  const loopPreview = start > 0 || end < duration - 0.01
+  const rangeOf = (kind: Handle): [number, number] => {
+    if (kind === 'start') return [0, longVideo ? duration - STORY_MAX_TRIM_SECONDS : end - 1]
+    if (kind === 'end')
+      return [start + 1, longVideo ? Math.min(duration, start + STORY_MAX_TRIM_SECONDS) : duration]
+    return [start, loopPreview ? Math.max(start, end - 0.1) : end]
   }
-  const begin =
-    (kind: 'start' | 'end' | 'playhead') => (event: PointerEvent<HTMLButtonElement>) => {
-      if (disabled) return
-      event.stopPropagation()
-      dragging.current = kind
-      event.currentTarget.setPointerCapture(event.pointerId)
+  const snapTime = (value: number) => {
+    const edge = value < 0.05 ? 0 : value > duration - 0.05 ? duration : value
+    return Math.round(edge * 10) / 10
+  }
+  const move = (kind: Handle, value: number) => {
+    const v = snapTime(value)
+    const [min, max] = rangeOf(kind)
+    if (kind === 'playhead') return onSeek(Math.max(min, Math.min(max, v)))
+    if (kind === 'start') {
+      const next = Math.max(min, Math.min(max, v))
+      onChange(next, longVideo ? next + STORY_MAX_TRIM_SECONDS : end)
+    } else {
+      onChange(start, Math.max(min, Math.min(max, v)))
     }
+  }
+  const begin = (kind: Handle) => (event: PointerEvent<HTMLButtonElement>) => {
+    if (disabled) return
+    event.stopPropagation()
+    dragging.current = { id: event.pointerId, kind }
+    event.currentTarget.setPointerCapture(event.pointerId)
+  }
   useEffect(() => {
     let cancelled = false
+    let timer = 0
     const video = document.createElement('video')
     video.muted = true
     video.preload = 'auto'
@@ -68,15 +77,15 @@ export function VideoTrimmer({
     const draw = async () => {
       const result: string[] = []
       for (let i = 0; i < 20 && !cancelled; i++) {
-        await new Promise<void>((resolve) => {
-          const timer = window.setTimeout(resolve, 1500)
+        const seeked = await new Promise<boolean>((resolve) => {
+          timer = window.setTimeout(() => resolve(false), 1500)
           video.onseeked = () => {
             window.clearTimeout(timer)
-            resolve()
+            resolve(true)
           }
           video.currentTime = Math.min(duration - 0.05, (duration * (i + 0.5)) / 20)
         })
-        if (cancelled) break
+        if (!seeked || cancelled) break
         try {
           canvas.getContext('2d')?.drawImage(video, 0, 0, 64, 48)
           result.push(canvas.toDataURL('image/jpeg', 0.6))
@@ -89,8 +98,15 @@ export function VideoTrimmer({
     video.onloadedmetadata = () => {
       void draw()
     }
+    video.onerror = () => {
+      if (!cancelled) setFrames([])
+    }
     return () => {
       cancelled = true
+      window.clearTimeout(timer)
+      video.onloadedmetadata = null
+      video.onerror = null
+      video.onseeked = null
       video.removeAttribute('src')
       video.load()
     }
@@ -101,7 +117,10 @@ export function VideoTrimmer({
         ref={trackRef}
         className="relative h-12 touch-none rounded-lg bg-muted"
         onPointerDown={(event) => {
-          if (!disabled) onSeek(Math.max(start, Math.min(end, pointerTime(event))))
+          if (!disabled) {
+            const [min, max] = rangeOf('playhead')
+            onSeek(Math.max(min, Math.min(max, snapTime(pointerTime(event)))))
+          }
         }}
       >
         <div className="flex h-full overflow-hidden rounded-lg" aria-hidden="true">
@@ -126,22 +145,8 @@ export function VideoTrimmer({
         />
         {(['start', 'end', 'playhead'] as const).map((kind) => {
           const value = kind === 'start' ? start : kind === 'end' ? end : currentTime
-          const min =
-            kind === 'end'
-              ? start + 1
-              : kind === 'playhead'
-                ? start
-                : duration > STORY_MAX_VIDEO_SECONDS
-                  ? 0
-                  : Math.max(0, end - STORY_MAX_TRIM_SECONDS)
-          const max =
-            kind === 'start'
-              ? duration > STORY_MAX_VIDEO_SECONDS
-                ? duration - STORY_MAX_TRIM_SECONDS
-                : end - 1
-              : kind === 'playhead'
-                ? end
-                : Math.min(duration, start + STORY_MAX_TRIM_SECONDS)
+          const [min, max] = rangeOf(kind)
+          const shown = Math.max(min, Math.min(max, value))
           return (
             <button
               key={kind}
@@ -156,23 +161,24 @@ export function VideoTrimmer({
               )}
               aria-valuemin={min}
               aria-valuemax={max}
-              aria-valuenow={Math.max(min, Math.min(max, value))}
+              aria-valuenow={shown}
+              aria-valuetext={`${shown.toFixed(1)}s`}
               disabled={disabled}
               className={`absolute top-0 ${kind === 'playhead' ? 'z-10' : 'z-20'} flex h-12 w-11 -translate-x-1/2 touch-none items-center justify-center focus-visible:outline-2 focus-visible:outline-primary`}
               style={{ left: `${Math.max(0, Math.min(1, value / duration)) * 100}%` }}
               onPointerDown={begin(kind)}
               onPointerMove={(event) => {
                 if (
-                  dragging.current === kind &&
+                  dragging.current?.kind === kind &&
                   event.currentTarget.hasPointerCapture(event.pointerId)
                 )
                   move(kind, pointerTime(event))
               }}
-              onPointerUp={() => {
-                dragging.current = null
+              onPointerUp={(event) => {
+                if (dragging.current?.id === event.pointerId) dragging.current = null
               }}
-              onPointerCancel={() => {
-                dragging.current = null
+              onPointerCancel={(event) => {
+                if (dragging.current?.id === event.pointerId) dragging.current = null
               }}
               onKeyDown={(event) => {
                 const delta =
@@ -181,10 +187,10 @@ export function VideoTrimmer({
                     : event.key === 'ArrowRight' || event.key === 'ArrowUp'
                       ? 0.1
                       : 0
-                if (delta) {
-                  event.preventDefault()
-                  move(kind, Math.max(min, Math.min(max, value + delta)))
-                }
+                if (!delta) return
+                event.preventDefault()
+                if ((delta < 0 && value <= min) || (delta > 0 && value >= max)) return
+                move(kind, value + delta)
               }}
             >
               <span

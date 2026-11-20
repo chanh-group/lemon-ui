@@ -235,7 +235,11 @@ export function MediaStoryEditor({
                 }}
                 onTimeUpdate={(event) => {
                   setPlayhead(event.currentTarget.currentTime)
-                  if (hasCustomTrim && event.currentTarget.currentTime >= trimEnd) {
+                  if (
+                    hasCustomTrim &&
+                    (event.currentTarget.currentTime >= trimEnd ||
+                      event.currentTarget.currentTime < trimStart)
+                  ) {
                     event.currentTarget.currentTime = trimStart
                   }
                 }}
@@ -267,8 +271,9 @@ export function MediaStoryEditor({
         ) : null}
 
         {showTrimmer && objectUrl !== null && (
-          <div className={frameWidth}>
+          <div className={`${frameWidth} shrink-0`}>
             <VideoTrimmer
+              key={objectUrl}
               url={objectUrl}
               duration={duration}
               start={trimStart}
@@ -282,7 +287,7 @@ export function MediaStoryEditor({
               onChange={(start, end) => {
                 setTrimStart(start)
                 setTrimEnd(end)
-                if (videoRef.current) videoRef.current.currentTime = start
+                if (start !== trimStart && videoRef.current) videoRef.current.currentTime = start
               }}
             />
           </div>

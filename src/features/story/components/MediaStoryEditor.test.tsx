@@ -13,6 +13,7 @@ vi.mock('../utils/readVideoDuration', () => ({ readVideoDuration: readVideoDurat
 
 afterEach(() => {
   cleanup()
+  vi.clearAllMocks()
   vi.restoreAllMocks()
 })
 
@@ -26,7 +27,7 @@ function renderWithVideo(durationSeconds: number, onShare = vi.fn()) {
   const video = view.container.querySelector('video')!
   Object.defineProperty(video, 'duration', { configurable: true, value: durationSeconds })
   fireEvent.loadedMetadata(video)
-  return { file, onShare }
+  return { file, onShare, video }
 }
 
 describe('media story editor share flow', () => {
@@ -64,5 +65,33 @@ describe('media story editor share flow', () => {
     expect(processStoryVideoMock).toHaveBeenCalledWith(
       expect.objectContaining({ startSeconds: 0.1, endSeconds: 30 }),
     )
+  })
+
+  it('restores the bypass when the user reselects the full video', async () => {
+    const { file, onShare } = renderWithVideo(60)
+    fireEvent.keyDown(screen.getByRole('slider', { name: 'chat.storyTrimStart' }), {
+      key: 'ArrowRight',
+    })
+    fireEvent.keyDown(screen.getByRole('slider', { name: 'chat.storyTrimStart' }), {
+      key: 'ArrowLeft',
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'chat.shareStory' }))
+    await waitFor(() => expect(onShare).toHaveBeenCalled())
+    expect(processStoryVideoMock).not.toHaveBeenCalled()
+    expect(onShare).toHaveBeenCalledWith(file, '', 60000)
+  })
+
+  it('snaps playback back into the selection when seeking outside it', () => {
+    const { video } = renderWithVideo(30)
+    fireEvent.keyDown(screen.getByRole('slider', { name: 'chat.storyTrimStart' }), {
+      key: 'ArrowRight',
+    })
+    Object.defineProperty(video, 'currentTime', {
+      configurable: true,
+      writable: true,
+      value: 0.05,
+    })
+    fireEvent.timeUpdate(video)
+    expect(video.currentTime).toBe(0.1)
   })
 })
