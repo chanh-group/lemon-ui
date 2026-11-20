@@ -182,34 +182,6 @@ export function MediaStoryEditor({
           {fileError}
         </p>
       )}
-      {isVideo && isVideoDurationKnown(duration) && duration > STORY_MAX_VIDEO_SECONDS && (
-        <div className="space-y-2 text-sm text-foreground">
-          <label htmlFor="story-trim-start" className="block font-semibold">
-            {t('chat.storyTrimHint')}
-          </label>
-          <input
-            id="story-trim-start"
-            type="range"
-            min={0}
-            max={maxTrimStartSeconds(duration)}
-            step={0.1}
-            value={trimStart}
-            disabled={isProcessing || isSharing}
-            onChange={(event) => {
-              const start = Number(event.target.value)
-              setTrimStart(start)
-              if (videoRef.current) videoRef.current.currentTime = start
-            }}
-            className="w-full accent-primary"
-          />
-          <p>
-            {t('chat.storyTrimRange', {
-              start: trimStart.toFixed(1),
-              end: Math.min(duration, trimStart + STORY_MAX_TRIM_SECONDS).toFixed(1),
-            })}
-          </p>
-        </div>
-      )}
       <input
         maxLength={500}
         value={caption}
@@ -222,10 +194,10 @@ export function MediaStoryEditor({
   )
 
   return (
-    <div className="min-h-full">
+    <div className="flex min-h-full flex-col md:h-full">
       {controlsTarget ? createPortal(controls, controlsTarget) : controls}
       {/* Xem trước */}
-      <div className="flex min-h-full flex-col items-center justify-center gap-3 bg-background p-4">
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 bg-background p-4">
         {objectUrl && (
           <div className="relative aspect-[9/16] w-[min(100%,460px,calc(56.25dvh-90px))] shrink-0 overflow-hidden rounded-2xl bg-card shadow-xl">
             {!isVideo && (
@@ -285,6 +257,36 @@ export function MediaStoryEditor({
           </button>
         ) : null}
 
+        <div className="w-[min(100%,460px,calc(56.25dvh-90px))]">
+          {isVideo && isVideoDurationKnown(duration) && duration > STORY_MAX_VIDEO_SECONDS && (
+            <div className="space-y-2 text-sm text-foreground">
+              <label htmlFor="story-trim-start" className="block font-semibold">
+                {t('chat.storyTrimHint')}
+              </label>
+              <input
+                id="story-trim-start"
+                type="range"
+                min={0}
+                max={maxTrimStartSeconds(duration)}
+                step={0.1}
+                value={trimStart}
+                disabled={isProcessing || isSharing}
+                onChange={(event) => {
+                  const start = Number(event.target.value)
+                  setTrimStart(start)
+                  if (videoRef.current) videoRef.current.currentTime = start
+                }}
+                className="w-full accent-primary"
+              />
+              <p>
+                {t('chat.storyTrimRange', {
+                  start: trimStart.toFixed(1),
+                  end: Math.min(duration, trimStart + STORY_MAX_TRIM_SECONDS).toFixed(1),
+                })}
+              </p>
+            </div>
+          )}
+        </div>
         <div className="flex w-[min(100%,460px,calc(56.25dvh-90px))] shrink-0 items-center justify-between gap-2 pb-2">
           <button
             type="button"
