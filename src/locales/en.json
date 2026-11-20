@@ -457,7 +457,7 @@
     "replyRemovedMessage": "Message removed",
     "replyRemovedAttachment": "Attachment removed",
     "replyRemovedVoice": "Voice note removed",
-    "replyUnavailableStory": "Story unavailable",
+    "replyUnavailableStory": "Story no longer available",
     "replyUnavailableContent": "Content unavailable",
     "voiceNoteLabel": "Voice note",
     "storyCount": "{{count}} stories",

@@ -109,12 +109,16 @@ export function resolveReplyQuote(
     thumbnailUrl = undefined
   }
 
-  let text: string | undefined = target.body ?? undefined
+  // Story quotes show the story content (issue #36): caption first, reply body only as fallback.
+  let text: string | undefined =
+    category === 'STORY'
+      ? target.storyPreview?.caption || target.body || undefined
+      : (target.body ?? undefined)
   if (!text) {
     if (category === 'VOICE') {
       text = t('chat.voiceNoteLabel')
     } else if (category === 'STORY') {
-      text = target.storyPreview?.caption || t('chat.unnamedStory')
+      text = t('chat.unnamedStory')
     } else if (category === 'ATTACHMENT') {
       text =
         target.previewAttachment?.fileName ||

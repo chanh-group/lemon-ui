@@ -127,8 +127,8 @@ describe('replyQuote pure helper', () => {
     expect(resolveReplyQuote(baseTombstone('VOICE'), tEn).label).toBe('Voice note removed')
 
     // 4. STORY
-    expect(resolveReplyQuote(baseTombstone('STORY'), tVi).label).toBe('Tin đã thu hồi hoặc hết hạn')
-    expect(resolveReplyQuote(baseTombstone('STORY'), tEn).label).toBe('Story unavailable')
+    expect(resolveReplyQuote(baseTombstone('STORY'), tVi).label).toBe('Tin không còn nữa')
+    expect(resolveReplyQuote(baseTombstone('STORY'), tEn).label).toBe('Story no longer available')
 
     // 5. UNKNOWN
     expect(resolveReplyQuote(baseTombstone('UNKNOWN'), tVi).label).toBe('Nội dung không khả dụng')
@@ -172,6 +172,83 @@ describe('replyQuote pure helper', () => {
 
     const resolved = resolveReplyQuote(targetWithEmptyUrl, t)
     expect(resolved.thumbnailUrl).toBeUndefined()
+  })
+
+  it('labels active voice notes, unknown content and story captions in both languages', async () => {
+    const tVi = await createT('vi')
+    const tEn = await createT('en')
+
+    const voice: MessageReplyTarget = {
+      id: 'm-voice',
+      senderId: 'u1',
+      kind: 'AUDIO',
+      body: null,
+      deletedAt: null,
+    }
+    expect(resolveReplyQuote(voice, tVi).label).toBe('Tệp thoại')
+    expect(resolveReplyQuote(voice, tEn).label).toBe('Voice note')
+
+    const system: MessageReplyTarget = {
+      id: 'm-sys',
+      senderId: 'u1',
+      kind: 'SYSTEM',
+      body: null,
+      deletedAt: null,
+    }
+    expect(resolveReplyQuote(system, tVi).label).toBe('Nội dung không khả dụng')
+    expect(resolveReplyQuote(system, tEn).label).toBe('Content unavailable')
+
+    const storyPreview = {
+      id: 's1',
+      kind: 'IMAGE' as const,
+      caption: 'At the beach',
+      mediaUrl: 'https://r2/s.jpg',
+      background: null,
+    }
+    const story: MessageReplyTarget = {
+      id: 'm-story',
+      senderId: 'u1',
+      kind: 'STORY_REPLY',
+      body: 'Bạn nam kdc à',
+      deletedAt: null,
+      storyPreview,
+    }
+    // Story quotes show the story caption (issue #36), not the reply body.
+    expect(resolveReplyQuote(story, tVi).label).toBe('At the beach')
+    expect(resolveReplyQuote(story, tVi).thumbnailUrl).toBe('https://r2/s.jpg')
+    // Caption-less story falls back to the body, then to the unnamed-story label.
+    expect(
+      resolveReplyQuote({ ...story, storyPreview: { ...storyPreview, caption: null } }, tVi).label,
+    ).toBe('Bạn nam kdc à')
+    const captionless = { ...storyPreview, caption: null }
+    expect(resolveReplyQuote({ ...story, body: null, storyPreview: captionless }, tVi).label).toBe(
+      'Tin không chú thích',
+    )
+    expect(resolveReplyQuote({ ...story, body: null, storyPreview: captionless }, tEn).label).toBe(
+      'Untitled story',
+    )
+  })
+
+  it('uses the presigned preview attachment for thumbnails and file names', async () => {
+    const t = await createT('vi')
+    const target: MessageReplyTarget = {
+      id: 'm-att',
+      senderId: 'u1',
+      kind: 'TEXT',
+      body: null,
+      deletedAt: null,
+      contentCategory: 'ATTACHMENT',
+      previewAttachment: {
+        id: 'a1',
+        kind: 'IMAGE',
+        fileName: 'pic.jpg',
+        mimeType: 'image/jpeg',
+        previewUrl: 'https://r2/pic.jpg',
+      },
+    }
+    const resolved = resolveReplyQuote(target, t)
+    expect(resolved.thumbnailUrl).toBe('https://r2/pic.jpg')
+    expect(resolved.label).toBe('pic.jpg')
   })
 })
 

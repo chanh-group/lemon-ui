@@ -457,7 +457,7 @@
     "replyRemovedMessage": "Đã gỡ tin nhắn",
     "replyRemovedAttachment": "Tệp đính kèm đã gỡ",
     "replyRemovedVoice": "Tệp thoại đã gỡ",
-    "replyUnavailableStory": "Tin đã thu hồi hoặc hết hạn",
+    "replyUnavailableStory": "Tin không còn nữa",
     "replyUnavailableContent": "Nội dung không khả dụng",
     "voiceNoteLabel": "Tệp thoại",
     "storyCount": "{{count}} tin",

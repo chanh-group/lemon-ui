@@ -154,7 +154,7 @@ function MediaBubble({ label, kind }: { label: string; kind: ChatMessage['kind']
   )
 }
 
-function StoryReplyQuote({
+export function StoryReplyQuote({
   preview,
   onOpen,
 }: {
@@ -177,6 +177,14 @@ function StoryReplyQuote({
     story.data?.kind === 'TEXT' || preview.kind === 'TEXT' || preview.kind === 'text'
   const isVideo = story.data?.mediaType === 'video' || preview.kind === 'VIDEO'
   const isUnavailable = story.isError
+
+  if (isUnavailable) {
+    return (
+      <div className="mb-2 max-w-full rounded-lg bg-muted/50 p-1.5 text-left text-xs italic text-muted-foreground">
+        {t('chat.replyUnavailableStory')}
+      </div>
+    )
+  }
 
   return (
     <button
@@ -214,22 +222,15 @@ function StoryReplyQuote({
         </span>
       )}
       <span className="min-w-0 flex-1">
-        <span
-          className={cn(
-            'block truncate font-medium text-xs text-foreground',
-            isUnavailable && 'italic opacity-80 text-muted-foreground',
-          )}
-        >
-          {isUnavailable
-            ? t('chat.replyUnavailableStory')
-            : preview.caption || story.data?.caption || t('chat.unnamedStory')}
+        <span className="block truncate font-medium text-xs text-foreground">
+          {preview.caption || story.data?.caption || t('chat.unnamedStory')}
         </span>
       </span>
     </button>
   )
 }
 
-function MessageReplyBubbleQuote({
+export function MessageReplyBubbleQuote({
   conversationId,
   replyToId,
   initialTarget,
@@ -243,21 +244,52 @@ function MessageReplyBubbleQuote({
   const { t } = useTranslation()
   const { target, isLoading } = useReplyTarget(conversationId, replyToId, initialTarget)
   const quote = resolveReplyQuote(target, t)
+  const storyPreview = target?.storyPreview
+  const story = useQuery({
+    queryKey: queryKeys.chat.storyReply(storyPreview?.id ?? ''),
+    queryFn: () => getStoryById(storyPreview!.id),
+    enabled: Boolean(storyPreview),
+    retry: false,
+    staleTime: 10 * 60_000,
+    gcTime: 30 * 60_000,
+  })
+  const media = useStoryMedia(story.data ?? { id: storyPreview?.id ?? '' })
+  // A dead story (expired/removed) replaces the quoted story content entirely.
+  const storyGone = Boolean(storyPreview) && story.isError
+  const thumbnailUrl = storyGone
+    ? undefined
+    : quote.thumbnailUrl || story.data?.mediaUrl || media.data || undefined
+  const isVideo = storyPreview?.kind === 'VIDEO' || story.data?.mediaType === 'video'
 
   return (
     <button
       type="button"
-      onClick={() => onJumpToMessage?.(replyToId)}
-      className="mb-1 flex max-w-full items-center gap-2 rounded border-l-2 border-muted-foreground/30 bg-muted/40 px-2 py-1 text-left text-[11px] text-muted-foreground hover:bg-muted/70"
-    >
-      {quote.thumbnailUrl && (
-        <img src={quote.thumbnailUrl} alt="" className="size-9 shrink-0 rounded object-cover" />
+      onClick={storyGone ? undefined : () => onJumpToMessage?.(replyToId)}
+      aria-disabled={storyGone}
+      className={cn(
+        'mb-1 flex max-w-full items-center gap-2 rounded border-l-2 border-muted-foreground/30 bg-muted/40 px-2 py-1 text-left text-[11px] text-muted-foreground hover:bg-muted/70',
+        storyGone && 'cursor-default hover:bg-muted/40',
       )}
+    >
+      {thumbnailUrl &&
+        (isVideo ? (
+          <video
+            src={thumbnailUrl}
+            muted
+            preload="metadata"
+            className="size-9 shrink-0 rounded object-cover"
+          />
+        ) : (
+          <img src={thumbnailUrl} alt="" className="size-9 shrink-0 rounded object-cover" />
+        ))}
       <span className="min-w-0 flex-1">
         <span
-          className={cn('block truncate', quote.availability === 'removed' && 'italic opacity-80')}
+          className={cn(
+            'block truncate',
+            (quote.availability === 'removed' || storyGone) && 'italic opacity-80',
+          )}
         >
-          {isLoading ? '...' : quote.label}
+          {storyGone ? t('chat.replyUnavailableStory') : isLoading ? '...' : quote.label}
         </span>
       </span>
     </button>
