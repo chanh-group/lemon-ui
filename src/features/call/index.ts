@@ -7,6 +7,7 @@ export type { CallEndReason, CallPhase, CallRouteState } from './components/Call
 export * from './types/call.types'
 export * from './api/call.api'
 export * from './hooks/useLiveKitCall'
+export * from './hooks/useCallHistory'
 export * from './context/CallContext'
 export * from './utils/callSounds'
 export * from './data/mockData'

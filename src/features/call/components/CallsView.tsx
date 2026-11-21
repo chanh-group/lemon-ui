@@ -22,6 +22,7 @@ import { UserAvatar } from '@/components/common/UserAvatar'
 import { ROUTES } from '@/config/constants'
 import { cn } from '@/lib/utils'
 import { MOCK_CALLS } from '@/features/call/data/mockData'
+import { useCallHistory } from '@/features/call/hooks/useCallHistory'
 import { useConversationsQuery } from '@/features/conversation/hooks/useConversations'
 import type { CallEntry } from '@/features/call/types/call.types'
 import { SideNav } from '@/features/shell/components/SideNav'
@@ -82,12 +83,14 @@ export function CallsView() {
     0,
   )
 
+  const callHistoryQuery = useCallHistory()
   const calls = useMemo(() => {
     const q = query.trim().toLowerCase()
-    return MOCK_CALLS.filter(
+    const list = callHistoryQuery.data ?? MOCK_CALLS
+    return list.filter(
       (c) => !q || c.name.toLowerCase().includes(q) || c.time.toLowerCase().includes(q),
     )
-  }, [query])
+  }, [callHistoryQuery.data, query])
 
   return (
     <main className="flex h-dvh w-full overflow-hidden bg-background pb-16 text-foreground md:pb-0">

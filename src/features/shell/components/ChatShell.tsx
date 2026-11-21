@@ -46,7 +46,7 @@ import { MiddlePanel } from '@/features/shell/components/MiddlePanel'
 import { ConversationView } from '@/features/messaging/components/conversation'
 import { StoryViewer } from '@/features/story/components/StoryViewer'
 import { useAuth } from '@/features/auth/api'
-import { useCall } from '@/features/call'
+import { useCall, useCallHistory } from '@/features/call'
 import { useCallWindow } from '@/features/call/components/CallScreen/CallWindowProvider'
 
 const TYPING_HEARTBEAT_MS = 1_500
@@ -121,7 +121,11 @@ export function ChatShell() {
     [rawConversations, q],
   )
 
-  const calls = useMemo(() => MOCK_CALLS.filter((c) => !q || c.name.toLowerCase().includes(q)), [q])
+  const callHistoryQuery = useCallHistory()
+  const calls = useMemo(() => {
+    const list = callHistoryQuery.data ?? MOCK_CALLS
+    return list.filter((c) => !q || c.name.toLowerCase().includes(q))
+  }, [callHistoryQuery.data, q])
 
   const storiesQuery = useStoriesList(user?.id)
   useEffect(() => {
