@@ -128,7 +128,7 @@ export function resolveReplyQuote(
     if (category === 'VOICE') {
       text = t('chat.voiceNoteLabel')
     } else if (category === 'STORY') {
-      text = t('chat.unnamedStory')
+      text = t('chat.replyToStory')
     } else if (category === 'ATTACHMENT') {
       text =
         target.previewAttachment?.fileName ||

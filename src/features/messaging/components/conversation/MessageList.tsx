@@ -13,6 +13,7 @@ import {
 import { useTranslation } from 'react-i18next'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import {
+  ArrowTurnBackwardIcon as ReplyData,
   CheckCheckIcon as CheckCheckData,
   CheckIcon as CheckData,
   Clock01Icon as ClockData,
@@ -31,6 +32,7 @@ const Film = createIcon(FilmData)
 const ImageIcon = createIcon(ImageIconData)
 const Sticker = createIcon(StickerData)
 const ForwardIcon = createIcon(ForwardData)
+const ReplyIcon = createIcon(ReplyData)
 import { UserAvatar } from '@/components/common/UserAvatar'
 import { useAuth } from '@/features/auth/api'
 import { TypingIndicator } from './TypingIndicator'
@@ -153,9 +155,15 @@ function MediaBubble({ label, kind }: { label: string; kind: ChatMessage['kind']
 export function StoryReplyQuote({
   preview,
   onOpen,
+  isMe = false,
+  authorName,
+  interaction = 'reply',
 }: {
   preview: ChatMessage['storyPreview']
   onOpen?: (id: string) => void
+  isMe?: boolean
+  authorName?: string
+  interaction?: ChatMessage['storyInteraction']
 }) {
   const { t } = useTranslation()
 
@@ -167,41 +175,61 @@ export function StoryReplyQuote({
     )
   }
 
+  const name = authorName?.trim()
+  const label =
+    interaction === 'reaction'
+      ? !isMe && name
+        ? t('chat.partnerReactedStory', { name })
+        : t('chat.youReactedStory')
+      : !isMe && name
+        ? t('chat.partnerRepliedToYourStory', { name })
+        : isMe && name
+          ? t('chat.repliedToStoryOf', { name })
+          : t('chat.replyToStory')
+
   const isTextStory = preview.kind === 'TEXT' || preview.kind === 'text'
   const isVideo = preview.kind === 'VIDEO'
   const mediaUrl = preview.mediaUrl?.trim() || undefined
+  const caption = preview.caption?.trim() || undefined
 
   return (
     <button
       type="button"
       onClick={() => onOpen?.(preview.id)}
-      className="mb-2 flex max-w-full items-center gap-2 rounded-lg bg-muted/50 p-1.5 text-left text-xs hover:bg-muted"
+      className={cn('mb-1.5 flex max-w-full flex-col gap-1 text-left text-xs', isMe && 'items-end')}
     >
-      {isTextStory ? (
-        <span
-          className="flex aspect-square size-12 shrink-0 items-center justify-center rounded p-1 text-center text-[8px] font-medium leading-tight text-foreground shadow-xs"
-          style={{ backgroundColor: preview.background || '#2a2a2a' }}
-        >
-          <span className="line-clamp-3 break-words">{preview.caption || ''}</span>
-        </span>
-      ) : (
-        <span className="flex aspect-square size-12 shrink-0 items-center justify-center overflow-hidden rounded bg-muted text-center text-[8px]">
-          {mediaUrl ? (
-            isVideo ? (
-              <video src={mediaUrl} muted preload="metadata" className="size-full object-cover" />
-            ) : (
-              <img src={mediaUrl} alt="" className="size-full object-cover" />
-            )
+      <span className="flex min-w-0 items-center gap-1 text-[11px] text-muted-foreground">
+        <ReplyIcon className="size-3 shrink-0" aria-hidden="true" />
+        <span className="truncate">{label}</span>
+      </span>
+      <span
+        className={cn(
+          'flex aspect-9/16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted text-center text-[8px] ring-1 ring-border',
+          isMe && 'self-end',
+        )}
+        style={isTextStory ? { backgroundColor: preview.background || '#2a2a2a' } : undefined}
+      >
+        {isTextStory ? (
+          <span className="line-clamp-4 wrap-break-words p-1 text-[8px] font-medium leading-tight text-foreground">
+            {caption || ''}
+          </span>
+        ) : mediaUrl ? (
+          isVideo ? (
+            <video src={mediaUrl} muted preload="metadata" className="size-full object-cover" />
           ) : (
-            <span className="text-muted-foreground text-[10px]">Story</span>
-          )}
+            <img src={mediaUrl} alt="" className="size-full object-cover" />
+          )
+        ) : (
+          <span className="text-[10px] text-muted-foreground">Story</span>
+        )}
+      </span>
+      {!isTextStory && caption && (
+        <span
+          className={cn('max-w-40 truncate text-xs text-muted-foreground', isMe && 'text-right')}
+        >
+          {caption}
         </span>
       )}
-      <span className="min-w-0 flex-1">
-        <span className="block truncate font-medium text-xs text-foreground">
-          {preview.caption || t('chat.unnamedStory')}
-        </span>
-      </span>
     </button>
   )
 }
@@ -308,6 +336,7 @@ const MessageRowView = memo(function MessageRowView({
   const authorName = group.sender ?? senderLabel
   const hasAttachments = Boolean(msg.attachments && msg.attachments.length > 0)
   const firstAttachment = hasAttachments ? msg.attachments![0] : undefined
+  const hasStoryReply = !msg.deletedAt && Boolean(msg.storyPreview || msg.storyId)
 
   const [isHeld, setIsHeld] = useState(false)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
@@ -368,8 +397,7 @@ const MessageRowView = memo(function MessageRowView({
     ) : !msg.deletedAt ? (
       <div
         className={cn(
-          'flex items-center gap-1 transition-opacity duration-150 self-center shrink-0',
-          isMe ? 'mr-1.5' : 'ml-1.5',
+          'flex items-center gap-1 transition-opacity duration-150',
           showActions
             ? 'opacity-100 pointer-events-auto'
             : 'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto',
@@ -419,234 +447,269 @@ const MessageRowView = memo(function MessageRowView({
       onTouchEnd={handleTouchEnd}
       onTouchCancel={handleTouchEnd}
       className={cn(
-        'group flex w-full items-center rounded-lg transition-colors',
+        'group flex w-full flex-col rounded-lg transition-colors',
         highlighted && 'bg-primary/15',
-        isMe ? 'justify-end' : 'justify-start gap-2.5',
         messageIndex > 0 && 'mt-0.5',
       )}
     >
-      {!isMe && isLast && (
-        <UserAvatar
-          name={authorName}
-          src={msg.senderAvatarUrl ?? senderAvatarUrl}
-          className="mt-auto mb-4 size-7"
-          fallbackClassName="text-[10px]"
-        />
+      {hasStoryReply && (
+        <div className={cn('mb-1 flex w-full', isMe ? 'justify-end' : 'justify-start pl-9.5')}>
+          <div className="max-w-[78%] sm:max-w-[65%]">
+            <StoryReplyQuote
+              preview={msg.storyPreview ?? null}
+              onOpen={onOpenStoryReply}
+              isMe={isMe}
+              authorName={senderLabel}
+              interaction={msg.storyInteraction}
+            />
+          </div>
+        </div>
       )}
-      {!isMe && !isLast && <span aria-hidden="true" className="size-7 shrink-0" />}
 
-      {/* 3 action buttons on the left of bubble for isMe */}
-      {isMe && !isEditing && actionBar}
-
-      {/* Single Message Box */}
       <div
-        className={cn(
-          'flex max-w-[78%] flex-col sm:max-w-[65%]',
-          isEditing && 'w-[78%] sm:w-[min(65%,28rem)]',
-          isMe ? 'items-end' : 'items-start',
-          msg.status === 'sending' && 'opacity-80',
-        )}
+        className={cn('flex w-full items-center', isMe ? 'justify-end' : 'justify-start gap-2.5')}
       >
+        {!isMe && isLast && (
+          <UserAvatar
+            name={authorName}
+            src={msg.senderAvatarUrl ?? senderAvatarUrl}
+            className="mt-auto mb-4 size-7"
+            fallbackClassName="text-[10px]"
+          />
+        )}
+        {!isMe && !isLast && <span aria-hidden="true" className="size-7 shrink-0" />}
+
+        {/* Single Message Box */}
         <div
           className={cn(
-            'w-fit max-w-full text-sm leading-relaxed wrap-break-word whitespace-pre-wrap',
-            isEditing && 'w-full',
-            isPureMedia
-              ? 'p-0 bg-transparent border-0 shadow-none'
-              : isMediaWithCaption
-                ? cn(
-                    'p-0 overflow-hidden shadow-sm',
-                    isMe
-                      ? 'bg-secondary text-foreground'
-                      : 'border border-border bg-card text-foreground',
-                    bubbleRadius(messageIndex, total, isMe, true),
-                  )
-                : cn(
-                    'px-3.5 py-2.5 shadow-sm',
-                    isMe
-                      ? 'bg-secondary text-foreground'
-                      : 'border border-border bg-card text-foreground',
-                    bubbleRadius(messageIndex, total, isMe, msg.kind !== 'text'),
-                  ),
+            'flex max-w-[78%] flex-col sm:max-w-[65%]',
+            isEditing && 'w-[78%] sm:w-[min(65%,28rem)]',
+            isMe ? 'items-end' : 'items-start',
+            msg.status === 'sending' && 'opacity-80',
           )}
         >
-          {isFirst && !isMe && isGroup && group.sender && (
-            <span className="mb-1 block text-xs font-bold text-brand-ink">{group.sender}</span>
-          )}
-
-          {!msg.deletedAt && msg.isForwarded && (
-            <div className="mb-1 flex items-center gap-1 text-[11px] font-medium text-muted-foreground/80 italic select-none">
-              <ForwardIcon className="size-3 text-primary" />
-              <span>{t('chat.forwarded', 'Đã chuyển tiếp')}</span>
-            </div>
-          )}
-
-          {!msg.deletedAt && msg.replyToId && (
-            <MessageReplyBubbleQuote
-              conversationId={conversationId}
-              replyToId={msg.replyToId}
-              initialTarget={msg.replyTarget}
-              onJumpToMessage={onJumpToMessage}
-            />
-          )}
-
-          {!msg.deletedAt && (msg.storyPreview || msg.storyId) && (
-            <StoryReplyQuote preview={msg.storyPreview ?? null} onOpen={onOpenStoryReply} />
-          )}
-
-          {msg.deletedAt ? (
-            <span className="italic text-muted-foreground text-xs">
-              {t('chat.messageRevokedText')}
-            </span>
-          ) : (
-            <>
-              {/* Render Attachments if present (Single Box) */}
-              {hasAttachments && (
-                <div className="flex flex-col gap-1.5">
-                  {msg.attachments!.map((att) => (
-                    <AttachmentBubble
-                      key={att.id}
-                      attachment={att}
-                      onOpenLightbox={onOpenLightbox}
-                      onOpenDocument={onOpenDocument}
-                      hasCaption={Boolean(msg.text)}
-                    />
-                  ))}
-                </div>
-              )}
-
-              {isEditing ? (
-                <div className="flex flex-col gap-2">
-                  <textarea
-                    autoFocus
-                    value={editDraft}
-                    onChange={(event) => setEditDraft(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Escape' && !isSavingEdit) setIsEditing(false)
-                      if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
-                        event.preventDefault()
-                        void saveEdit()
-                      }
-                    }}
-                    disabled={isSavingEdit}
-                    maxLength={4000}
-                    rows={3}
-                    aria-label={t('chat.editMessage')}
-                    className="min-h-20 w-full resize-y rounded-lg border border-border bg-background px-2.5 py-2 text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                  />
-                  <div className="flex justify-end gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setIsEditing(false)}
-                      disabled={isSavingEdit}
-                      className="rounded-md px-3 py-1 text-xs hover:bg-muted disabled:opacity-50"
-                    >
-                      {t('chat.cancelEdit')}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void saveEdit()}
-                      disabled={isSavingEdit || !editDraft.trim() || editDraft === msg.text}
-                      className="rounded-md bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground disabled:opacity-50"
-                    >
-                      {t('chat.saveEdit')}
-                    </button>
-                  </div>
-                </div>
-              ) : msg.text ? (
-                <div className={cn(isMediaWithCaption && 'px-3.5 py-2 text-sm')}>{msg.text}</div>
-              ) : null}
-
-              {/* Legacy fallback for media without attachments */}
-              {!hasAttachments && !msg.storyPreview && msg.kind !== 'text' && (
-                <span className="flex flex-col gap-1.5">
-                  <MediaBubble label={msg.photoLabel ?? t('chat.attachment')} kind={msg.kind} />
-                  {msg.text && <span>{msg.text}</span>}
-                </span>
-              )}
-            </>
-          )}
-        </div>
-
-        {msg.editedAt && !msg.deletedAt && !isEditing && (
-          <span className="mt-1 px-1 text-[11px] text-muted-foreground">
-            {t('chat.messageEditedLabel')}
-          </span>
-        )}
-
-        {/* Reactions floating independently outside the bubble, matching image 2 & Messenger */}
-        {!msg.deletedAt && msg.reactions && msg.reactions.length > 0 && (
           <div
-            className="-mt-2.5 z-10 flex max-w-full flex-wrap justify-end gap-1 select-none self-end mr-1.5"
-            aria-label={t('chat.reactions')}
-          >
-            {msg.reactions.map((r, i) => {
-              const isString = typeof r === 'string'
-              const emoji = isString ? r : r.emoji
-              const count = isString ? 1 : r.count
-              const userIds = isString ? [] : r.userIds
-              const myReaction = currentUserId ? userIds.includes(currentUserId) : false
-
-              return (
-                <button
-                  key={`${emoji}-${i}`}
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onReact?.(msg.id, emoji)
-                  }}
-                  className={cn(
-                    'flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs shadow-xs transition-all active:scale-95 cursor-pointer select-none',
-                    myReaction
-                      ? 'border-primary/80 bg-secondary text-brand-ink font-semibold ring-1 ring-primary/30 shadow-xs'
-                      : 'border-border/80 bg-card hover:bg-muted text-foreground shadow-xs',
-                  )}
-                  title={myReaction ? t('chat.removeReaction', 'Bỏ cảm xúc') : emoji}
-                >
-                  <span>{emoji}</span>
-                  {count > 1 && <span className="text-[11px] font-medium">{count}</span>}
-                </button>
-              )
-            })}
-          </div>
-        )}
-
-        {(isLast || msg.status === 'uncertain' || msg.status === 'failed') && (
-          <span
             className={cn(
-              'mt-1 flex items-center gap-1 px-1 text-[11px] text-muted-foreground',
-              isMe ? 'justify-end' : 'justify-start',
+              'flex max-w-full flex-col',
+              isEditing ? 'w-full' : 'w-fit',
+              isMe ? 'items-end' : 'items-start',
             )}
           >
-            {msg.time}
-            {isMe &&
-              (msg.status === 'sending' ? (
-                <Clock
-                  className="size-3.5 text-muted-foreground animate-pulse"
-                  aria-label={t('chat.sending')}
-                />
-              ) : msg.status === 'uncertain' || msg.status === 'failed' ? (
-                <button
-                  type="button"
-                  onClick={() => onRetryMessage?.(msg.id)}
-                  title={
-                    msg.status === 'uncertain' ? t('chat.sendUncertain') : t('chat.failedMessage')
-                  }
-                  className="text-destructive underline"
+            <div className="relative w-fit max-w-full">
+              {/* 3 action buttons, centered on the bubble box only */}
+              {!isEditing && actionBar && (
+                <div
+                  className={cn(
+                    'absolute top-1/2 -translate-y-1/2',
+                    isMe ? 'right-full mr-1.5' : 'left-full ml-1.5',
+                  )}
                 >
-                  {t('chat.retrySend')}
-                </button>
-              ) : msg.status === 'read' ? (
-                <CheckCheck className="size-3.5 text-brand-ink" aria-label={t('chat.read')} />
-              ) : (
-                <Check className="size-3.5" aria-label={t('chat.sent')} />
-              ))}
-          </span>
-        )}
-      </div>
+                  {actionBar}
+                </div>
+              )}
+              <div
+                className={cn(
+                  'w-fit max-w-full text-sm leading-relaxed wrap-break-word whitespace-pre-wrap',
+                  isEditing && 'w-full',
+                  isPureMedia
+                    ? 'p-0 bg-transparent border-0 shadow-none'
+                    : isMediaWithCaption
+                      ? cn(
+                          'p-0 overflow-hidden shadow-sm',
+                          isMe
+                            ? 'bg-secondary text-foreground'
+                            : 'border border-border bg-card text-foreground',
+                          bubbleRadius(messageIndex, total, isMe, true),
+                        )
+                      : cn(
+                          'px-3.5 py-2.5 shadow-sm',
+                          isMe
+                            ? 'bg-secondary text-foreground'
+                            : 'border border-border bg-card text-foreground',
+                          bubbleRadius(messageIndex, total, isMe, msg.kind !== 'text'),
+                        ),
+                )}
+              >
+                {isFirst && !isMe && isGroup && group.sender && (
+                  <span className="mb-1 block text-xs font-bold text-brand-ink">
+                    {group.sender}
+                  </span>
+                )}
 
-      {/* 3 action buttons on the right of bubble for !isMe */}
-      {!isMe && actionBar}
+                {!msg.deletedAt && msg.isForwarded && (
+                  <div className="mb-1 flex items-center gap-1 text-[11px] font-medium text-muted-foreground/80 italic select-none">
+                    <ForwardIcon className="size-3 text-primary" />
+                    <span>{t('chat.forwarded', 'Đã chuyển tiếp')}</span>
+                  </div>
+                )}
+
+                {!msg.deletedAt && msg.replyToId && (
+                  <MessageReplyBubbleQuote
+                    conversationId={conversationId}
+                    replyToId={msg.replyToId}
+                    initialTarget={msg.replyTarget}
+                    onJumpToMessage={onJumpToMessage}
+                  />
+                )}
+
+                {msg.deletedAt ? (
+                  <span className="italic text-muted-foreground text-xs">
+                    {t('chat.messageRevokedText')}
+                  </span>
+                ) : (
+                  <>
+                    {/* Render Attachments if present (Single Box) */}
+                    {hasAttachments && (
+                      <div className="flex flex-col gap-1.5">
+                        {msg.attachments!.map((att) => (
+                          <AttachmentBubble
+                            key={att.id}
+                            attachment={att}
+                            onOpenLightbox={onOpenLightbox}
+                            onOpenDocument={onOpenDocument}
+                            hasCaption={Boolean(msg.text)}
+                          />
+                        ))}
+                      </div>
+                    )}
+
+                    {isEditing ? (
+                      <div className="flex flex-col gap-2">
+                        <textarea
+                          autoFocus
+                          value={editDraft}
+                          onChange={(event) => setEditDraft(event.target.value)}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Escape' && !isSavingEdit) setIsEditing(false)
+                            if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+                              event.preventDefault()
+                              void saveEdit()
+                            }
+                          }}
+                          disabled={isSavingEdit}
+                          maxLength={4000}
+                          rows={3}
+                          aria-label={t('chat.editMessage')}
+                          className="min-h-20 w-full resize-y rounded-lg border border-border bg-background px-2.5 py-2 text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                        />
+                        <div className="flex justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setIsEditing(false)}
+                            disabled={isSavingEdit}
+                            className="rounded-md px-3 py-1 text-xs hover:bg-muted disabled:opacity-50"
+                          >
+                            {t('chat.cancelEdit')}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void saveEdit()}
+                            disabled={isSavingEdit || !editDraft.trim() || editDraft === msg.text}
+                            className="rounded-md bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+                          >
+                            {t('chat.saveEdit')}
+                          </button>
+                        </div>
+                      </div>
+                    ) : msg.text ? (
+                      <div className={cn(isMediaWithCaption && 'px-3.5 py-2 text-sm')}>
+                        {msg.text}
+                      </div>
+                    ) : null}
+
+                    {/* Legacy fallback for media without attachments */}
+                    {!hasAttachments && !msg.storyPreview && msg.kind !== 'text' && (
+                      <span className="flex flex-col gap-1.5">
+                        <MediaBubble
+                          label={msg.photoLabel ?? t('chat.attachment')}
+                          kind={msg.kind}
+                        />
+                        {msg.text && <span>{msg.text}</span>}
+                      </span>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+
+            {msg.editedAt && !msg.deletedAt && !isEditing && (
+              <span className="mt-1 px-1 text-[11px] text-muted-foreground">
+                {t('chat.messageEditedLabel')}
+              </span>
+            )}
+
+            {/* Reactions floating independently outside the bubble, matching image 2 & Messenger */}
+            {!msg.deletedAt && msg.reactions && msg.reactions.length > 0 && (
+              <div
+                className="-mt-2.5 z-10 flex max-w-full flex-wrap justify-end gap-1 select-none self-end mr-1.5"
+                aria-label={t('chat.reactions')}
+              >
+                {msg.reactions.map((r, i) => {
+                  const isString = typeof r === 'string'
+                  const emoji = isString ? r : r.emoji
+                  const count = isString ? 1 : r.count
+                  const userIds = isString ? [] : r.userIds
+                  const myReaction = currentUserId ? userIds.includes(currentUserId) : false
+
+                  return (
+                    <button
+                      key={`${emoji}-${i}`}
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onReact?.(msg.id, emoji)
+                      }}
+                      className={cn(
+                        'flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs shadow-xs transition-all active:scale-95 cursor-pointer select-none',
+                        myReaction
+                          ? 'border-primary/80 bg-secondary text-brand-ink font-semibold ring-1 ring-primary/30 shadow-xs'
+                          : 'border-border/80 bg-card hover:bg-muted text-foreground shadow-xs',
+                      )}
+                      title={myReaction ? t('chat.removeReaction', 'Bỏ cảm xúc') : emoji}
+                    >
+                      <span>{emoji}</span>
+                      {count > 1 && <span className="text-[11px] font-medium">{count}</span>}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          {(isLast || msg.status === 'uncertain' || msg.status === 'failed') && (
+            <span
+              className={cn(
+                'mt-1 flex items-center gap-1 px-1 text-[11px] text-muted-foreground',
+                isMe ? 'justify-end' : 'justify-start',
+              )}
+            >
+              {msg.time}
+              {isMe &&
+                (msg.status === 'sending' ? (
+                  <Clock
+                    className="size-3.5 text-muted-foreground animate-pulse"
+                    aria-label={t('chat.sending')}
+                  />
+                ) : msg.status === 'uncertain' || msg.status === 'failed' ? (
+                  <button
+                    type="button"
+                    onClick={() => onRetryMessage?.(msg.id)}
+                    title={
+                      msg.status === 'uncertain' ? t('chat.sendUncertain') : t('chat.failedMessage')
+                    }
+                    className="text-destructive underline"
+                  >
+                    {t('chat.retrySend')}
+                  </button>
+                ) : msg.status === 'read' ? (
+                  <CheckCheck className="size-3.5 text-brand-ink" aria-label={t('chat.read')} />
+                ) : (
+                  <Check className="size-3.5" aria-label={t('chat.sent')} />
+                ))}
+            </span>
+          )}
+        </div>
+      </div>
     </div>
   )
 })

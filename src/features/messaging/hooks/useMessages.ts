@@ -445,6 +445,7 @@ export function useSendMessageMutation(conversationId: string | null) {
             fileName: pf.file.name,
             mimeType,
             sizeBytes: pf.file.size,
+            durationMs: pf.durationMs,
             previewUrl,
             downloadUrl: previewUrl,
           }
@@ -552,6 +553,7 @@ export function useSendMessageMutation(conversationId: string | null) {
             fileName: file.name,
             mimeType,
             sizeBytes: file.size,
+            durationMs: item.durationMs,
             kind: kind.replace('CHAT_', '') as 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE',
           }
           // Keep the completed upload on the attempt. If a later file or the

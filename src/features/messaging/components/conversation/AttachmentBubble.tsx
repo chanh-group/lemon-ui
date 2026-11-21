@@ -24,14 +24,17 @@ export function AudioPlayerBubble({
   src,
   fileName,
   sizeBytes,
+  durationMs,
 }: {
   src: string
   fileName?: string
   sizeBytes?: number
+  durationMs?: number | null
 }) {
+  const { t } = useTranslation()
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
-  const [duration, setDuration] = useState(0)
+  const [duration, setDuration] = useState(durationMs ? durationMs / 1000 : 0)
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
   const togglePlay = (e: React.MouseEvent) => {
@@ -47,15 +50,36 @@ export function AudioPlayerBubble({
 
   const handleTimeUpdate = () => {
     const audio = audioRef.current
-    if (audio) {
+    // Ignore the seek used below to resolve an Infinity duration.
+    if (audio && Number.isFinite(audio.duration)) {
       setCurrentTime(audio.currentTime)
+    }
+  }
+
+  const handleDurationChange = () => {
+    const audio = audioRef.current
+    if (audio && Number.isFinite(audio.duration) && audio.duration > 0) {
+      setDuration(audio.duration)
     }
   }
 
   const handleLoadedMetadata = () => {
     const audio = audioRef.current
-    if (audio && audio.duration && !isNaN(audio.duration) && isFinite(audio.duration)) {
-      setDuration(audio.duration)
+    if (!audio || audio.duration !== Infinity) return
+    // Chrome reports Infinity for MediaRecorder WebM until it scans the file.
+    // Seek once to the end so the real duration becomes available.
+    const onResolved = () => {
+      audio.removeEventListener('durationchange', onResolved)
+      if (Number.isFinite(audio.duration) && audio.duration > 0) {
+        audio.currentTime = 0
+        setCurrentTime(0)
+      }
+    }
+    audio.addEventListener('durationchange', onResolved)
+    try {
+      audio.currentTime = 1e7
+    } catch {
+      audio.removeEventListener('durationchange', onResolved)
     }
   }
 
@@ -81,6 +105,10 @@ export function AudioPlayerBubble({
   }
 
   const isVoiceNote = fileName?.startsWith('voice-note')
+  // Countdown while played/paused (Messenger-style); total duration when idle.
+  // Same formula at currentTime 0 so the first tick never jumps up a second.
+  const shownSeconds = Math.max(0, Math.floor(duration - currentTime))
+  const progress = duration > 0 ? Math.min(currentTime, duration) : 0
 
   return (
     <div
@@ -95,6 +123,7 @@ export function AudioPlayerBubble({
         onPause={() => setIsPlaying(false)}
         onTimeUpdate={handleTimeUpdate}
         onLoadedMetadata={handleLoadedMetadata}
+        onDurationChange={handleDurationChange}
         onEnded={handleEnded}
         className="hidden"
       />
@@ -130,13 +159,15 @@ export function AudioPlayerBubble({
             type="range"
             min={0}
             max={duration || 1}
-            step={0.1}
-            value={currentTime}
+            step="any"
+            value={progress}
             onChange={handleSeek}
-            className="w-full h-1.5 bg-foreground/15 rounded-full appearance-none cursor-pointer accent-primary"
+            disabled={!duration}
+            aria-label={t('chat.voiceNoteLabel')}
+            className="w-full h-1.5 bg-foreground/15 rounded-full appearance-none cursor-pointer accent-primary disabled:cursor-default"
           />
           <span className="tabular-nums font-mono text-[11px] text-foreground/80 shrink-0 min-w-7 text-right">
-            {formatSec(isPlaying ? currentTime : duration || currentTime)}
+            {formatSec(shownSeconds)}
           </span>
         </div>
       </div>
@@ -240,6 +271,7 @@ export function AttachmentBubble({
           src={src}
           fileName={attachment.fileName}
           sizeBytes={attachment.sizeBytes}
+          durationMs={attachment.durationMs}
         />
       </div>
     )

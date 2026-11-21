@@ -36,6 +36,8 @@ export interface ChatMessage {
   isForwarded?: boolean
   storyId?: string | null
   storyPreview?: StoryPreview | null
+  /** `reply` / `reaction` for story messages; undefined for normal messages. */
+  storyInteraction?: 'reply' | 'reaction'
   replyToId?: string | null
   replyTarget?: MessageReplyTarget | null
   createdAt?: string
@@ -122,6 +124,7 @@ export interface SendMessagePendingFile {
   file: File
   clientMsgId?: string
   previewUrl?: string
+  durationMs?: number
   uploadedAttachment?: MessageAttachmentInput
 }
 

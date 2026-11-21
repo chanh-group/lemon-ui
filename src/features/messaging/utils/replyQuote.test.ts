@@ -222,10 +222,10 @@ describe('replyQuote pure helper', () => {
     ).toBe('Bạn nam kdc à')
     const captionless = { ...storyPreview, caption: null }
     expect(resolveReplyQuote({ ...story, body: null, storyPreview: captionless }, tVi).label).toBe(
-      'Tin không chú thích',
+      'Trả lời tin',
     )
     expect(resolveReplyQuote({ ...story, body: null, storyPreview: captionless }, tEn).label).toBe(
-      'Untitled story',
+      'Replied to story',
     )
   })
 

@@ -449,6 +449,8 @@
     "unreactStorySuccess": "Đã gỡ cảm xúc",
     "unreactStory": "Gỡ cảm xúc",
     "replyToStory": "Trả lời tin",
+    "repliedToStoryOf": "Bạn đã trả lời tin của {{name}}",
+    "partnerRepliedToYourStory": "{{name}} đã trả lời tin của bạn",
     "replyMessage": "Trả lời",
     "you": "Bạn",
     "replyingTo": "Đang trả lời {{name}}",

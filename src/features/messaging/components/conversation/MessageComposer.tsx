@@ -25,11 +25,27 @@ const TrashIcon = createIcon(TrashData)
 
 const MAX_FILE_SIZE = 25 * 1024 * 1024 // 25MB
 
+/** Exact duration of a recorded blob (MediaRecorder WebM headers carry none). */
+async function getAudioDurationMs(blob: Blob): Promise<number | null> {
+  try {
+    const context = new AudioContext()
+    try {
+      const buffer = await context.decodeAudioData(await blob.arrayBuffer())
+      return Math.round(buffer.duration * 1000)
+    } finally {
+      void context.close()
+    }
+  } catch {
+    return null
+  }
+}
+
 export interface PendingFile {
   id: string
   file: File
   clientMsgId?: string
   previewUrl?: string
+  durationMs?: number
   isCompressing?: boolean
   uploadedAttachment?: MessageAttachmentInput
 }
@@ -169,7 +185,8 @@ export function MessageComposer({
       const audioBlob = new Blob(audioChunksRef.current, { type: mimeType })
       cleanupRecording()
 
-      if (audioBlob.size < 100 || duration < 1) {
+      const durationMs = (await getAudioDurationMs(audioBlob)) ?? duration * 1000
+      if (audioBlob.size < 100 || durationMs < 1000) {
         toast.error(t('chat.recordingTooShort'))
         return
       }
@@ -179,7 +196,13 @@ export function MessageComposer({
       const previewUrl = URL.createObjectURL(file)
 
       const clientMsgId = generateUUID()
-      const pendingFile = { id: generateUUID(), clientMsgId, file, previewUrl }
+      const pendingFile = {
+        id: generateUUID(),
+        clientMsgId,
+        file,
+        previewUrl,
+        durationMs,
+      }
       const sent = await onSubmit('', undefined, [pendingFile], null, clientMsgId)
       if (sent === false) {
         setPendingFiles((prev) => [...prev, pendingFile])

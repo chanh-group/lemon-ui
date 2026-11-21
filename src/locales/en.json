@@ -449,6 +449,8 @@
     "unreactStorySuccess": "Reaction removed",
     "unreactStory": "Remove reaction",
     "replyToStory": "Replied to story",
+    "repliedToStoryOf": "You replied to {{name}}'s story",
+    "partnerRepliedToYourStory": "{{name}} replied to your story",
     "replyMessage": "Reply",
     "you": "You",
     "replyingTo": "Replying to {{name}}",

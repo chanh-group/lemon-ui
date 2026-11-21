@@ -52,6 +52,43 @@ describe('StoryReplyQuote', () => {
     fireEvent.click(screen.getByRole('button'))
     expect(onOpen).toHaveBeenCalledWith('s1')
   })
+
+  it('labels a captionless story reply without the untitled fallback', () => {
+    render(
+      <StoryReplyQuote
+        preview={{ ...alivePreview, caption: null }}
+        isMe
+        authorName="Trọng"
+        interaction="reply"
+      />,
+    )
+
+    expect(screen.getByText('chat.repliedToStoryOf')).toBeTruthy()
+    expect(screen.queryByText('chat.unnamedStory')).toBeNull()
+    expect(document.querySelector('img')?.getAttribute('src')).toBe('https://r2/s1.jpg')
+  })
+
+  it('labels an incoming story reply and a story reaction differently', () => {
+    render(
+      <StoryReplyQuote
+        preview={{ ...alivePreview, caption: null }}
+        authorName="Trọng"
+        interaction="reply"
+      />,
+    )
+    expect(screen.getByText('chat.partnerRepliedToYourStory')).toBeTruthy()
+
+    cleanup()
+
+    render(
+      <StoryReplyQuote
+        preview={{ ...alivePreview, caption: null }}
+        authorName="Trọng"
+        interaction="reaction"
+      />,
+    )
+    expect(screen.getByText('chat.partnerReactedStory')).toBeTruthy()
+  })
 })
 
 describe('MessageReplyBubbleQuote', () => {
