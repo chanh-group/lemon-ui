@@ -1,6 +1,7 @@
 export * from './components/CallsView'
 export * from './components/CallsHeaderActions'
 export * from './components/NewCallView'
-export * from './components/CallScreen'
+export { CallScreen } from './components/CallScreen'
+export type { CallEndReason, CallPhase, CallRouteState } from './components/CallScreen'
 export * from './types/call.types'
 export * from './data/mockData'
