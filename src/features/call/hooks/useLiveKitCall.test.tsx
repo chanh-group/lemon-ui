@@ -3,6 +3,12 @@ import { renderHook, act } from '@testing-library/react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { useLiveKitCall } from './useLiveKitCall'
 
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string, fallback?: string) => fallback ?? key,
+  }),
+}))
+
 const { mockRoom, mockLocalParticipant } = vi.hoisted(() => {
   const localParticipant = {
     setMicrophoneEnabled: vi.fn(),
