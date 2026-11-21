@@ -81,4 +81,14 @@ describe('CallControls Soft Permission Fallback UI', () => {
     fireEvent.click(camButton)
     expect(onToggleCamera).toHaveBeenCalledTimes(1)
   })
+
+  it('renders camera toggle button during ringing phase for video call', () => {
+    render(<CallControls {...defaultProps} phase="ringing" media="video" cameraOn={true} />)
+    expect(screen.getByRole('button', { name: 'Tắt camera' })).toBeDefined()
+  })
+
+  it('does NOT render camera toggle button for voice call', () => {
+    render(<CallControls {...defaultProps} phase="ringing" media="voice" />)
+    expect(screen.queryByRole('button', { name: /camera/i })).toBeNull()
+  })
 })
