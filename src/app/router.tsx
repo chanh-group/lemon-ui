@@ -15,6 +15,7 @@ import { StoriesCreatePage } from '@/pages/StoriesCreatePage'
 import { StoriesArchivePage } from '@/pages/StoriesArchivePage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
 import { CallWindowHost } from '@/features/call/components/CallScreen/CallWindowProvider'
+import { CallProvider, IncomingCallModal } from '@/features/call'
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const { status } = useAuth()
@@ -165,9 +166,10 @@ export const router = createBrowserRouter(
 
 function ApplicationLayout() {
   return (
-    <>
+    <CallProvider>
       <Outlet />
       <CallWindowHost />
-    </>
+      <IncomingCallModal />
+    </CallProvider>
   )
 }
