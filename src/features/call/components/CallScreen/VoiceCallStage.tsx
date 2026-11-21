@@ -1,3 +1,5 @@
+import { useEffect, useRef } from 'react'
+import type { RemoteTrack } from 'livekit-client'
 import {
   AudioWave01Icon as AudioWaveData,
   UserMultiple02Icon as UsersData,
@@ -30,6 +32,8 @@ interface VoiceCallStageProps {
   isGroup: boolean
   seconds: number
   endReason: CallEndReason
+  remoteAudioTrack?: RemoteTrack | null
+  isPeerSpeaking?: boolean
 }
 
 export function VoiceCallStage({
@@ -40,8 +44,22 @@ export function VoiceCallStage({
   isGroup,
   seconds,
   endReason,
+  remoteAudioTrack,
+  isPeerSpeaking = false,
 }: VoiceCallStageProps) {
   const { t } = useTranslation()
+  const remoteAudioRef = useRef<HTMLAudioElement>(null)
+
+  useEffect(() => {
+    const audioEl = remoteAudioRef.current
+    if (remoteAudioTrack && audioEl) {
+      remoteAudioTrack.attach(audioEl)
+      return () => {
+        remoteAudioTrack.detach(audioEl)
+      }
+    }
+  }, [remoteAudioTrack])
+
   const isEnded = phase === 'ended'
   const isIncoming = phase === 'incoming'
   const isActive = phase === 'active'
@@ -62,21 +80,33 @@ export function VoiceCallStage({
 
   return (
     <section className="absolute inset-0 flex flex-col items-center justify-center px-6 pt-20 pb-46 text-center sm:pb-52">
+      {/* Remote Audio Track Element */}
+      <audio ref={remoteAudioRef} autoPlay playsInline />
+
       <div className="relative mb-8 sm:mb-10">
         {showPulse && (
           <>
             <span
               aria-hidden="true"
-              className="absolute inset-0 rounded-full bg-primary/15 animate-pulse-ring"
+              className={cn(
+                'absolute inset-0 rounded-full animate-pulse-ring',
+                isPeerSpeaking ? 'bg-emerald-400/30' : 'bg-primary/15',
+              )}
             />
             <span
               aria-hidden="true"
-              className="absolute inset-0 rounded-full bg-primary/10 animate-pulse-ring"
+              className={cn(
+                'absolute inset-0 rounded-full animate-pulse-ring',
+                isPeerSpeaking ? 'bg-emerald-400/20' : 'bg-primary/10',
+              )}
               style={{ animationDelay: '0.9s' }}
             />
             <span
               aria-hidden="true"
-              className="absolute inset-0 rounded-full bg-primary/5 animate-pulse-ring"
+              className={cn(
+                'absolute inset-0 rounded-full animate-pulse-ring',
+                isPeerSpeaking ? 'bg-emerald-400/10' : 'bg-primary/5',
+              )}
               style={{ animationDelay: '1.8s' }}
             />
           </>
@@ -85,13 +115,21 @@ export function VoiceCallStage({
           name={name}
           src={avatarUrl}
           className={cn(
-            'relative size-32 ring-4 ring-white/10 shadow-[0_28px_80px_-24px_rgba(0,0,0,0.9)] sm:size-40',
+            'relative size-32 ring-4 shadow-[0_28px_80px_-24px_rgba(0,0,0,0.9)] transition-all sm:size-40',
+            isPeerSpeaking
+              ? 'ring-emerald-400/70 shadow-[0_0_40px_rgba(16,185,129,0.35)]'
+              : 'ring-white/10',
             isEnded && 'opacity-80 saturate-75',
           )}
           fallbackClassName="text-4xl font-bold sm:text-5xl"
         />
         {isActive && (
-          <span className="absolute -right-2 -bottom-2 grid size-11 place-items-center rounded-full bg-emerald-500 text-white ring-4 ring-[#07120c]">
+          <span
+            className={cn(
+              'absolute -right-2 -bottom-2 grid size-11 place-items-center rounded-full text-white ring-4 ring-[#07120c] transition-all',
+              isPeerSpeaking ? 'bg-emerald-400 scale-110 shadow-lg' : 'bg-emerald-600',
+            )}
+          >
             <AudioWave className="size-5" aria-hidden="true" />
           </span>
         )}
@@ -111,11 +149,9 @@ export function VoiceCallStage({
 
         <div className="mt-1 flex min-h-11 flex-col items-center justify-center gap-2">
           {isActive ? (
-            <>
-              <span className="font-mono text-lg font-semibold tabular-nums text-white/90">
-                {status}
-              </span>
-            </>
+            <span className="font-mono text-lg font-semibold tabular-nums text-white/90">
+              {status}
+            </span>
           ) : (
             <span
               className={cn(
@@ -141,8 +177,13 @@ export function VoiceCallStage({
             {EQ_BARS.map((bar, index) => (
               <span
                 key={index}
-                className="w-1.5 rounded-full bg-primary/80 animate-call-eq"
-                style={{ height: bar.height, animationDelay: bar.delay }}
+                className={cn(
+                  'w-1.5 rounded-full transition-all duration-150',
+                  isPeerSpeaking
+                    ? 'bg-emerald-400 animate-call-eq'
+                    : 'bg-primary/40 h-2',
+                )}
+                style={isPeerSpeaking ? { height: bar.height, animationDelay: bar.delay } : undefined}
               />
             ))}
           </div>

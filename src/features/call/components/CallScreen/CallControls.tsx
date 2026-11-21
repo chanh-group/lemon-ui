@@ -52,6 +52,8 @@ interface ControlButtonProps {
   tone?: ControlTone
   size?: ControlSize
   pulse?: boolean
+  hasError?: boolean
+  errorTooltip?: string
 }
 
 function ControlButton({
@@ -61,6 +63,8 @@ function ControlButton({
   tone = 'glass',
   size = 'md',
   pulse = false,
+  hasError = false,
+  errorTooltip,
 }: ControlButtonProps) {
   return (
     <div className="flex w-18 flex-col items-center gap-2">
@@ -82,15 +86,28 @@ function ControlButton({
           type="button"
           onClick={onClick}
           aria-label={label}
-          title={label}
+          title={hasError && errorTooltip ? errorTooltip : label}
           className={cn(
             'relative grid cursor-pointer place-items-center rounded-full transition-all duration-150 outline-none active:scale-95 focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
             SIZE_CLASS[size],
-            TONE_CLASS[tone],
+            hasError
+              ? 'bg-amber-500/20 text-amber-200 ring-2 ring-amber-400/60 hover:bg-amber-500/30'
+              : TONE_CLASS[tone],
           )}
         >
           <Icon className={cn(size === 'lg' ? 'size-7' : 'size-6')} aria-hidden="true" />
         </button>
+
+        {/* Badge dấu '!' vàng/hổ phách cảnh báo lỗi cấp quyền thiết bị */}
+        {hasError && (
+          <span
+            className="pointer-events-none absolute -top-1 -right-1 flex size-5 items-center justify-center rounded-full bg-amber-500 text-[11px] font-bold text-slate-950 shadow-md ring-2 ring-slate-900"
+            title={errorTooltip}
+            aria-hidden="true"
+          >
+            !
+          </span>
+        )}
       </span>
       <span className="max-w-19 text-center text-[11px] leading-tight font-medium text-white/65">
         {label}
@@ -105,6 +122,8 @@ interface CallControlsProps {
   muted: boolean
   speakerOn: boolean
   cameraOn: boolean
+  hasMicError?: boolean
+  hasCameraError?: boolean
   onToggleMute: () => void
   onToggleSpeaker: () => void
   onToggleCamera: () => void
@@ -123,6 +142,8 @@ export function CallControls({
   muted,
   speakerOn,
   cameraOn,
+  hasMicError = false,
+  hasCameraError = false,
   onToggleMute,
   onToggleSpeaker,
   onToggleCamera,
@@ -202,9 +223,11 @@ export function CallControls({
   const micButton = (
     <ControlButton
       icon={muted ? MicOff : Mic}
-      label={muted ? t('chat.callUnmute') : t('chat.callMute')}
+      label={hasMicError ? t('chat.callMicBlocked', 'Lỗi Mic') : muted ? t('chat.callUnmute') : t('chat.callMute')}
       onClick={onToggleMute}
       tone={muted ? 'pressed' : 'glass'}
+      hasError={hasMicError}
+      errorTooltip={t('chat.callMicPermissionTooltip', 'Microphone chưa được cấp quyền. Bấm để thử lại')}
     />
   )
 
@@ -214,9 +237,17 @@ export function CallControls({
         {micButton}
         <ControlButton
           icon={cameraOn ? Video : VideoOff}
-          label={cameraOn ? t('chat.callCameraOff') : t('chat.callCameraOn')}
+          label={
+            hasCameraError
+              ? t('chat.callCameraBlocked', 'Lỗi Cam')
+              : cameraOn
+                ? t('chat.callCameraOff')
+                : t('chat.callCameraOn')
+          }
           onClick={onToggleCamera}
           tone={cameraOn ? 'glass' : 'pressed'}
+          hasError={hasCameraError}
+          errorTooltip={t('chat.callCameraPermissionTooltip', 'Camera chưa được cấp quyền. Bấm để thử lại')}
         />
         <ControlButton
           icon={FlipCamera}

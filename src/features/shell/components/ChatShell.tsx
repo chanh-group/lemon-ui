@@ -46,6 +46,7 @@ import { MiddlePanel } from '@/features/shell/components/MiddlePanel'
 import { ConversationView } from '@/features/messaging/components/conversation'
 import { StoryViewer } from '@/features/story/components/StoryViewer'
 import { useAuth } from '@/features/auth/api'
+import { useCall } from '@/features/call'
 import { useCallWindow } from '@/features/call/components/CallScreen/CallWindowProvider'
 
 const TYPING_HEARTBEAT_MS = 1_500
@@ -105,6 +106,7 @@ export function ChatShell() {
   const sendMessageMutation = useSendMessageMutation(selectedId)
   const markReadMutation = useMarkReadMutation()
   const callWindow = useCallWindow()
+  const { startCall: initiateCallSession } = useCall()
   const lastTypingSentAt = useRef(0)
   const lastReadAttempt = useRef<string | null>(null)
 
@@ -241,6 +243,13 @@ export function ChatShell() {
 
   const startCall = (media: CallMedia) => {
     if (!selected || selected.isGroup) return
+    void initiateCallSession({
+      conversationId: selected.id,
+      media,
+      peerName: selected.name,
+      peerAvatar: selected.partnerAvatar,
+      isGroup: selected.isGroup,
+    })
     const fallback = () =>
       navigate(callPath(selected.id, { media, state: 'ringing' }), {
         state: {
