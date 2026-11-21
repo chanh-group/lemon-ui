@@ -45,9 +45,8 @@ export function openCallWindow(
     url.searchParams.set('peerName', options.peerName.slice(0, 60))
   }
 
-  // Cửa sổ nổi chuyên dụng cho cuộc gọi: kích thước tối ưu 1080x720, resizable
-  const windowFeatures =
-    'width=1080,height=720,menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=no'
+  // Cửa sổ nổi chuyên dụng cho cuộc gọi: dùng chuẩn popup flag để hiển thị thanh địa chỉ và quyền thiết bị
+  const windowFeatures = 'popup,width=1080,height=720,resizable=yes'
   const windowName = `LemonCall_${conversationId}`
 
   const win = window.open(url.toString(), windowName, windowFeatures)

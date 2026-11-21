@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 import {
   ConnectionState,
   Room,
@@ -30,6 +32,7 @@ export interface UseLiveKitCallReturn {
 }
 
 export function useLiveKitCall(): UseLiveKitCallReturn {
+  const { t } = useTranslation()
   const roomRef = useRef<Room | null>(null)
 
   const [remoteVideoTrack, setRemoteVideoTrack] = useState<RemoteTrack | null>(null)
@@ -100,20 +103,75 @@ export function useLiveKitCall(): UseLiveKitCallReturn {
 
   const requestMediaPermissions = useCallback(async (media: CallMedia) => {
     if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) return
+
+    // 1. Lắng nghe trạng thái quyền qua Permissions API nếu trình duyệt hỗ trợ
+    if (typeof navigator.permissions !== 'undefined' && navigator.permissions.query) {
+      try {
+        const micStatus = await navigator.permissions.query({
+          name: 'microphone' as PermissionName,
+        })
+        if (micStatus.state === 'denied') {
+          setHasMicError(true)
+        } else if (micStatus.state === 'granted') {
+          setHasMicError(false)
+        }
+        micStatus.onchange = () => {
+          if (micStatus.state === 'granted') setHasMicError(false)
+          if (micStatus.state === 'denied') setHasMicError(true)
+        }
+      } catch {
+        // query mic không được hỗ trợ trên trình duyệt này
+      }
+
+      if (media === 'VIDEO') {
+        try {
+          const camStatus = await navigator.permissions.query({ name: 'camera' as PermissionName })
+          if (camStatus.state === 'denied') {
+            setHasCameraError(true)
+          } else if (camStatus.state === 'granted') {
+            setHasCameraError(false)
+          }
+          camStatus.onchange = () => {
+            if (camStatus.state === 'granted') setHasCameraError(false)
+            if (camStatus.state === 'denied') setHasCameraError(true)
+          }
+        } catch {
+          // query cam không được hỗ trợ
+        }
+      }
+    }
+
+    // 2. Yêu cầu Microphone riêng biệt
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-        video: media === 'VIDEO',
-      })
-      stream.getTracks().forEach((track) => track.stop())
+      const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      audioStream.getTracks().forEach((track) => track.stop())
       setHasMicError(false)
-      setHasCameraError(false)
     } catch (err: unknown) {
-      console.warn('Browser permission request error:', err)
+      console.warn('Browser mic permission request error:', err)
       const errorName = err instanceof Error ? err.name : ''
-      if (errorName === 'NotAllowedError' || errorName === 'PermissionDeniedError') {
+      if (
+        errorName === 'NotAllowedError' ||
+        errorName === 'PermissionDeniedError' ||
+        errorName === 'NotFoundError'
+      ) {
         setHasMicError(true)
-        if (media === 'VIDEO') {
+      }
+    }
+
+    // 3. Yêu cầu Camera riêng biệt nếu là VIDEO
+    if (media === 'VIDEO') {
+      try {
+        const videoStream = await navigator.mediaDevices.getUserMedia({ video: true })
+        videoStream.getTracks().forEach((track) => track.stop())
+        setHasCameraError(false)
+      } catch (err: unknown) {
+        console.warn('Browser camera permission request error:', err)
+        const errorName = err instanceof Error ? err.name : ''
+        if (
+          errorName === 'NotAllowedError' ||
+          errorName === 'PermissionDeniedError' ||
+          errorName === 'NotFoundError'
+        ) {
           setHasCameraError(true)
         }
       }
@@ -165,27 +223,33 @@ export function useLiveKitCall(): UseLiveKitCallReturn {
   )
 
   const toggleMicrophone = useCallback(async () => {
-    const room = roomRef.current
-    if (!room) return
-
-    // Khi đang có lỗi quyền: thử xin cấp lại quyền
-    if (hasMicError) {
+    // 1. Thử yêu cầu lại quyền qua getUserMedia nếu đang có lỗi
+    if (hasMicError && typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
       try {
-        await room.localParticipant.setMicrophoneEnabled(true)
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+        stream.getTracks().forEach((track) => track.stop())
         setHasMicError(false)
         setIsMuted(false)
-        const micTrack = room.localParticipant.getTrackPublication(Track.Source.Microphone)?.track
-        if (micTrack) setLocalAudioTrack(micTrack)
-      } catch (err) {
-        console.warn('Microphone permission retry failed:', err)
+      } catch (err: unknown) {
+        console.warn('Microphone permission retry failed on user click:', err)
         setHasMicError(true)
+        toast.error(t('chat.callMicBlockedAlert'))
+        return
       }
+    }
+
+    const room = roomRef.current
+    if (!room) {
+      // Khi đang ringing (chưa có phòng), chỉ toggle trạng thái mic UI
+      setIsMuted((prev) => !prev)
       return
     }
 
-    const nextState = !isMuted
+    // 2. Thử bật/tắt trên LiveKit participant
+    const nextState = hasMicError ? false : !isMuted
     try {
       await room.localParticipant.setMicrophoneEnabled(!nextState)
+      setHasMicError(false)
       setIsMuted(nextState)
       if (nextState) {
         setLocalAudioTrack(null)
@@ -194,33 +258,45 @@ export function useLiveKitCall(): UseLiveKitCallReturn {
         if (micTrack) setLocalAudioTrack(micTrack)
       }
     } catch (err) {
-      console.warn('Failed to toggle microphone:', err)
+      console.warn('Failed to toggle microphone on room:', err)
       setHasMicError(true)
+      setIsMuted(true)
+      toast.error(t('chat.callMicBlockedAlert'))
     }
-  }, [hasMicError, isMuted])
+  }, [hasMicError, isMuted, t])
 
   const toggleCamera = useCallback(async () => {
-    const room = roomRef.current
-    if (!room) return
-
-    // Khi đang có lỗi quyền: thử xin cấp lại quyền
-    if (hasCameraError) {
+    // 1. Thử yêu cầu lại quyền qua getUserMedia nếu đang có lỗi
+    if (
+      hasCameraError &&
+      typeof navigator !== 'undefined' &&
+      navigator.mediaDevices?.getUserMedia
+    ) {
       try {
-        await room.localParticipant.setCameraEnabled(true)
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true })
+        stream.getTracks().forEach((track) => track.stop())
         setHasCameraError(false)
         setIsCameraOff(false)
-        const camTrack = room.localParticipant.getTrackPublication(Track.Source.Camera)?.track
-        if (camTrack) setLocalVideoTrack(camTrack)
-      } catch (err) {
-        console.warn('Camera permission retry failed:', err)
+      } catch (err: unknown) {
+        console.warn('Camera permission retry failed on user click:', err)
         setHasCameraError(true)
+        toast.error(t('chat.callCameraBlockedAlert'))
+        return
       }
+    }
+
+    const room = roomRef.current
+    if (!room) {
+      // Khi đang ringing (chưa có phòng), chỉ toggle trạng thái camera UI
+      setIsCameraOff((prev) => !prev)
       return
     }
 
-    const nextState = !isCameraOff
+    // 2. Thử bật/tắt trên LiveKit participant
+    const nextState = hasCameraError ? false : !isCameraOff
     try {
       await room.localParticipant.setCameraEnabled(!nextState)
+      setHasCameraError(false)
       setIsCameraOff(nextState)
       if (nextState) {
         setLocalVideoTrack(null)
@@ -229,10 +305,12 @@ export function useLiveKitCall(): UseLiveKitCallReturn {
         if (camTrack) setLocalVideoTrack(camTrack)
       }
     } catch (err) {
-      console.warn('Failed to toggle camera:', err)
+      console.warn('Failed to toggle camera on room:', err)
       setHasCameraError(true)
+      setIsCameraOff(true)
+      toast.error(t('chat.callCameraBlockedAlert'))
     }
-  }, [hasCameraError, isCameraOff])
+  }, [hasCameraError, isCameraOff, t])
 
   const flipCamera = useCallback(async () => {
     const room = roomRef.current
