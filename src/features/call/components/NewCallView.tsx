@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { createIcon } from '@/components/icons/hugeIcon'
-import { callPath, ROUTES, type CallMedia } from '@/config/constants'
+import { ROUTES, type CallMedia } from '@/config/constants'
 import { SideNav } from '@/features/shell/components/SideNav'
 import {
   useConversationsQuery,
@@ -18,7 +18,7 @@ import { useFriends } from '@/features/friend/hooks/useFriends'
 import type { ChatUser } from '@/features/friend/types/friend.types'
 import type { Conversation } from '@/features/conversation/types/conversation.types'
 import { Avatar, SearchBox } from '@/features/friend/components/kit'
-import { useCallWindow } from '@/features/call/components/CallScreen/CallWindowProvider'
+import { openCallWindow } from '@/features/call/utils/callWindow'
 
 const ArrowLeft = createIcon(ArrowLeftData)
 const Phone = createIcon(PhoneData)
@@ -33,7 +33,6 @@ export function NewCallView() {
   const friendsQuery = useFriends()
   const conversationsQuery = useConversationsQuery()
   const createDirectChat = useCreateDirectChatMutation()
-  const callWindow = useCallWindow()
   const totalUnread = (conversationsQuery.data ?? []).reduce(
     (count, conversation) => count + conversation.unread,
     0,
@@ -59,46 +58,13 @@ export function NewCallView() {
     [conversationsQuery.data, normalizedQuery],
   )
   const startDirectCall = async (friend: ChatUser, media: CallMedia) => {
-    let conversationPromise: ReturnType<typeof createDirectChat.mutateAsync> | undefined
-    const getConversation = () => (conversationPromise ??= createDirectChat.mutateAsync(friend.id))
-    const fallback = () => {
-      void getConversation()
-        .then((conversation) =>
-          navigate(callPath(conversation.id, { media, state: 'ringing' }), {
-            state: {
-              peerName: friend.name,
-              peerAvatar: friend.avatarUrl,
-              from: ROUTES.calls,
-            },
-          }),
-        )
-        .catch((error: unknown) => {
-          toast.error(error instanceof Error ? error.message : t('chat.callsNotAvailable'))
-        })
-    }
-    const opened = callWindow.openCall(
-      {
+    try {
+      const conversation = await createDirectChat.mutateAsync(friend.id)
+      openCallWindow(conversation.id, {
         media,
+        state: 'ringing',
         peerName: friend.name,
         peerAvatar: friend.avatarUrl,
-        isGroup: false,
-      },
-      fallback,
-    )
-    if (opened) {
-      void getConversation().catch((error: unknown) => {
-        toast.error(error instanceof Error ? error.message : t('chat.callsNotAvailable'))
-      })
-      return
-    }
-    try {
-      const conversation = await getConversation()
-      navigate(callPath(conversation.id, { media, state: 'ringing' }), {
-        state: {
-          peerName: friend.name,
-          peerAvatar: friend.avatarUrl,
-          from: ROUTES.calls,
-        },
       })
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : t('common.error'))
@@ -106,27 +72,12 @@ export function NewCallView() {
   }
 
   const startGroupCall = (group: Conversation, media: CallMedia) => {
-    const fallback = () =>
-      navigate(callPath(group.id, { media, state: 'ringing' }), {
-        state: {
-          peerName: group.name,
-          peerAvatar: group.partnerAvatar,
-          from: ROUTES.calls,
-        },
-      })
-    if (
-      !callWindow.openCall(
-        {
-          conversationId: group.id,
-          media,
-          peerName: group.name,
-          peerAvatar: group.partnerAvatar,
-          isGroup: true,
-        },
-        fallback,
-      )
-    )
-      fallback()
+    openCallWindow(group.id, {
+      media,
+      state: 'ringing',
+      peerName: group.name,
+      peerAvatar: group.partnerAvatar,
+    })
   }
 
   return (

@@ -21,6 +21,7 @@ export interface UseLiveKitCallReturn {
   isPeerSpeaking: boolean
   isReconnecting: boolean
   connectionState: ConnectionState
+  requestMediaPermissions: (media: CallMedia) => Promise<void>
   connect: (serverUrl: string, token: string, media: CallMedia) => Promise<void>
   toggleMicrophone: () => Promise<void>
   toggleCamera: () => Promise<void>
@@ -95,6 +96,28 @@ export function useLiveKitCall(): UseLiveKitCallReturn {
       roomRef.current = room
     }
     return roomRef.current
+  }, [])
+
+  const requestMediaPermissions = useCallback(async (media: CallMedia) => {
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) return
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: media === 'VIDEO',
+      })
+      stream.getTracks().forEach((track) => track.stop())
+      setHasMicError(false)
+      setHasCameraError(false)
+    } catch (err: unknown) {
+      console.warn('Browser permission request error:', err)
+      const errorName = err instanceof Error ? err.name : ''
+      if (errorName === 'NotAllowedError' || errorName === 'PermissionDeniedError') {
+        setHasMicError(true)
+        if (media === 'VIDEO') {
+          setHasCameraError(true)
+        }
+      }
+    }
   }, [])
 
   const connect = useCallback(
@@ -279,6 +302,7 @@ export function useLiveKitCall(): UseLiveKitCallReturn {
     isPeerSpeaking,
     isReconnecting,
     connectionState,
+    requestMediaPermissions,
     connect,
     toggleMicrophone,
     toggleCamera,
