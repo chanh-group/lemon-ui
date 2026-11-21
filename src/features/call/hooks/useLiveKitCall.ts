@@ -257,6 +257,7 @@ export function useLiveKitCall(): UseLiveKitCallReturn {
   )
 
   const toggleMicrophone = useCallback(async () => {
+    let permissionGrantedNow = false
     // 1. Thử yêu cầu lại quyền qua getUserMedia nếu đang có lỗi
     if (hasMicError && typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
       try {
@@ -264,6 +265,7 @@ export function useLiveKitCall(): UseLiveKitCallReturn {
         stream.getTracks().forEach((track) => track.stop())
         setHasMicError(false)
         setIsMuted(false)
+        permissionGrantedNow = true
       } catch (err: unknown) {
         console.warn('Microphone permission retry failed on user click:', err)
         setHasMicError(true)
@@ -275,12 +277,14 @@ export function useLiveKitCall(): UseLiveKitCallReturn {
     const room = roomRef.current
     if (!room) {
       // Khi đang ringing (chưa có phòng), chỉ toggle trạng thái mic UI
-      setIsMuted((prev) => !prev)
+      if (!permissionGrantedNow) {
+        setIsMuted((prev) => !prev)
+      }
       return
     }
 
     // 2. Thử bật/tắt trên LiveKit participant
-    const nextState = hasMicError ? false : !isMuted
+    const nextState = permissionGrantedNow ? false : hasMicError ? false : !isMuted
     try {
       await room.localParticipant.setMicrophoneEnabled(!nextState)
       setHasMicError(false)
@@ -300,6 +304,7 @@ export function useLiveKitCall(): UseLiveKitCallReturn {
   }, [hasMicError, isMuted, t])
 
   const toggleCamera = useCallback(async () => {
+    let permissionGrantedNow = false
     // 1. Thử yêu cầu lại quyền qua getUserMedia nếu đang có lỗi
     if (
       hasCameraError &&
@@ -311,6 +316,7 @@ export function useLiveKitCall(): UseLiveKitCallReturn {
         stream.getTracks().forEach((track) => track.stop())
         setHasCameraError(false)
         setIsCameraOff(false)
+        permissionGrantedNow = true
       } catch (err: unknown) {
         console.warn('Camera permission retry failed on user click:', err)
         setHasCameraError(true)
@@ -322,12 +328,14 @@ export function useLiveKitCall(): UseLiveKitCallReturn {
     const room = roomRef.current
     if (!room) {
       // Khi đang ringing (chưa có phòng), chỉ toggle trạng thái camera UI
-      setIsCameraOff((prev) => !prev)
+      if (!permissionGrantedNow) {
+        setIsCameraOff((prev) => !prev)
+      }
       return
     }
 
     // 2. Thử bật/tắt trên LiveKit participant
-    const nextState = hasCameraError ? false : !isCameraOff
+    const nextState = permissionGrantedNow ? false : hasCameraError ? false : !isCameraOff
     try {
       await room.localParticipant.setCameraEnabled(!nextState)
       setHasCameraError(false)

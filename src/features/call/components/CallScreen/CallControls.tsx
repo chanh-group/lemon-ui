@@ -128,7 +128,7 @@ interface CallControlsProps {
   onToggleSpeaker: () => void
   onToggleCamera: () => void
   onFlipCamera: () => void
-  onChangeMedia: (media: CallMedia) => void
+  onChangeMedia?: (media: CallMedia) => void
   onEnd: () => void
   onAccept: (media: CallMedia) => void
   onDecline: () => void
@@ -148,7 +148,6 @@ export function CallControls({
   onToggleSpeaker,
   onToggleCamera,
   onFlipCamera,
-  onChangeMedia,
   onEnd,
   onAccept,
   onDecline,
@@ -191,21 +190,14 @@ export function CallControls({
           size="lg"
         />
         {media === 'video' ? (
-          <>
-            <ControlButton
-              icon={Phone}
-              label={t('chat.callAcceptVoice')}
-              onClick={() => onAccept('voice')}
-            />
-            <ControlButton
-              icon={Video}
-              label={t('chat.callAcceptVideo')}
-              onClick={() => onAccept('video')}
-              tone="accept"
-              size="lg"
-              pulse
-            />
-          </>
+          <ControlButton
+            icon={Video}
+            label={t('chat.callAcceptVideo')}
+            onClick={() => onAccept('video')}
+            tone="accept"
+            size="lg"
+            pulse
+          />
         ) : (
           <ControlButton
             icon={Phone}
@@ -240,38 +232,53 @@ export function CallControls({
     />
   )
 
-  if (phase === 'active' && media === 'video') {
+  const cameraButton = (
+    <ControlButton
+      icon={cameraOn ? Video : VideoOff}
+      label={
+        hasCameraError
+          ? t('chat.callCameraBlocked', 'Lỗi Cam')
+          : cameraOn
+            ? t('chat.callCameraOff')
+            : t('chat.callCameraOn')
+      }
+      onClick={onToggleCamera}
+      tone={cameraOn ? 'glass' : 'pressed'}
+      hasError={hasCameraError}
+      errorTooltip={t(
+        'chat.callCameraPermissionTooltip',
+        'Camera chưa được cấp quyền. Bấm để thử lại',
+      )}
+    />
+  )
+
+  const speakerButton = (
+    <ControlButton
+      icon={speakerOn ? Speaker : SpeakerOff}
+      label={speakerOn ? t('chat.callSpeakerOn') : t('chat.callSpeakerOff')}
+      onClick={onToggleSpeaker}
+      tone={speakerOn ? 'glass' : 'pressed'}
+    />
+  )
+
+  const endCallButton = (
+    <ControlButton icon={CallEnd} label={t('chat.callEnd')} onClick={onEnd} tone="danger" />
+  )
+
+  if (media === 'video') {
     return (
       <div className="flex flex-wrap items-start justify-center gap-2 sm:gap-5">
         {micButton}
-        <ControlButton
-          icon={cameraOn ? Video : VideoOff}
-          label={
-            hasCameraError
-              ? t('chat.callCameraBlocked', 'Lỗi Cam')
-              : cameraOn
-                ? t('chat.callCameraOff')
-                : t('chat.callCameraOn')
-          }
-          onClick={onToggleCamera}
-          tone={cameraOn ? 'glass' : 'pressed'}
-          hasError={hasCameraError}
-          errorTooltip={t(
-            'chat.callCameraPermissionTooltip',
-            'Camera chưa được cấp quyền. Bấm để thử lại',
-          )}
-        />
-        <ControlButton
-          icon={FlipCamera}
-          label={t('chat.callSwitchCamera')}
-          onClick={onFlipCamera}
-        />
-        <ControlButton
-          icon={Phone}
-          label={t('chat.callSwitchToVoice')}
-          onClick={() => onChangeMedia('voice')}
-        />
-        <ControlButton icon={CallEnd} label={t('chat.callEnd')} onClick={onEnd} tone="danger" />
+        {cameraButton}
+        {speakerButton}
+        {phase === 'active' && (
+          <ControlButton
+            icon={FlipCamera}
+            label={t('chat.callSwitchCamera')}
+            onClick={onFlipCamera}
+          />
+        )}
+        {endCallButton}
       </div>
     )
   }
@@ -279,18 +286,8 @@ export function CallControls({
   return (
     <div className="flex flex-wrap items-start justify-center gap-3 sm:gap-6">
       {micButton}
-      <ControlButton
-        icon={speakerOn ? Speaker : SpeakerOff}
-        label={speakerOn ? t('chat.callSpeakerOn') : t('chat.callSpeakerOff')}
-        onClick={onToggleSpeaker}
-        tone={speakerOn ? 'glass' : 'pressed'}
-      />
-      <ControlButton
-        icon={media === 'video' ? Phone : Video}
-        label={media === 'video' ? t('chat.callSwitchToVoice') : t('chat.callSwitchToVideo')}
-        onClick={() => onChangeMedia(media === 'video' ? 'voice' : 'video')}
-      />
-      <ControlButton icon={CallEnd} label={t('chat.callEnd')} onClick={onEnd} tone="danger" />
+      {speakerButton}
+      {endCallButton}
     </div>
   )
 }
