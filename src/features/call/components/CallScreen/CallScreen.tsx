@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { ArrowLeft01Icon as ArrowLeftData } from '@hugeicons/core-free-icons'
+import {
+  ArrowLeft01Icon as ArrowLeftData,
+  Mic01Icon as MicData,
+  Video01Icon as VideoData,
+} from '@hugeicons/core-free-icons'
 import { toast } from 'sonner'
 import { createIcon } from '@/components/icons/hugeIcon'
 import { ROUTES, type CallEndReason, type CallMedia, type CallPhase } from '@/config/constants'
@@ -26,6 +30,8 @@ import type { CallPreview } from './types'
 import { formatCallDuration } from './utils'
 
 const ArrowLeft = createIcon(ArrowLeftData)
+const Mic = createIcon(MicData)
+const Video = createIcon(VideoData)
 
 function parseMedia(value: string | null): CallMedia {
   return value === 'video' ? 'video' : 'voice'
@@ -69,6 +75,14 @@ export function CallScreen({
   const [seconds, setSeconds] = useState(0)
   const [finalSeconds, setFinalSeconds] = useState(0)
   const [speakerOn, setSpeakerOn] = useState(true)
+
+  type PermissionGateState = 'checking' | 'prompt_needed' | 'granted' | 'denied'
+  const [permissionState, setPermissionState] = useState<PermissionGateState>(
+    previewCall ? 'granted' : 'checking',
+  )
+  const [permissionErrorKind, setPermissionErrorKind] = useState<'denied' | 'not_found' | null>(
+    null,
+  )
 
   const stopDialingSoundRef = useRef<(() => void) | null>(null)
   const hasInitiatedRef = useRef(false)
@@ -134,7 +148,7 @@ export function CallScreen({
     }
 
     // Nếu đang chạy trong cửa sổ riêng biệt được mở bởi window.open -> Đóng cửa sổ
-    if (typeof window !== 'undefined' && window.opener) {
+    if (typeof window !== 'undefined' && (window.opener || window.history.length <= 1)) {
       window.close()
       return
     }
@@ -142,9 +156,109 @@ export function CallScreen({
     navigate(ROUTES.messages)
   }, [conversationId, livekit, onPreviewClose, previewCall, stopDialing, navigate])
 
-  // Caller: Khởi tạo cuộc gọi duy nhất 1 lần khi màn hình mở ở trạng thái ringing
+  const handleGrantPermission = useCallback(async () => {
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+      setPermissionState('granted')
+      return
+    }
+
+    try {
+      const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      audioStream.getTracks().forEach((track) => track.stop())
+
+      if (media === 'video') {
+        try {
+          const videoStream = await navigator.mediaDevices.getUserMedia({ video: true })
+          videoStream.getTracks().forEach((track) => track.stop())
+        } catch (camErr) {
+          console.warn('Camera request error during permission gate:', camErr)
+        }
+      }
+
+      setPermissionState('granted')
+    } catch (err: unknown) {
+      console.warn('handleGrantPermission error:', err)
+      const errorName = err instanceof Error ? err.name : ''
+      if (errorName === 'NotFoundError' || errorName === 'DevicesNotFoundError') {
+        setPermissionErrorKind('not_found')
+        setPermissionState('denied')
+      } else {
+        setPermissionErrorKind('denied')
+        setPermissionState('denied')
+      }
+    }
+  }, [media])
+
+  // Kiểm tra và yêu cầu quyền trước khi màn hình cuộc gọi được render
   useEffect(() => {
-    if (hasInitiatedRef.current || previewCall) return
+    if (previewCall) return
+    let isCancelled = false
+
+    const checkAndPrompt = async () => {
+      if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+        if (!isCancelled) setPermissionState('granted')
+        return
+      }
+
+      // 1. Kiểm tra trạng thái hiện tại qua Permissions API nếu hỗ trợ
+      if (navigator.permissions && navigator.permissions.query) {
+        try {
+          const micStatus = await navigator.permissions.query({
+            name: 'microphone' as PermissionName,
+          })
+          if (micStatus.state === 'granted') {
+            if (!isCancelled) setPermissionState('granted')
+            return
+          }
+          if (micStatus.state === 'denied') {
+            if (!isCancelled) {
+              setPermissionErrorKind('denied')
+              setPermissionState('denied')
+            }
+            return
+          }
+        } catch {
+          // Permissions query không hỗ trợ microphone
+        }
+      }
+
+      // 2. Thử tự động yêu cầu quyền để hiện popup trình duyệt
+      try {
+        const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true })
+        audioStream.getTracks().forEach((track) => track.stop())
+
+        if (media === 'video') {
+          try {
+            const videoStream = await navigator.mediaDevices.getUserMedia({ video: true })
+            videoStream.getTracks().forEach((track) => track.stop())
+          } catch {
+            // Camera không có hoặc bị từ chối, audio đã cấp quyền
+          }
+        }
+
+        if (!isCancelled) setPermissionState('granted')
+      } catch (err: unknown) {
+        if (isCancelled) return
+        const errorName = err instanceof Error ? err.name : ''
+        if (errorName === 'NotFoundError' || errorName === 'DevicesNotFoundError') {
+          setPermissionErrorKind('not_found')
+          setPermissionState('denied')
+        } else {
+          // Trình duyệt chưa cấp quyền hoặc cần tương tác click: hiển thị màn hình bấm nút
+          setPermissionState('prompt_needed')
+        }
+      }
+    }
+
+    void checkAndPrompt()
+    return () => {
+      isCancelled = true
+    }
+  }, [media, previewCall])
+
+  // Caller: Khởi tạo cuộc gọi duy nhất 1 lần khi màn hình mở ở trạng thái ringing VÀ ĐÃ CẤP QUYỀN
+  useEffect(() => {
+    if (hasInitiatedRef.current || previewCall || permissionState !== 'granted') return
     const stateParam = searchParams.get('state')
     if (stateParam === 'ringing' && conversationId) {
       hasInitiatedRef.current = true
@@ -173,11 +287,11 @@ export function CallScreen({
 
       void run()
     }
-  }, [conversationId, livekit, media, previewCall, searchParams, t])
+  }, [conversationId, livekit, media, permissionState, previewCall, searchParams, t])
 
-  // Callee: Chấp nhận cuộc gọi duy nhất 1 lần khi màn hình mở ở trạng thái active có callId
+  // Callee: Chấp nhận cuộc gọi duy nhất 1 lần khi màn hình mở ở trạng thái active có callId VÀ ĐÃ CẤP QUYỀN
   useEffect(() => {
-    if (hasAcceptedRef.current || previewCall) return
+    if (hasAcceptedRef.current || previewCall || permissionState !== 'granted') return
     const stateParam = searchParams.get('state')
     const callId = searchParams.get('callId')
 
@@ -223,7 +337,7 @@ export function CallScreen({
 
       void run()
     }
-  }, [conversationId, livekit, media, previewCall, searchParams, t])
+  }, [conversationId, livekit, media, permissionState, previewCall, searchParams, t])
 
   // Lắng nghe các sự kiện Socket.IO trong cửa sổ đàm thoại
   useEffect(() => {
@@ -406,6 +520,124 @@ export function CallScreen({
   if (!conversationId && !previewCall) {
     return (
       <CallErrorScreen title={t('chat.callNotFound')} onClose={() => navigate(ROUTES.messages)} />
+    )
+  }
+
+  // Màn hình kiểm tra & cấp quyền thiết bị trước khi render màn hình đàm thoại
+  if (permissionState === 'checking') {
+    return (
+      <main className="relative flex h-dvh w-full flex-col items-center justify-center overflow-hidden bg-[#07120c] text-white">
+        <CallBackdrop />
+        <div className="relative z-10 flex flex-col items-center gap-4 text-center">
+          <span className="size-10 animate-spin rounded-full border-3 border-white/20 border-t-primary" />
+          <p className="text-sm font-medium text-white/70">
+            {t('chat.callCheckingPermissions', 'Đang kiểm tra thiết bị…')}
+          </p>
+        </div>
+      </main>
+    )
+  }
+
+  if (permissionState === 'prompt_needed') {
+    return (
+      <main className="relative flex h-dvh w-full flex-col items-center justify-center p-6 overflow-hidden bg-[#07120c] text-white">
+        <CallBackdrop />
+        <div className="relative z-10 flex w-full max-w-md flex-col items-center rounded-3xl border border-white/15 bg-black/40 p-8 text-center shadow-2xl backdrop-blur-2xl animate-scale-in">
+          <div className="relative mb-6">
+            <span className="absolute inset-0 rounded-full bg-primary/20 animate-pulse-ring" />
+            <div className="relative grid size-20 place-items-center rounded-full bg-primary/10 ring-2 ring-primary/40 text-primary">
+              {media === 'video' ? <Video className="size-10" /> : <Mic className="size-10" />}
+            </div>
+          </div>
+
+          <h2 className="text-xl font-bold tracking-tight text-white">
+            {media === 'video'
+              ? t('chat.callPermissionGateVideoTitle', 'Cần quyền Microphone & Camera')
+              : t('chat.callPermissionGateVoiceTitle', 'Cần quyền Microphone')}
+          </h2>
+
+          <p className="mt-2 text-sm text-white/70">
+            {media === 'video'
+              ? t(
+                  'chat.callPermissionGateVideoDesc',
+                  'Để tham gia cuộc gọi video với {{name}}, vui lòng cấp quyền Microphone và Camera.',
+                  { name },
+                )
+              : t(
+                  'chat.callPermissionGateVoiceDesc',
+                  'Để tham gia cuộc gọi thoại với {{name}}, vui lòng cấp quyền Microphone để đối phương có thể nghe thấy bạn.',
+                  { name },
+                )}
+          </p>
+
+          <div className="mt-8 flex w-full flex-col gap-3">
+            <button
+              type="button"
+              onClick={handleGrantPermission}
+              className="inline-flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-2xl bg-primary px-6 text-sm font-bold text-primary-foreground shadow-[0_10px_35px_-10px_rgba(0,230,118,0.8)] transition-all hover:brightness-105 active:scale-[0.98]"
+            >
+              {media === 'video' ? <Video className="size-5" /> : <Mic className="size-5" />}
+              {t('chat.callGrantPermissionButton', 'Bật quyền & Bắt đầu cuộc gọi')}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleClose}
+              className="inline-flex h-11 w-full cursor-pointer items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-sm font-medium text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+            >
+              {t('chat.callCancel', 'Hủy')}
+            </button>
+          </div>
+        </div>
+      </main>
+    )
+  }
+
+  if (permissionState === 'denied') {
+    return (
+      <main className="relative flex h-dvh w-full flex-col items-center justify-center p-6 overflow-hidden bg-[#07120c] text-white">
+        <CallBackdrop />
+        <div className="relative z-10 flex w-full max-w-md flex-col items-center rounded-3xl border border-amber-500/25 bg-black/50 p-8 text-center shadow-2xl backdrop-blur-2xl animate-scale-in">
+          <div className="mb-4 grid size-16 place-items-center rounded-full bg-amber-500/20 text-amber-400 ring-2 ring-amber-400/50">
+            <span className="text-2xl font-bold">!</span>
+          </div>
+
+          <h2 className="text-xl font-bold tracking-tight text-white">
+            {permissionErrorKind === 'not_found'
+              ? t('chat.callDeviceNotFoundTitle', 'Không tìm thấy thiết bị Microphone/Camera')
+              : t('chat.callDeviceBlockedTitle', 'Quyền truy cập Microphone đang bị chặn')}
+          </h2>
+
+          <p className="mt-2 text-xs leading-relaxed text-white/75">
+            {permissionErrorKind === 'not_found'
+              ? t(
+                  'chat.callDeviceNotFoundDesc',
+                  'Máy tính của bạn chưa kết nối micro hoặc tai nghe. Vui lòng cắm thiết bị vào máy tính rồi nhấn Thử lại.',
+                )
+              : t(
+                  'chat.callDeviceBlockedDesc',
+                  'Opera GX đang chặn quyền Microphone của trang này. Vui lòng nhấn vào biểu tượng ổ khóa 🔒 trên thanh địa chỉ, chuyển Microphone sang Cho phép (Allow), sau đó nhấn Thử lại.',
+                )}
+          </p>
+
+          <div className="mt-6 flex w-full flex-col gap-2.5">
+            <button
+              type="button"
+              onClick={handleGrantPermission}
+              className="inline-flex h-11 w-full cursor-pointer items-center justify-center rounded-2xl bg-amber-500 px-6 text-sm font-bold text-slate-950 shadow transition hover:bg-amber-400 active:scale-[0.98]"
+            >
+              {t('chat.callRetryPermission', 'Thử lại')}
+            </button>
+            <button
+              type="button"
+              onClick={handleClose}
+              className="inline-flex h-11 w-full cursor-pointer items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-sm font-medium text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+            >
+              {t('chat.callClose', 'Đóng')}
+            </button>
+          </div>
+        </div>
+      </main>
     )
   }
 

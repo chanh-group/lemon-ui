@@ -107,14 +107,6 @@ export function CallProvider({ children }: { children: ReactNode }) {
       peerAvatar?: string | null
     }) => {
       const uiMedia = toUiMedia(media)
-      // Yêu cầu quyền sơ bộ trên user gesture của cửa sổ chính khi Caller bấm gọi
-      if (typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
-        navigator.mediaDevices
-          .getUserMedia({ audio: true, video: uiMedia === 'video' })
-          .then((stream) => stream.getTracks().forEach((t) => t.stop()))
-          .catch((err) => console.warn('Pre-call permission check on initiate click:', err))
-      }
-
       openCallWindow(
         conversationId,
         {
@@ -151,14 +143,6 @@ export function CallProvider({ children }: { children: ReactNode }) {
       setIncomingCall(null)
 
       // Mở hẳn cửa sổ mới cho cuộc gọi
-      // Yêu cầu quyền sơ bộ trên user gesture của cửa sổ chính khi Caller bấm gọi
-      if (typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
-        navigator.mediaDevices
-          .getUserMedia({ audio: true, video: uiMedia === 'video' })
-          .then((stream) => stream.getTracks().forEach((t) => t.stop()))
-          .catch((err) => console.warn('Pre-call permission check on initiate click:', err))
-      }
-
       openCallWindow(
         convId,
         {

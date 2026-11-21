@@ -10,7 +10,7 @@ describe('openCallWindow', () => {
   })
 
   it('never appends peerAvatar to URL search params to avoid HTTP 431', () => {
-    const mockOpen = vi.fn().mockReturnValue({ focus: vi.fn() })
+    const mockOpen = vi.fn().mockReturnValue({ focus: vi.fn(), closed: false })
     vi.stubGlobal('open', mockOpen)
 
     const largeDataUrl = 'data:image/png;base64,' + 'A'.repeat(5000)
@@ -34,5 +34,24 @@ describe('openCallWindow', () => {
     const stored = JSON.parse(window.localStorage.getItem('lemon_call_peer_conv-123') || '{}')
     expect(stored.peerAvatar).toBe(largeDataUrl)
     expect(stored.peerName).toBe('Lemon User')
+  })
+
+  it('calls onPopupBlocked when popup window is blocked by browser', () => {
+    const mockOpen = vi.fn().mockReturnValue(null)
+    vi.stubGlobal('open', mockOpen)
+    const onBlocked = vi.fn()
+
+    const win = openCallWindow(
+      'conv-456',
+      {
+        media: 'voice',
+        state: 'ringing',
+      },
+      onBlocked,
+    )
+
+    expect(mockOpen).toHaveBeenCalledTimes(1)
+    expect(onBlocked).toHaveBeenCalledTimes(1)
+    expect(win).toBeNull()
   })
 })
