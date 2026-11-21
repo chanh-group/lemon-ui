@@ -109,7 +109,10 @@ export function VideoCallStage({
 
           <div className="relative z-10 flex h-full flex-col items-center justify-center px-6 pt-24 pb-46 text-center sm:pb-52">
             <div className="relative">
-              <span aria-hidden="true" className="absolute inset-0 rounded-full bg-white/5 blur-2xl" />
+              <span
+                aria-hidden="true"
+                className="absolute inset-0 rounded-full bg-white/5 blur-2xl"
+              />
               <UserAvatar
                 name={name}
                 src={avatarUrl}

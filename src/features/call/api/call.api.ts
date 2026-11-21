@@ -11,7 +11,10 @@ import type {
 
 export const callApi = {
   /** Khởi tạo cuộc gọi thoại / video mới */
-  initiateCall: async (data: { conversationId: string; media: CallMedia }): Promise<InitiateCallResponse> => {
+  initiateCall: async (data: {
+    conversationId: string
+    media: CallMedia
+  }): Promise<InitiateCallResponse> => {
     const res = await api.post<InitiateCallResponse>('/calls', data)
     return res.data
   },
@@ -55,7 +58,9 @@ export const callApi = {
     conversationId: string,
     params?: { cursor?: string; limit?: number },
   ): Promise<CallListResponse> => {
-    const res = await api.get<CallListResponse>(`/conversations/${conversationId}/calls`, { params })
+    const res = await api.get<CallListResponse>(`/conversations/${conversationId}/calls`, {
+      params,
+    })
     return res.data
   },
 

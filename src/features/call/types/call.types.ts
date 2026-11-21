@@ -116,13 +116,7 @@ export interface CallUserReconnectedPayload {
   userId: string
 }
 
-export type CallClientPhase =
-  | 'idle'
-  | 'outgoing'
-  | 'incoming'
-  | 'active'
-  | 'reconnecting'
-  | 'ended'
+export type CallClientPhase = 'idle' | 'outgoing' | 'incoming' | 'active' | 'reconnecting' | 'ended'
 
 export function toApiMedia(media: 'voice' | 'video' | CallMedia): CallMedia {
   return media.toUpperCase() === 'VIDEO' ? 'VIDEO' : 'VOICE'

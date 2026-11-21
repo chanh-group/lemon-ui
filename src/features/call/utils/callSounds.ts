@@ -7,7 +7,9 @@ let sharedAudioContext: AudioContext | null = null
 
 function getAudioContext(): AudioContext | null {
   if (typeof window === 'undefined') return null
-  const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+  const AudioContextClass =
+    window.AudioContext ||
+    (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
   if (!AudioContextClass) return null
   if (!sharedAudioContext || sharedAudioContext.state === 'closed') {
     sharedAudioContext = new AudioContextClass()
@@ -104,12 +106,12 @@ export function playIncomingRingtone(): () => void {
   let timeoutId: number | null = null
 
   const notes = [
-    { freq: 523.25, time: 0 },    // C5
+    { freq: 523.25, time: 0 }, // C5
     { freq: 659.25, time: 0.18 }, // E5
     { freq: 783.99, time: 0.36 }, // G5
     { freq: 1046.5, time: 0.54 }, // C6
-    { freq: 783.99, time: 0.8 },  // G5
-    { freq: 1046.5, time: 1.0 },  // C6
+    { freq: 783.99, time: 0.8 }, // G5
+    { freq: 1046.5, time: 1.0 }, // C6
   ]
 
   const scheduleMelody = () => {
@@ -161,8 +163,8 @@ export function playConnectedTone(): void {
   try {
     const now = ctx.currentTime
     const tones = [
-      { freq: 587.33, time: 0, duration: 0.12 },    // D5
-      { freq: 880.0, time: 0.12, duration: 0.2 },   // A5
+      { freq: 587.33, time: 0, duration: 0.12 }, // D5
+      { freq: 880.0, time: 0.12, duration: 0.2 }, // A5
     ]
 
     for (const tone of tones) {

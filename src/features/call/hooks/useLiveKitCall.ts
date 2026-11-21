@@ -134,9 +134,7 @@ export function useLiveKitCall(): UseLiveKitCallReturn {
         await room.localParticipant.setMicrophoneEnabled(true)
         setHasMicError(false)
         setIsMuted(false)
-        const micTrack = room.localParticipant.getTrackPublication(
-          Track.Source.Microphone,
-        )?.track
+        const micTrack = room.localParticipant.getTrackPublication(Track.Source.Microphone)?.track
         if (micTrack) setLocalAudioTrack(micTrack)
       } catch (err) {
         console.warn('Microphone permission or hardware error:', err)
@@ -151,9 +149,7 @@ export function useLiveKitCall(): UseLiveKitCallReturn {
           await room.localParticipant.setCameraEnabled(true)
           setHasCameraError(false)
           setIsCameraOff(false)
-          const camTrack = room.localParticipant.getTrackPublication(
-            Track.Source.Camera,
-          )?.track
+          const camTrack = room.localParticipant.getTrackPublication(Track.Source.Camera)?.track
           if (camTrack) setLocalVideoTrack(camTrack)
         } catch (err) {
           console.warn('Camera permission or hardware error:', err)
@@ -178,9 +174,7 @@ export function useLiveKitCall(): UseLiveKitCallReturn {
         await room.localParticipant.setMicrophoneEnabled(true)
         setHasMicError(false)
         setIsMuted(false)
-        const micTrack = room.localParticipant.getTrackPublication(
-          Track.Source.Microphone,
-        )?.track
+        const micTrack = room.localParticipant.getTrackPublication(Track.Source.Microphone)?.track
         if (micTrack) setLocalAudioTrack(micTrack)
       } catch (err) {
         console.warn('Microphone permission retry failed:', err)
@@ -196,9 +190,7 @@ export function useLiveKitCall(): UseLiveKitCallReturn {
       if (nextState) {
         setLocalAudioTrack(null)
       } else {
-        const micTrack = room.localParticipant.getTrackPublication(
-          Track.Source.Microphone,
-        )?.track
+        const micTrack = room.localParticipant.getTrackPublication(Track.Source.Microphone)?.track
         if (micTrack) setLocalAudioTrack(micTrack)
       }
     } catch (err) {
@@ -217,9 +209,7 @@ export function useLiveKitCall(): UseLiveKitCallReturn {
         await room.localParticipant.setCameraEnabled(true)
         setHasCameraError(false)
         setIsCameraOff(false)
-        const camTrack = room.localParticipant.getTrackPublication(
-          Track.Source.Camera,
-        )?.track
+        const camTrack = room.localParticipant.getTrackPublication(Track.Source.Camera)?.track
         if (camTrack) setLocalVideoTrack(camTrack)
       } catch (err) {
         console.warn('Camera permission retry failed:', err)
@@ -235,9 +225,7 @@ export function useLiveKitCall(): UseLiveKitCallReturn {
       if (nextState) {
         setLocalVideoTrack(null)
       } else {
-        const camTrack = room.localParticipant.getTrackPublication(
-          Track.Source.Camera,
-        )?.track
+        const camTrack = room.localParticipant.getTrackPublication(Track.Source.Camera)?.track
         if (camTrack) setLocalVideoTrack(camTrack)
       }
     } catch (err) {

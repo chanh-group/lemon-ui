@@ -75,9 +75,7 @@ export function IncomingCallModal() {
             >
               <CallEnd className="size-6" aria-hidden="true" />
             </button>
-            <span className="text-[11px] font-medium text-white/60">
-              {t('chat.callDecline')}
-            </span>
+            <span className="text-[11px] font-medium text-white/60">{t('chat.callDecline')}</span>
           </div>
 
           {/* Nếu là Video Call, cho phép nhận bằng Voice hoặc Video */}
@@ -121,9 +119,7 @@ export function IncomingCallModal() {
               >
                 <Phone className="size-6" aria-hidden="true" />
               </button>
-              <span className="text-[11px] font-medium text-white/60">
-                {t('chat.callAccept')}
-              </span>
+              <span className="text-[11px] font-medium text-white/60">{t('chat.callAccept')}</span>
             </div>
           )}
         </div>
