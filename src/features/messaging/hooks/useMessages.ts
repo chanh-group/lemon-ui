@@ -436,6 +436,8 @@ export function useSendMessageMutation(conversationId: string | null) {
           const mimeType = pf.file.type || 'application/octet-stream'
           const kindRaw = getKindFromMime(mimeType, pf.file.name)
           const kind = kindRaw.replace('CHAT_', '') as 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE'
+          // Media (video/audio) không dùng blob URL cho tin optimistic: blob bị
+          // revoke khi xác nhận còn <video> ảo hóa có thể fetch dở → ERR_FILE_NOT_FOUND.
           const previewUrl =
             pf.previewUrl || (isImage(mimeType, pf.file.name) ? URL.createObjectURL(pf.file) : '')
           if (previewUrl && !pf.previewUrl) pf.previewUrl = previewUrl

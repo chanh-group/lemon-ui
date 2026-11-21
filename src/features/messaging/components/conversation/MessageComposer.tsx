@@ -12,7 +12,6 @@ import { createIcon } from '@/components/icons/hugeIcon'
 import { toast } from 'sonner'
 import type { MessageAttachmentInput } from '@/features/messaging/types/message.types'
 import { formatBytes, isImage } from '@/features/file/utils/fileTypes'
-import { compressVideoIfNeeded } from '@/features/file/utils/videoCompressor'
 import { generateUUID } from '@/lib/utils'
 import { getConversationDraft, setConversationDraft } from '@/features/messaging/utils/draftStore'
 
@@ -46,7 +45,6 @@ export interface PendingFile {
   clientMsgId?: string
   previewUrl?: string
   durationMs?: number
-  isCompressing?: boolean
   uploadedAttachment?: MessageAttachmentInput
 }
 
@@ -240,11 +238,10 @@ export function MessageComposer({
     }
   }
 
-  const processFiles = async (files: File[]) => {
+  const processFiles = (files: File[]) => {
     if (files.length === 0) return
 
     for (const rawFile of files) {
-      let fileToUse = rawFile
       const fileId = generateUUID()
 
       // Kiểm tra file thực thi độc hại
@@ -253,47 +250,31 @@ export function MessageComposer({
         continue
       }
 
-      // Xử lý nén nếu là video
-      if (rawFile.type.startsWith('video/')) {
-        try {
-          if (rawFile.size > 15 * 1024 * 1024) {
-            toast.info(t('chat.optimizingVideo', { name: rawFile.name }))
-          }
-          const compressed = await compressVideoIfNeeded(rawFile, { maxSizeBytes: MAX_FILE_SIZE })
-          if (compressed instanceof File) {
-            fileToUse = compressed
-          }
-        } catch (err) {
-          toast.error(err instanceof Error ? err.message : t('chat.videoCompressionFailed'))
-          continue
-        }
-      }
-
-      if (fileToUse.size > MAX_FILE_SIZE) {
+      if (rawFile.size > MAX_FILE_SIZE) {
         toast.error(
           t('chat.fileTooLarge', {
-            fileName: fileToUse.name,
-            fileSize: formatBytes(fileToUse.size),
+            fileName: rawFile.name,
+            fileSize: formatBytes(rawFile.size),
           }),
         )
         continue
       }
 
-      const previewUrl = isImage(fileToUse.type, fileToUse.name)
-        ? URL.createObjectURL(fileToUse)
+      const previewUrl = isImage(rawFile.type, rawFile.name)
+        ? URL.createObjectURL(rawFile)
         : undefined
 
-      setPendingFiles((prev) => [...prev, { id: fileId, file: fileToUse, previewUrl }])
+      setPendingFiles((prev) => [...prev, { id: fileId, file: rawFile, previewUrl }])
     }
   }
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
-    await processFiles(files)
+    processFiles(files)
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
-  const handlePaste = async (e: React.ClipboardEvent<HTMLInputElement>) => {
+  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
     const clipboardFiles = e.clipboardData?.files
     if (clipboardFiles && clipboardFiles.length > 0) {
       const filesToAdd: File[] = []
@@ -303,17 +284,17 @@ export function MessageComposer({
       }
       if (filesToAdd.length > 0) {
         e.preventDefault()
-        await processFiles(filesToAdd)
+        processFiles(filesToAdd)
       }
     }
   }
 
-  const handleDrop = async (e: React.DragEvent) => {
+  const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
     e.stopPropagation()
     const droppedFiles = Array.from(e.dataTransfer.files || [])
     if (droppedFiles.length > 0) {
-      await processFiles(droppedFiles)
+      processFiles(droppedFiles)
     }
   }
 

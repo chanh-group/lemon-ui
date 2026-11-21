@@ -239,7 +239,9 @@ export function AttachmentBubble({
     }
   }
 
-  if (isImg) {
+  const src = attachment.previewUrl || attachment.downloadUrl
+
+  if (isImg && src) {
     return (
       <div
         className={cn(
@@ -248,7 +250,7 @@ export function AttachmentBubble({
         )}
       >
         <img
-          src={attachment.previewUrl || attachment.downloadUrl}
+          src={src}
           alt={attachment.fileName}
           onClick={handleCardClick}
           loading="lazy"
@@ -258,8 +260,7 @@ export function AttachmentBubble({
     )
   }
 
-  if (isAud) {
-    const src = attachment.previewUrl || attachment.downloadUrl
+  if (isAud && src) {
     return (
       <div
         className={cn(
@@ -277,7 +278,7 @@ export function AttachmentBubble({
     )
   }
 
-  if (isVid) {
+  if (isVid && src) {
     return (
       <div
         className={cn(
@@ -285,13 +286,7 @@ export function AttachmentBubble({
           hasCaption ? 'rounded-t-2xl' : 'rounded-2xl',
         )}
       >
-        <video
-          src={attachment.previewUrl || attachment.downloadUrl}
-          controls
-          playsInline
-          preload="metadata"
-          className="max-h-72 w-full"
-        />
+        <video src={src} controls playsInline preload="metadata" className="max-h-72 w-full" />
         {onOpenLightbox && (
           <button
             type="button"

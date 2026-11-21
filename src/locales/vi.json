@@ -440,8 +440,6 @@
     "uploadFailed": "Tải tệp lên thất bại. Vui lòng thử lại.",
     "fileTooLarge": "Tệp “{{fileName}}” vượt quá giới hạn 25MB ({{fileSize}}).",
     "fileTypeNotAllowed": "Tệp “{{fileName}}” không được phép gửi vì lý do an toàn.",
-    "optimizingVideo": "Đang tối ưu dung lượng video “{{name}}”…",
-    "videoCompressionFailed": "Không thể nén video.",
     "replyStoryPlaceholder": "Nhắn tin cho {{name}}…",
     "replyStorySuccess": "Đã gửi phản hồi vào cuộc trò chuyện 1:1",
     "replyStoryError": "Không thể gửi phản hồi",
