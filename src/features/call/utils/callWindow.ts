@@ -45,11 +45,27 @@ export function openCallWindow(
     url.searchParams.set('peerName', options.peerName.slice(0, 60))
   }
 
-  // Cửa sổ nổi chuyên dụng cho cuộc gọi: dùng chuẩn popup flag để hiển thị thanh địa chỉ và quyền thiết bị
-  const windowFeatures = 'popup,width=1080,height=720,resizable=yes'
-  const windowName = `LemonCall_${conversationId}`
+  // Cửa sổ nổi chuyên dụng cho cuộc gọi: mở cửa sổ mới độc lập thay vì tab mới.
+  // popup=yes bắt buộc Chromium / Opera GX mở một standalone popup window (không có thanh tab).
+  // TUYỆT ĐỐI không thêm menubar=yes hoặc toolbar=yes vì sẽ khiến Opera GX xếp vào tab mới.
+  const width = 1080
+  const height = 720
+  const screenLeft = window.screenLeft ?? window.screenX ?? 0
+  const screenTop = window.screenTop ?? window.screenY ?? 0
+  const screenWidth = window.innerWidth || window.screen.width
+  const screenHeight = window.innerHeight || window.screen.height
+  const left = Math.max(0, Math.round(screenLeft + (screenWidth - width) / 2))
+  const top = Math.max(0, Math.round(screenTop + (screenHeight - height) / 2))
 
-  const win = window.open(url.toString(), windowName, windowFeatures)
+  const windowFeatures = `popup=yes,width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
+
+  let win: Window | null = null
+  try {
+    win = window.open(url.toString(), '_blank', windowFeatures)
+  } catch {
+    win = null
+  }
+
   if (!win) {
     onPopupBlocked?.()
     return null

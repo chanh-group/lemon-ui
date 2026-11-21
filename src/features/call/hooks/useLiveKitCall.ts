@@ -31,6 +31,40 @@ export interface UseLiveKitCallReturn {
   disconnect: () => void
 }
 
+function getMediaErrorMessage(
+  err: unknown,
+  kind: 'audio' | 'video',
+  t: (key: string, optionsOrFallback?: any) => string,
+): string {
+  const errorName = err instanceof Error ? err.name : ''
+  if (errorName === 'NotFoundError' || errorName === 'DevicesNotFoundError') {
+    return kind === 'audio'
+      ? t(
+          'chat.callMicNotFoundAlert',
+          'Không tìm thấy thiết bị Microphone trên máy tính. Vui lòng cắm tai nghe hoặc microphone.',
+        )
+      : t(
+          'chat.callCameraNotFoundAlert',
+          'Không tìm thấy thiết bị Camera trên máy tính. Vui lòng kết nối webcam.',
+        )
+  }
+  if (errorName === 'NotReadableError' || errorName === 'TrackStartError') {
+    return t(
+      'chat.callDeviceInUseAlert',
+      'Thiết bị đang bị ứng dụng khác sử dụng. Vui lòng đóng các ứng dụng đang dùng mic/camera và thử lại.',
+    )
+  }
+  return kind === 'audio'
+    ? t(
+        'chat.callMicBlockedAlert',
+        'Microphone đang bị chặn trong trình duyệt. Vui lòng bấm vào biểu tượng cài đặt/ổ khóa trên thanh địa chỉ để Bật quyền.',
+      )
+    : t(
+        'chat.callCameraBlockedAlert',
+        'Camera đang bị chặn trong trình duyệt. Vui lòng bấm vào biểu tượng cài đặt/ổ khóa trên thanh địa chỉ để Bật quyền.',
+      )
+}
+
 export function useLiveKitCall(): UseLiveKitCallReturn {
   const { t } = useTranslation()
   const roomRef = useRef<Room | null>(null)
@@ -233,7 +267,7 @@ export function useLiveKitCall(): UseLiveKitCallReturn {
       } catch (err: unknown) {
         console.warn('Microphone permission retry failed on user click:', err)
         setHasMicError(true)
-        toast.error(t('chat.callMicBlockedAlert'))
+        toast.error(getMediaErrorMessage(err, 'audio', t))
         return
       }
     }
@@ -280,7 +314,7 @@ export function useLiveKitCall(): UseLiveKitCallReturn {
       } catch (err: unknown) {
         console.warn('Camera permission retry failed on user click:', err)
         setHasCameraError(true)
-        toast.error(t('chat.callCameraBlockedAlert'))
+        toast.error(getMediaErrorMessage(err, 'video', t))
         return
       }
     }
