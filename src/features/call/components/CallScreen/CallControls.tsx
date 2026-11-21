@@ -223,11 +223,20 @@ export function CallControls({
   const micButton = (
     <ControlButton
       icon={muted ? MicOff : Mic}
-      label={hasMicError ? t('chat.callMicBlocked', 'Lỗi Mic') : muted ? t('chat.callUnmute') : t('chat.callMute')}
+      label={
+        hasMicError
+          ? t('chat.callMicBlocked', 'Lỗi Mic')
+          : muted
+            ? t('chat.callUnmute')
+            : t('chat.callMute')
+      }
       onClick={onToggleMute}
       tone={muted ? 'pressed' : 'glass'}
       hasError={hasMicError}
-      errorTooltip={t('chat.callMicPermissionTooltip', 'Microphone chưa được cấp quyền. Bấm để thử lại')}
+      errorTooltip={t(
+        'chat.callMicPermissionTooltip',
+        'Microphone chưa được cấp quyền. Bấm để thử lại',
+      )}
     />
   )
 
@@ -247,7 +256,10 @@ export function CallControls({
           onClick={onToggleCamera}
           tone={cameraOn ? 'glass' : 'pressed'}
           hasError={hasCameraError}
-          errorTooltip={t('chat.callCameraPermissionTooltip', 'Camera chưa được cấp quyền. Bấm để thử lại')}
+          errorTooltip={t(
+            'chat.callCameraPermissionTooltip',
+            'Camera chưa được cấp quyền. Bấm để thử lại',
+          )}
         />
         <ControlButton
           icon={FlipCamera}

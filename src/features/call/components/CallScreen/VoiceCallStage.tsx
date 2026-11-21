@@ -179,11 +179,11 @@ export function VoiceCallStage({
                 key={index}
                 className={cn(
                   'w-1.5 rounded-full transition-all duration-150',
-                  isPeerSpeaking
-                    ? 'bg-emerald-400 animate-call-eq'
-                    : 'bg-primary/40 h-2',
+                  isPeerSpeaking ? 'bg-emerald-400 animate-call-eq' : 'bg-primary/40 h-2',
                 )}
-                style={isPeerSpeaking ? { height: bar.height, animationDelay: bar.delay } : undefined}
+                style={
+                  isPeerSpeaking ? { height: bar.height, animationDelay: bar.delay } : undefined
+                }
               />
             ))}
           </div>

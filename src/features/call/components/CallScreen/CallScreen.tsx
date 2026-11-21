@@ -4,23 +4,14 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ArrowLeft01Icon as ArrowLeftData } from '@hugeicons/core-free-icons'
 import { toast } from 'sonner'
 import { createIcon } from '@/components/icons/hugeIcon'
-import {
-  ROUTES,
-  type CallEndReason,
-  type CallMedia,
-  type CallPhase,
-} from '@/config/constants'
+import { ROUTES, type CallEndReason, type CallMedia, type CallPhase } from '@/config/constants'
 import { useAuth } from '@/features/auth/api'
 import { useConversationQuery } from '@/features/conversation/hooks/useConversations'
 import { getChatSocket } from '@/lib/socket'
 import { cn } from '@/lib/utils'
 import { callApi } from '../../api/call.api'
 import { useLiveKitCall } from '../../hooks/useLiveKitCall'
-import {
-  playConnectedTone,
-  playHangupTone,
-  playOutgoingDialingSound,
-} from '../../utils/callSounds'
+import { playConnectedTone, playHangupTone, playOutgoingDialingSound } from '../../utils/callSounds'
 import type {
   CallAcceptedPayload,
   CallEndedPayload,
@@ -63,9 +54,7 @@ export function CallScreen({
     Boolean(conversationId) && !previewCall,
   )
 
-  const media: CallMedia = previewCall
-    ? previewCall.media
-    : parseMedia(searchParams.get('media'))
+  const media: CallMedia = previewCall ? previewCall.media : parseMedia(searchParams.get('media'))
 
   const initialPhase: CallPhase = previewCall
     ? 'ringing'
@@ -91,16 +80,29 @@ export function CallScreen({
     activeCallRef.current = activeCall
   }, [activeCall])
 
+  const cachedPeer = (() => {
+    if (typeof window === 'undefined' || !conversationId) return null
+    try {
+      const raw =
+        sessionStorage.getItem(`lemon_call_peer_${conversationId}`) ||
+        localStorage.getItem(`lemon_call_peer_${conversationId}`)
+      return raw ? (JSON.parse(raw) as { peerName?: string; peerAvatar?: string | null }) : null
+    } catch {
+      return null
+    }
+  })()
+
   const isGroup = previewCall?.isGroup ?? conversationQuery.data?.isGroup ?? false
   const name =
     previewCall?.peerName ||
+    cachedPeer?.peerName ||
     searchParams.get('peerName') ||
     conversationQuery.data?.name ||
     t('chat.callUnknownPeer')
 
   const avatarUrl =
     previewCall?.peerAvatar ??
-    searchParams.get('peerAvatar') ??
+    cachedPeer?.peerAvatar ??
     conversationQuery.data?.partnerAvatar ??
     null
 
@@ -117,6 +119,15 @@ export function CallScreen({
     stopDialing()
     livekit.disconnect()
 
+    if (conversationId && typeof window !== 'undefined') {
+      try {
+        sessionStorage.removeItem(`lemon_call_peer_${conversationId}`)
+        localStorage.removeItem(`lemon_call_peer_${conversationId}`)
+      } catch {
+        // ignore
+      }
+    }
+
     if (previewCall) {
       onPreviewClose?.()
       return
@@ -129,7 +140,7 @@ export function CallScreen({
     }
 
     navigate(ROUTES.messages)
-  }, [livekit, onPreviewClose, previewCall, stopDialing, navigate])
+  }, [conversationId, livekit, onPreviewClose, previewCall, stopDialing, navigate])
 
   // Caller: Khởi tạo cuộc gọi duy nhất 1 lần khi màn hình mở ở trạng thái ringing
   useEffect(() => {
@@ -239,7 +250,11 @@ export function CallScreen({
       playHangupTone()
       setPhase('ended')
       setEndReason('declined')
-      toast.info(payload.reason ? `${t('chat.callEndedDeclined')} (${payload.reason})` : t('chat.callEndedDeclined'))
+      toast.info(
+        payload.reason
+          ? `${t('chat.callEndedDeclined')} (${payload.reason})`
+          : t('chat.callEndedDeclined'),
+      )
       livekit.disconnect()
 
       window.setTimeout(() => {
@@ -389,10 +404,17 @@ export function CallScreen({
   }
 
   if (!conversationId && !previewCall) {
-    return <CallErrorScreen title={t('chat.callNotFound')} onClose={() => navigate(ROUTES.messages)} />
+    return (
+      <CallErrorScreen title={t('chat.callNotFound')} onClose={() => navigate(ROUTES.messages)} />
+    )
   }
 
-  if (conversationQuery.isPending && !searchParams.get('peerName') && !previewCall) {
+  if (
+    conversationQuery.isPending &&
+    !searchParams.get('peerName') &&
+    !cachedPeer?.peerName &&
+    !previewCall
+  ) {
     return (
       <main className="relative flex h-dvh w-full flex-col overflow-hidden bg-[#07120c] text-white">
         <CallBackdrop />
@@ -555,13 +577,7 @@ function CallBackdrop({ children }: { children?: ReactNode }) {
   )
 }
 
-function CallErrorScreen({
-  title,
-  onClose,
-}: {
-  title: string
-  onClose: () => void
-}) {
+function CallErrorScreen({ title, onClose }: { title: string; onClose: () => void }) {
   const { t } = useTranslation()
   return (
     <main className="relative flex h-dvh w-full flex-col overflow-hidden bg-[#07120c] text-white">

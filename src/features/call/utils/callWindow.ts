@@ -19,6 +19,21 @@ export function openCallWindow(
 ): Window | null {
   if (typeof window === 'undefined') return null
 
+  // Lưu peer info vào localStorage/sessionStorage để cửa sổ mới có thể đọc ngay
+  // mà TUYỆT ĐỐI không đưa peerAvatar vào URL query string (tránh lỗi HTTP 431 Request Header Fields Too Large)
+  if (options.peerName || options.peerAvatar) {
+    try {
+      const payload = JSON.stringify({
+        peerName: options.peerName ? options.peerName.slice(0, 80) : undefined,
+        peerAvatar: options.peerAvatar,
+      })
+      sessionStorage.setItem(`lemon_call_peer_${conversationId}`, payload)
+      localStorage.setItem(`lemon_call_peer_${conversationId}`, payload)
+    } catch {
+      // Bỏ qua nếu storage đầy hoặc bị chặn
+    }
+  }
+
   const path = callPath(conversationId, {
     media: options.media,
     state: options.state,
@@ -26,8 +41,9 @@ export function openCallWindow(
 
   const url = new URL(path, window.location.origin)
   if (options.callId) url.searchParams.set('callId', options.callId)
-  if (options.peerName) url.searchParams.set('peerName', options.peerName)
-  if (options.peerAvatar) url.searchParams.set('peerAvatar', options.peerAvatar)
+  if (options.peerName) {
+    url.searchParams.set('peerName', options.peerName.slice(0, 60))
+  }
 
   // Cửa sổ nổi chuyên dụng cho cuộc gọi: kích thước tối ưu 1080x720, resizable
   const windowFeatures =
