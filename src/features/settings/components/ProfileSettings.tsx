@@ -32,6 +32,7 @@ import {
 import { presignFile, uploadBinaryToUrl, uploadFileViaBackend } from '@/features/file/api/file.api'
 import { isAuthBypass } from '@/config/env'
 import { cn } from '@/lib/utils'
+import { AVATAR_MAX_BYTES, FULL_NAME_MAX_LENGTH, USER_BIO_MAX_LENGTH } from '@/config/constants'
 
 const AtSign = createIcon(AtSignData)
 const Camera = createIcon(CameraData)
@@ -105,7 +106,7 @@ export function ProfileSettings() {
       toast.error(t('chat.fullNameRequired'))
       return
     }
-    if (trimmed.length > 100) {
+    if (trimmed.length > FULL_NAME_MAX_LENGTH) {
       toast.error(t('chat.fullNameMaxLength'))
       return
     }
@@ -166,7 +167,7 @@ export function ProfileSettings() {
       toast.error(t('chat.avatarInvalidType'))
       return
     }
-    if (file.size > 5 * 1024 * 1024) {
+    if (file.size > AVATAR_MAX_BYTES) {
       toast.error(t('chat.avatarFileTooLarge'))
       return
     }
@@ -333,7 +334,7 @@ export function ProfileSettings() {
                     if (e.key === 'Enter') void handleSaveName()
                     if (e.key === 'Escape') handleCancelName()
                   }}
-                  maxLength={100}
+                  maxLength={FULL_NAME_MAX_LENGTH}
                   autoFocus
                   disabled={updateProfileMutation.isPending}
                   className="min-w-0 flex-1 rounded-xl border border-border bg-background px-3 py-1.5 text-sm font-semibold text-foreground focus:border-brand-ink focus:outline-none focus:ring-1 focus:ring-brand-ink"
@@ -403,7 +404,7 @@ export function ProfileSettings() {
                   if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') void handleSaveBio()
                   if (e.key === 'Escape') handleCancelBio()
                 }}
-                maxLength={500}
+                maxLength={USER_BIO_MAX_LENGTH}
                 rows={3}
                 autoFocus
                 disabled={updateProfileMutation.isPending}
