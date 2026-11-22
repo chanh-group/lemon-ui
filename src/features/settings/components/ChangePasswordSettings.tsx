@@ -51,6 +51,9 @@ export function ChangePasswordSettings() {
   const [showOld, setShowOld] = useState(false)
   const [showNew, setShowNew] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
+  // Chống trình duyệt tự điền mật khẩu đã lưu vào ô "current password" (issue #39):
+  // autocomplete="off" là chưa đủ với Chrome/Edge nên giữ readOnly tới khi user focus thật sự.
+  const [oldPwEditable, setOldPwEditable] = useState(false)
 
   const form = useForm<ChangePasswordInput>({
     resolver: zodResolver(changePasswordSchema),
@@ -88,7 +91,12 @@ export function ChangePasswordSettings() {
         </div>
 
         <Form {...form}>
-          <form noValidate onSubmit={form.handleSubmit(submit)} className="flex flex-col gap-3">
+          <form
+            noValidate
+            autoComplete="off"
+            onSubmit={form.handleSubmit(submit)}
+            className="flex flex-col gap-3"
+          >
             <FormField
               control={form.control}
               name="oldPassword"
@@ -98,12 +106,14 @@ export function ChangePasswordSettings() {
                   <FormControl>
                     <div className="relative">
                       <Input
+                        {...field}
                         type={showOld ? 'text' : 'password'}
-                        autoComplete="current-password"
+                        autoComplete="off"
                         placeholder={t('chat.currentPassword')}
                         className="pr-12"
                         aria-invalid={!!form.formState.errors.oldPassword}
-                        {...field}
+                        readOnly={!oldPwEditable}
+                        onFocus={() => setOldPwEditable(true)}
                       />
                       <PasswordVisibilityButton
                         visible={showOld}
