@@ -377,10 +377,10 @@ export function MessageComposer({
     }
   }
 
-  const submittedDraft = draft.trim()
-  const messageLength = getMessageLengthState(submittedDraft)
+  const trimmedDraft = draft.trim()
+  const messageLength = getMessageLengthState(trimmedDraft)
   const canSubmit =
-    (submittedDraft.length > 0 || pendingFiles.length > 0) &&
+    (trimmedDraft.length > 0 || pendingFiles.length > 0) &&
     !messageLength.isOverLimit &&
     !disabled &&
     !isSending

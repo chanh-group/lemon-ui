@@ -241,4 +241,11 @@ describe('MediaBubble fallback', () => {
     expect(label.className).toContain('truncate')
     expect(label.parentElement?.className).toContain('overflow-hidden')
   })
+
+  it('uses the video label instead of a long video filename', () => {
+    render(<MediaBubble kind="video" label={`${'long-video-name-'.repeat(10)}.mp4`} />)
+
+    expect(screen.getByText('chat.video')).toBeTruthy()
+    expect(screen.queryByText(/long-video-name/)).toBeNull()
+  })
 })

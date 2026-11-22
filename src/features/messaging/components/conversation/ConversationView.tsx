@@ -16,7 +16,7 @@ import { MessageList, type MessageListHandle } from './MessageList'
 import { MessageComposer, type PendingFile } from './MessageComposer'
 import type { MessageScrollPosition } from '@/features/messaging/utils/messageScrollPosition'
 import { clearConversationDraft } from '@/features/messaging/utils/draftStore'
-import { isImage } from '@/features/file/utils/fileTypes'
+import { isImage, isVideo } from '@/features/file/utils/fileTypes'
 import { ApiError } from '@/infrastructure/api/errors'
 
 interface ConversationViewProps {
@@ -58,6 +58,19 @@ interface ConversationViewProps {
   onOpenStory?: () => void
   onOpenStoryReply?: (storyId: string) => void
   onLoadMessage?: (messageId: string) => Promise<void>
+}
+
+function replyChipLabel(
+  replyingTo: ChatMessage,
+  t: (key: string, options?: Record<string, unknown>) => string,
+): string {
+  if (replyingTo.text) return replyingTo.text
+  if (replyingTo.storyPreview) return t('chat.replyToStory')
+  const att = replyingTo.attachments?.[0]
+  if (!att) return t('chat.attachment')
+  if (att.kind === 'IMAGE' || isImage(att.mimeType, att.fileName)) return t('chat.photo')
+  if (att.kind === 'VIDEO' || isVideo(att.mimeType, att.fileName)) return t('chat.video')
+  return t('chat.attachment')
 }
 
 export function ConversationView({
@@ -444,19 +457,7 @@ export function ConversationView({
                   ? t('chat.replyingTo', { name: replyDraftName })
                   : t('chat.replyMessage')}
               </p>
-              <p className="truncate text-muted-foreground">
-                {replyingTo.text ||
-                  (replyingTo.storyPreview
-                    ? t('chat.replyToStory')
-                    : replyingTo.attachments?.[0] &&
-                        (replyingTo.attachments[0].kind === 'IMAGE' ||
-                          isImage(
-                            replyingTo.attachments[0].mimeType,
-                            replyingTo.attachments[0].fileName,
-                          ))
-                      ? t('chat.photo')
-                      : t('chat.attachment'))}
-              </p>
+              <p className="truncate text-muted-foreground">{replyChipLabel(replyingTo, t)}</p>
             </div>
             <button
               type="button"

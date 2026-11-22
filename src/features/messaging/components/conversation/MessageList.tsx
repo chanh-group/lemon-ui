@@ -139,7 +139,12 @@ function MediaIcon({ kind }: { kind: ChatMessage['kind'] }) {
 export function MediaBubble({ label, kind }: { label: string; kind: ChatMessage['kind'] }) {
   const { t } = useTranslation()
   const isGif = kind === 'gif'
-  const displayLabel = kind === 'photo' ? t('chat.photo') : label || t('chat.attachment')
+  const displayLabel =
+    kind === 'photo'
+      ? t('chat.photo')
+      : kind === 'video'
+        ? t('chat.video')
+        : label || t('chat.attachment')
   return (
     <span
       className={cn(
