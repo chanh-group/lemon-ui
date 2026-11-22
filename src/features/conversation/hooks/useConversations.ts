@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@/infrastructure/query/keys'
+import { CONVERSATION_STALE_MS } from '@/config/constants'
 import {
   getConversationById,
   getConversations,
@@ -19,7 +20,7 @@ export function useConversationsQuery() {
     queryKey: conversationKeys.conversations,
     queryFn: () => getConversations(),
     select: (data) => data.map((item) => mapConversationResponse(item)),
-    staleTime: 1000 * 30,
+    staleTime: CONVERSATION_STALE_MS,
   })
 }
 
@@ -33,7 +34,7 @@ export function useConversationQuery(conversationId: string | null, enabled = tr
     },
     select: (data) => mapConversationResponse(data),
     enabled: Boolean(conversationId) && enabled,
-    staleTime: 1000 * 30,
+    staleTime: CONVERSATION_STALE_MS,
   })
 }
 
@@ -45,7 +46,7 @@ export function useGroupMembersQuery(conversationId: string | null, enabled = tr
       return getGroupMembers(conversationId, signal)
     },
     enabled: Boolean(conversationId) && enabled,
-    staleTime: 30_000,
+    staleTime: CONVERSATION_STALE_MS,
   })
 }
 

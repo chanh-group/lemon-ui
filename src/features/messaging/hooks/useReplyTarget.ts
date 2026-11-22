@@ -4,6 +4,7 @@ import { getReplyTarget } from '../api/message.api'
 import { isReplyTargetComplete } from '../utils/replyQuote'
 import type { MessageReplyTarget } from '../types/message.types'
 import { ApiError } from '@/infrastructure/api/errors'
+import { REPLY_TARGET_GC_MS, REPLY_TARGET_STALE_MS } from '@/config/constants'
 
 export const UNAVAILABLE_TARGET_SENTINEL: MessageReplyTarget = {
   id: '',
@@ -42,8 +43,8 @@ export function useReplyTarget(
       }
     },
     enabled: queryEnabled,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
+    staleTime: REPLY_TARGET_STALE_MS,
+    gcTime: REPLY_TARGET_GC_MS,
     retry: false,
     initialData: initialTarget ?? undefined,
     // Incomplete seeds must not count as fresh or TanStack skips fetching the preview.

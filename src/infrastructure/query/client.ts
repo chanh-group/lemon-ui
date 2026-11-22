@@ -1,5 +1,8 @@
 import { QueryClient } from '@tanstack/react-query'
 
+/** Default staleTime cho mọi query (ms). */
+const DEFAULT_QUERY_STALE_MS = 60_000
+
 /**
  * `refetchOnWindowFocus: false` có chủ ý: mỗi refetch focus có thể dính
  * access hết hạn → kéo refresh rotation không cần thiết.
@@ -15,7 +18,7 @@ export function createQueryClient(): QueryClient {
         },
         refetchOnWindowFocus: false,
         refetchOnReconnect: true,
-        staleTime: 60_000,
+        staleTime: DEFAULT_QUERY_STALE_MS,
       },
       mutations: { retry: false },
     },

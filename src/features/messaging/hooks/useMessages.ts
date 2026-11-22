@@ -44,10 +44,12 @@ import type {
 } from '@/features/messaging/types/message.types'
 export type { SendMessagePendingFile } from '@/features/messaging/types/message.types'
 import type { ConversationResponse } from '@/features/conversation/types/conversation.types'
+import { MESSAGE_PAGE_SIZE } from '@/config/constants'
 
 export const CHAT_QUERY_KEYS = queryKeys.chat
-const MESSAGE_PAGE_SIZE = 30
 const MESSAGE_CACHE_TIME = 30 * 60_000
+/** Media archive coi dữ liệu là tươi trong 1 phút. */
+const MEDIA_ARCHIVE_STALE_MS = 60_000
 const MESSAGE_STALE_TIME = Infinity
 /** Cửa sổ 3 trang: -1 (mới hơn), 0 (đang đọc), +1 (cũ hơn). */
 const MAX_MESSAGE_PAGES = 3
@@ -379,7 +381,7 @@ export function useConversationMediaArchiveQuery(conversationId: string, enabled
     getNextPageParam: (lastPage): MessagePageParam | undefined =>
       lastPage.hasMore && lastPage.nextCursor ? { cursor: lastPage.nextCursor } : undefined,
     enabled,
-    staleTime: 1000 * 60,
+    staleTime: MEDIA_ARCHIVE_STALE_MS,
   })
 }
 

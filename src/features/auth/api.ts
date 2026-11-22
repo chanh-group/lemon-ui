@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { isAuthBypass } from '@/config/env'
-import { DEV_SESSION_KEY } from '@/config/constants'
+import { AUTH_ME_STALE_MS, DEV_SESSION_KEY } from '@/config/constants'
 import { api, toApiError } from '@/infrastructure/api/client'
 import { clearAllDrafts } from '@/features/messaging/utils/draftStore'
 import { authEndpoints, userEndpoints } from '@/infrastructure/api/endpoints'
@@ -54,7 +54,7 @@ export function useMe() {
       }
     },
     enabled: status === 'authenticated',
-    staleTime: 5 * 60_000,
+    staleTime: AUTH_ME_STALE_MS,
   })
 }
 
