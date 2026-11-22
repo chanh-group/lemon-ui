@@ -43,7 +43,68 @@ export function callPath(conversationId: string, options: CallPathOptions = {}):
   return `${ROUTES.call.replace(':conversationId', encodeURIComponent(conversationId))}${query ? `?${query}` : ''}`
 }
 
+// contract: LemonCore domain/user/constants.ts PASSWORD_MIN_LENGTH (issue #59)
 export const PASSWORD_MIN_LENGTH = 8
+
+// contract: LemonCore domain/user/constants.ts OTP_LENGTH (issue #59)
+export const OTP_LENGTH = 6
+
+// contract: LemonCore OTP format, exactly OTP_LENGTH digits (issue #59)
+export const OTP_REGEX = new RegExp(`^\\d{${OTP_LENGTH}}$`)
+
+// contract: LemonCore domain/user/constants.ts FULL_NAME_MIN_LENGTH (issue #59)
+export const FULL_NAME_MIN_LENGTH = 2
+
+// contract: LemonCore domain/user/constants.ts FULL_NAME_MAX_LENGTH (issue #59)
+export const FULL_NAME_MAX_LENGTH = 100
+
+// contract: LemonCore domain/user/constants.ts USERNAME_MIN_LENGTH (issue #59)
+export const USERNAME_MIN_LENGTH = 3
+
+// contract: LemonCore domain/user/constants.ts USERNAME_MAX_LENGTH (issue #59)
+export const USERNAME_MAX_LENGTH = 30
+
+// contract: LemonCore domain/user/constants.ts USER_BIO_MAX_LENGTH (issue #59)
+export const USER_BIO_MAX_LENGTH = 500
+
+// contract: LemonCore domain/story/constants.ts STORY_MAX_CAPTION_LENGTH (issue #59)
+export const STORY_MAX_CAPTION_LENGTH = 500
+
+// contract: LemonCore domain/user/constants.ts AVATAR_MAX_BYTES (issue #59)
+export const AVATAR_MAX_BYTES = 5 * 1024 * 1024
+
+/** Giới hạn dung lượng file upload trong chat. */
+export const CHAT_UPLOAD_MAX_BYTES = 25 * 1024 * 1024
+
+// contract: LemonCore domain/user/constants.ts USER_SEARCH_MIN_LENGTH (issue #59)
+export const USER_SEARCH_MIN_LENGTH = 2
+
+/** Debounce ô tìm kiếm người dùng (ms). */
+export const USER_SEARCH_DEBOUNCE_MS = 300
+
+/** Kích thước trang danh sách lời mời kết bạn. */
+export const FRIEND_REQUESTS_PAGE_SIZE = 20
+
+/** Kích thước trang danh sách bạn bè. */
+export const FRIENDS_PAGE_SIZE = 50
+
+/** Kích thước trang tin nhắn. */
+export const MESSAGE_PAGE_SIZE = 30
+
+/** Thời gian coi dữ liệu hội thoại là tươi (ms). */
+export const CONVERSATION_STALE_MS = 30_000
+
+/** Thời gian coi dữ liệu bạn bè là tươi (ms). */
+export const FRIEND_STALE_MS = 30_000
+
+/** Thời gian coi dữ liệu /auth/me là tươi (ms). */
+export const AUTH_ME_STALE_MS = 5 * 60_000
+
+/** Thời gian coi dữ liệu reply target là tươi (ms). */
+export const REPLY_TARGET_STALE_MS = 5 * 60_000
+
+/** Thời gian giữ reply target trong cache trước khi dọn (ms). */
+export const REPLY_TARGET_GC_MS = 10 * 60_000
 
 /** Tuổi thọ mã OTP (2 phút). */
 export const OTP_TTL_MS = 2 * 60_000
