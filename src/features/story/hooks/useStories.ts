@@ -1,5 +1,6 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@/infrastructure/query/keys'
+import { STORY_MEDIA_STALE_MS } from '@/features/story/constants'
 import {
   createMediaStory,
   deleteStory,
@@ -229,7 +230,7 @@ export function useStoryMedia(story: { id: string; kind?: string; mediaUrl?: str
     queryFn: () => getStoryMediaUrl(story.id),
     enabled:
       story.kind?.toUpperCase() === 'MEDIA' && !story.mediaUrl && !story.id.startsWith('story-'),
-    staleTime: 4 * 60_000,
+    staleTime: STORY_MEDIA_STALE_MS,
   })
 }
 

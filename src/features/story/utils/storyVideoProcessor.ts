@@ -1,4 +1,9 @@
-import { STORY_MAX_MEDIA_BYTES, STORY_MAX_TRIM_SECONDS } from '../constants'
+import {
+  STORY_AUDIO_BITRATE,
+  STORY_MAX_MEDIA_BYTES,
+  STORY_MAX_TRIM_SECONDS,
+  STORY_VIDEO_BITRATE,
+} from '../constants'
 
 export interface ProcessStoryVideoInput {
   file: File
@@ -68,7 +73,7 @@ export async function processStoryVideo({
         signal,
       )
       const supported = await abortable(
-        canEncodeAudio('aac', { numberOfChannels, sampleRate, bitrate: 96000 }),
+        canEncodeAudio('aac', { numberOfChannels, sampleRate, bitrate: STORY_AUDIO_BITRATE }),
         signal,
       )
       if (!supported) {
@@ -95,9 +100,15 @@ export async function processStoryVideo({
             rotation % 180 === 0 ? [squareWidth, squareHeight] : [squareHeight, squareWidth]
           const width = Math.max(2, Math.min(1080, Math.ceil(sourceWidth / 2) * 2))
           const height = Math.max(2, Math.round((sourceHeight * width) / sourceWidth / 2) * 2)
-          return { codec: 'avc', bitrate: 2400000, width, height, fit: 'contain' }
+          return {
+            codec: 'avc',
+            bitrate: STORY_VIDEO_BITRATE,
+            width,
+            height,
+            fit: 'contain',
+          }
         },
-        audio: { codec: 'aac', bitrate: 96000 },
+        audio: { codec: 'aac', bitrate: STORY_AUDIO_BITRATE },
       }).catch((error) => {
         void output.cancel().catch(() => {})
         throw error

@@ -1,6 +1,7 @@
 import { isAuthBypass } from '@/config/env'
 import { api } from '@/infrastructure/api/client'
 import { MOCK_STORIES } from '@/features/story/data/mockData'
+import { STORY_STORAGE_FALLBACK_BYTES } from '@/features/story/constants'
 import { presignFile, uploadBinaryToUrl, uploadFileViaBackend } from '@/features/file/api/file.api'
 import type {
   StoryEntry,
@@ -636,12 +637,12 @@ export async function getStoryMediaUrl(storyId: string): Promise<string> {
 
 export async function getStorageUsage(): Promise<{ usedBytes: number; limitBytes: number }> {
   if (isAuthBypass()) {
-    return { usedBytes: 0, limitBytes: 512 * 1024 * 1024 }
+    return { usedBytes: 0, limitBytes: STORY_STORAGE_FALLBACK_BYTES }
   }
   const res = await api.get<{ usedBytes?: number; limitBytes?: number }>('/stories/storage')
   return {
     usedBytes: res.data?.usedBytes ?? 0,
-    limitBytes: res.data?.limitBytes ?? 512 * 1024 * 1024,
+    limitBytes: res.data?.limitBytes ?? STORY_STORAGE_FALLBACK_BYTES,
   }
 }
 

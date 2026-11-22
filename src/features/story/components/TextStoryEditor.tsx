@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 import { TEXT_STORY_BG } from '@/features/story/data/storiesData'
+import { TEXT_STORY_MAX_LENGTH } from '@/features/story/constants'
 
 interface TextStoryEditorProps {
   onDiscard: () => void
@@ -31,7 +32,7 @@ export function TextStoryEditor({ onDiscard, onShare, isSharing }: TextStoryEdit
           placeholder={t('chat.addTextHint')}
           aria-label={t('chat.addTextHint')}
           rows={1}
-          maxLength={140}
+          maxLength={TEXT_STORY_MAX_LENGTH}
           className="max-h-full w-full resize-none overflow-y-auto bg-transparent text-center text-2xl font-bold text-white drop-shadow-md outline-none placeholder:font-semibold placeholder:text-white/70 [field-sizing:content]"
         />
       </div>

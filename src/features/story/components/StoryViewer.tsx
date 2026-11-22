@@ -18,6 +18,7 @@ import {
 import { UserAvatar } from '@/components/common/UserAvatar'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { TEXT_STORY_BG, storyDisplayName } from '@/features/story/data/storiesData'
+import { STORY_MAX_CAPTION_LENGTH } from '@/config/constants'
 import { cn } from '@/lib/utils'
 import {
   useDeleteStory,
@@ -533,7 +534,7 @@ export function StoryViewer({
           <textarea
             value={editCaption}
             onChange={(e) => setEditCaption(e.target.value)}
-            maxLength={500}
+            maxLength={STORY_MAX_CAPTION_LENGTH}
             rows={4}
             className="w-full rounded-lg border border-border bg-background p-3"
           />

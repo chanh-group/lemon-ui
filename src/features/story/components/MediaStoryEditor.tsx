@@ -9,6 +9,7 @@ import {
   STORY_MAX_VIDEO_INPUT_BYTES,
   STORY_MAX_VIDEO_SECONDS,
 } from '../constants'
+import { STORY_MAX_CAPTION_LENGTH } from '@/config/constants'
 import { isVideoDurationKnown, planStoryVideo, toStoryDurationMs } from '../utils/storyVideo'
 import { processStoryVideo } from '../utils/storyVideoProcessor'
 import { readVideoDuration } from '../utils/readVideoDuration'
@@ -192,7 +193,7 @@ export function MediaStoryEditor({
         </p>
       )}
       <input
-        maxLength={500}
+        maxLength={STORY_MAX_CAPTION_LENGTH}
         value={caption}
         onChange={(e) => setCaption(e.target.value)}
         placeholder={t('chat.storyCaptionPlaceholder')}
