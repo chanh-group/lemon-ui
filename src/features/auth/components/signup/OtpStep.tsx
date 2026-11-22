@@ -5,6 +5,7 @@ import { LoaderCircleIcon as Loader2IconData } from '@hugeicons/core-free-icons'
 import { createIcon } from '@/components/icons/hugeIcon'
 const Loader2Icon = createIcon(Loader2IconData)
 import { useTranslation } from 'react-i18next'
+import { OTP_LENGTH } from '@/config/constants'
 import { Button } from '@/components/ui/button'
 import {
   Form,
@@ -44,7 +45,9 @@ export function OtpStep({
   onChangeEmail,
 }: OtpStepProps) {
   const { t } = useTranslation()
-  const [otpDigits, setOtpDigits] = useState<string[]>(() => Array.from({ length: 6 }, () => ''))
+  const [otpDigits, setOtpDigits] = useState<string[]>(() =>
+    Array.from({ length: OTP_LENGTH }, () => ''),
+  )
 
   const form = useForm<VerifyOtpInput>({
     resolver: zodResolver(verifyOtpSchema),
@@ -65,7 +68,7 @@ export function OtpStep({
 
   const handleSubmit = () => {
     const otp = otpDigits.join('')
-    if (otp.length !== 6) {
+    if (otp.length !== OTP_LENGTH) {
       form.setError('otp', { message: t('auth.errorOtpLength') })
       return
     }

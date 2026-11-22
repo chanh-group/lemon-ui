@@ -11,6 +11,7 @@ const EyeIcon = createIcon(EyeIconData)
 const EyeOffIcon = createIcon(EyeOffIconData)
 const Loader2Icon = createIcon(Loader2IconData)
 import { useTranslation } from 'react-i18next'
+import { OTP_LENGTH } from '@/config/constants'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -35,7 +36,9 @@ export function ResetPasswordStep({ email, isPending, onSubmit, onBack }: ResetP
   const { t } = useTranslation()
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
-  const [otpDigits, setOtpDigits] = useState<string[]>(() => Array.from({ length: 6 }, () => ''))
+  const [otpDigits, setOtpDigits] = useState<string[]>(() =>
+    Array.from({ length: OTP_LENGTH }, () => ''),
+  )
 
   const form = useForm<ResetPasswordInput>({
     resolver: zodResolver(resetPasswordSchema),

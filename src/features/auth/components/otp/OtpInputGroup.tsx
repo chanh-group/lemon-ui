@@ -1,7 +1,6 @@
 import { useRef, type ClipboardEvent, type KeyboardEvent } from 'react'
 import { useTranslation } from 'react-i18next'
-
-const OTP_LENGTH = 6
+import { OTP_LENGTH } from '@/config/constants'
 
 type OtpInputGroupProps = {
   value: string[]

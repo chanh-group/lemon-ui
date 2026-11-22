@@ -1,5 +1,12 @@
 import { z } from 'zod'
-import { PASSWORD_MIN_LENGTH } from '@/config/constants'
+import {
+  FULL_NAME_MAX_LENGTH,
+  FULL_NAME_MIN_LENGTH,
+  OTP_REGEX,
+  PASSWORD_MIN_LENGTH,
+  USERNAME_MAX_LENGTH,
+  USERNAME_MIN_LENGTH,
+} from '@/config/constants'
 
 const emailSchema = z.string().trim().min(1, 'errors.required').email('errors.emailInvalid')
 
@@ -8,14 +15,14 @@ const passwordSchema = z
   .min(1, 'errors.required')
   .min(PASSWORD_MIN_LENGTH, 'errors.passwordMinLength')
 
-const otpCodeSchema = z.string().regex(/^\d{6}$/, 'errors.otpInvalid')
+const otpCodeSchema = z.string().regex(OTP_REGEX, 'errors.otpInvalid')
 
 const usernameSchema = z
   .string()
   .trim()
   .min(1, 'errors.required')
-  .min(3, 'errors.usernameMinLength')
-  .max(30, 'errors.usernameMaxLength')
+  .min(USERNAME_MIN_LENGTH, 'errors.usernameMinLength')
+  .max(USERNAME_MAX_LENGTH, 'errors.usernameMaxLength')
   .regex(/^[a-z0-9._-]+$/, 'errors.usernameRule')
 
 export const loginSchema = z.object({
@@ -42,8 +49,8 @@ export const signupInfoSchema = z
       .string()
       .trim()
       .min(1, 'errors.required')
-      .min(2, 'errors.fullNameMinLength')
-      .max(60, 'errors.fullNameMaxLength'),
+      .min(FULL_NAME_MIN_LENGTH, 'errors.fullNameMinLength')
+      .max(FULL_NAME_MAX_LENGTH, 'errors.fullNameMaxLength'),
     username: usernameSchema,
     password: z
       .string()
@@ -61,7 +68,11 @@ export type SignupInfoInput = z.infer<typeof signupInfoSchema>
 
 export const signupSchema = z.object({
   email: emailSchema,
-  fullName: z.string().min(1, 'errors.required').max(255, 'errors.fullNameMaxLength'),
+  fullName: z
+    .string()
+    .min(1, 'errors.required')
+    .min(FULL_NAME_MIN_LENGTH, 'errors.fullNameMinLength')
+    .max(FULL_NAME_MAX_LENGTH, 'errors.fullNameMaxLength'),
   username: usernameSchema,
   password: passwordSchema,
   otp: otpCodeSchema,
