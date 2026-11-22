@@ -225,6 +225,25 @@ describe('replyQuote pure helper', () => {
       ],
     }
     expect(resolveReplyQuote(document, tVi).label).toBe(document.attachments![0].fileName)
+
+    // A preview URL alone must not relabel a non-image attachment as a photo.
+    const voice: MessageReplyTarget = {
+      id: 'm-voice-attachment',
+      senderId: 'u1',
+      kind: 'TEXT',
+      body: null,
+      deletedAt: null,
+      contentCategory: 'ATTACHMENT',
+      previewAttachment: {
+        id: 'a-audio',
+        kind: 'AUDIO',
+        fileName: 'voice-note.webm',
+        mimeType: 'audio/webm',
+        durationMs: 4500,
+        previewUrl: 'https://r2/voice.webm',
+      },
+    }
+    expect(resolveReplyQuote(voice, tVi).label).toBe('voice-note.webm')
   })
 
   it('labels active voice notes, unknown content and story captions in both languages', async () => {

@@ -133,9 +133,7 @@ export function resolveReplyQuote(
     )
     const isTargetImage = Boolean(
       attachment &&
-      (attachment.kind === 'IMAGE' ||
-        isImage(attachment.mimeType, attachment.fileName) ||
-        (Boolean(thumbnailUrl) && !isTargetVideo)),
+      (attachment.kind === 'IMAGE' || isImage(attachment.mimeType, attachment.fileName)),
     )
 
     if (category === 'VOICE') {

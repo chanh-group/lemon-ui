@@ -621,7 +621,6 @@ const MessageRowView = memo(function MessageRowView({
                               editLength.isOverLimit ? 'text-destructive' : 'text-muted-foreground'
                             }`}
                             role={editLength.isOverLimit ? 'alert' : 'status'}
-                            aria-live="polite"
                           >
                             {editLength.isOverLimit
                               ? t('chat.messageTooLong', { max: MESSAGE_MAX_BODY_LENGTH })

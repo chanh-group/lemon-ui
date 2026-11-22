@@ -526,7 +526,6 @@ export function StoryViewer({
                         replyLength.isOverLimit ? 'text-destructive' : 'text-muted-foreground',
                       )}
                       role={replyLength.isOverLimit ? 'alert' : 'status'}
-                      aria-live="polite"
                     >
                       {replyLength.isOverLimit
                         ? t('chat.messageTooLong', { max: MESSAGE_MAX_BODY_LENGTH })

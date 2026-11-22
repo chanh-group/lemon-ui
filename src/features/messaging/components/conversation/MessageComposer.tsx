@@ -115,7 +115,7 @@ export function MessageComposer({
     const contentHeight = input.scrollHeight
     input.style.height = `${Math.min(contentHeight, COMPOSER_MAX_HEIGHT_PX)}px`
     input.style.overflowY = contentHeight > COMPOSER_MAX_HEIGHT_PX ? 'auto' : 'hidden'
-  }, [draft])
+  }, [draft, isRecording])
 
   useEffect(() => {
     pendingFilesRef.current = pendingFiles
@@ -551,7 +551,6 @@ export function MessageComposer({
             messageLength.isOverLimit ? 'text-destructive' : 'text-muted-foreground'
           }`}
           role={messageLength.isOverLimit ? 'alert' : 'status'}
-          aria-live="polite"
         >
           {messageLength.isOverLimit
             ? t('chat.messageTooLong', { max: MESSAGE_MAX_BODY_LENGTH })
