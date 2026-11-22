@@ -48,6 +48,8 @@ import type {
 } from '@/features/messaging/types/message.types'
 import type { MessageScrollPosition } from '@/features/messaging/utils/messageScrollPosition'
 import { isAudio, isImage, isVideo } from '@/features/file/utils/fileTypes'
+import { MESSAGE_MAX_BODY_LENGTH } from '@/config/constants'
+import { getMessageLengthState } from '@/features/messaging/utils/messageLength'
 import {
   useReactMessageMutation,
   useRevokeMessageMutation,
@@ -355,10 +357,11 @@ const MessageRowView = memo(function MessageRowView({
   const [editDraft, setEditDraft] = useState('')
   const [isSavingEdit, setIsSavingEdit] = useState(false)
   const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const editLength = getMessageLengthState(editDraft)
 
   const saveEdit = async () => {
     if (isSavingEdit || !onEdit) return
-    if (!editDraft.trim() || editDraft.length > 4000) return
+    if (!editDraft.trim() || editLength.isOverLimit) return
     if (editDraft === msg.text) {
       setIsEditing(false)
       return
@@ -598,11 +601,31 @@ const MessageRowView = memo(function MessageRowView({
                             }
                           }}
                           disabled={isSavingEdit}
-                          maxLength={4000}
                           rows={3}
                           aria-label={t('chat.editMessage')}
+                          aria-invalid={editLength.isOverLimit || undefined}
+                          aria-describedby={
+                            editLength.isNearLimit ? `edit-length-${msg.id}` : undefined
+                          }
                           className="min-h-20 w-full resize-y rounded-lg border border-border bg-background px-2.5 py-2 text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary"
                         />
+                        {editLength.isNearLimit && (
+                          <p
+                            id={`edit-length-${msg.id}`}
+                            className={`text-right text-xs ${
+                              editLength.isOverLimit ? 'text-destructive' : 'text-muted-foreground'
+                            }`}
+                            role={editLength.isOverLimit ? 'alert' : 'status'}
+                            aria-live="polite"
+                          >
+                            {editLength.isOverLimit
+                              ? t('chat.messageTooLong', { max: MESSAGE_MAX_BODY_LENGTH })
+                              : t('chat.messageLengthCounter', {
+                                  count: editLength.count,
+                                  max: MESSAGE_MAX_BODY_LENGTH,
+                                })}
+                          </p>
+                        )}
                         <div className="flex justify-end gap-2">
                           <button
                             type="button"
@@ -615,7 +638,12 @@ const MessageRowView = memo(function MessageRowView({
                           <button
                             type="button"
                             onClick={() => void saveEdit()}
-                            disabled={isSavingEdit || !editDraft.trim() || editDraft === msg.text}
+                            disabled={
+                              isSavingEdit ||
+                              !editDraft.trim() ||
+                              editLength.isOverLimit ||
+                              editDraft === msg.text
+                            }
                             className="rounded-md bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground disabled:opacity-50"
                           >
                             {t('chat.saveEdit')}

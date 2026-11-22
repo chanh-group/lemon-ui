@@ -164,6 +164,8 @@
     "partnerReactedStory": "{{name}} đã bày tỏ cảm xúc về một tin",
     "composeHint": "Nhập tin",
     "composeFilesHint": "Thêm tin nhắn hoặc gửi tệp…",
+    "messageTooLong": "Tin nhắn vượt quá giới hạn {{max}} ký tự.",
+    "messageLengthCounter": "{{count}} / {{max}}",
     "attachFile": "Đính kèm tệp",
     "sendPhoto": "Gửi ảnh",
     "sendMessage": "Gửi tin nhắn",

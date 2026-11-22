@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Cancel01Icon as CancelData,
@@ -14,7 +14,11 @@ import type { MessageAttachmentInput } from '@/features/messaging/types/message.
 import { formatBytes, isImage } from '@/features/file/utils/fileTypes'
 import { generateUUID } from '@/lib/utils'
 import { getConversationDraft, setConversationDraft } from '@/features/messaging/utils/draftStore'
-import { CHAT_UPLOAD_MAX_BYTES } from '@/config/constants'
+import { CHAT_UPLOAD_MAX_BYTES, MESSAGE_MAX_BODY_LENGTH } from '@/config/constants'
+import {
+  getMessageLengthState,
+  isMessageWithinLimit,
+} from '@/features/messaging/utils/messageLength'
 
 const Paperclip = createIcon(PaperclipData)
 const Send = createIcon(SendData)
@@ -24,6 +28,7 @@ const MicIcon = createIcon(MicData)
 const TrashIcon = createIcon(TrashData)
 
 const MAX_FILE_SIZE = CHAT_UPLOAD_MAX_BYTES
+const COMPOSER_MAX_HEIGHT_PX = 144
 
 /** Exact duration of a recorded blob (MediaRecorder WebM headers carry none). */
 async function getAudioDurationMs(blob: Blob): Promise<number | null> {
@@ -85,7 +90,7 @@ export function MessageComposer({
 
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([])
   const pendingFilesRef = useRef(pendingFiles)
   const draftRef = useRef(draft)
@@ -100,6 +105,16 @@ export function MessageComposer({
 
   useEffect(() => {
     draftRef.current = draft
+  }, [draft])
+
+  useLayoutEffect(() => {
+    const input = inputRef.current
+    if (!input) return
+
+    input.style.height = '0px'
+    const contentHeight = input.scrollHeight
+    input.style.height = `${Math.min(contentHeight, COMPOSER_MAX_HEIGHT_PX)}px`
+    input.style.overflowY = contentHeight > COMPOSER_MAX_HEIGHT_PX ? 'auto' : 'hidden'
   }, [draft])
 
   useEffect(() => {
@@ -275,7 +290,7 @@ export function MessageComposer({
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
-  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const clipboardFiles = e.clipboardData?.files
     if (clipboardFiles && clipboardFiles.length > 0) {
       const filesToAdd: File[] = []
@@ -311,6 +326,7 @@ export function MessageComposer({
     const text = draftRef.current.trim()
     if (!text && pendingFiles.length === 0) return
     if (disabled || isSending || submittingRef.current) return
+    if (!isMessageWithinLimit(text)) return
 
     submittingRef.current = true
 
@@ -361,7 +377,13 @@ export function MessageComposer({
     }
   }
 
-  const canSubmit = (draft.trim().length > 0 || pendingFiles.length > 0) && !disabled && !isSending
+  const submittedDraft = draft.trim()
+  const messageLength = getMessageLengthState(submittedDraft)
+  const canSubmit =
+    (submittedDraft.length > 0 || pendingFiles.length > 0) &&
+    !messageLength.isOverLimit &&
+    !disabled &&
+    !isSending
 
   return (
     <footer
@@ -458,12 +480,13 @@ export function MessageComposer({
           </div>
         </div>
       ) : (
-        <div className="flex w-full items-center gap-1.5">
-          <label className="chat-composer flex min-h-11 min-w-0 flex-1 items-center gap-1 rounded-full border border-border bg-muted px-4 transition-all duration-150 focus-within:border-ring focus-within:bg-card">
+        <div className="flex w-full items-end gap-1.5">
+          <label className="chat-composer flex min-h-11 min-w-0 flex-1 items-end gap-1 rounded-3xl border border-border bg-muted px-4 py-1 transition-all duration-150 focus-within:border-ring focus-within:bg-card">
             <span className="sr-only">{t('chat.sendMessage')}</span>
-            <input
+            <textarea
               ref={inputRef}
               value={draft}
+              rows={1}
               disabled={disabled}
               onChange={(e) => handleChange(e.target.value)}
               onPaste={handlePaste}
@@ -478,7 +501,13 @@ export function MessageComposer({
                 pendingFiles.length > 0 ? t('chat.composeFilesHint') : t('chat.composeHint')
               }
               aria-label={t('chat.composeHint')}
-              className="h-11 min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+              aria-invalid={messageLength.isOverLimit || undefined}
+              aria-describedby={
+                messageLength.isNearLimit || messageLength.isOverLimit
+                  ? 'message-length-feedback'
+                  : undefined
+              }
+              className="min-h-9 max-h-36 min-w-0 flex-1 resize-none bg-transparent py-2 text-sm leading-5 text-foreground outline-none placeholder:text-muted-foreground wrap-break-word"
             />
             <button
               type="button"
@@ -513,6 +542,23 @@ export function MessageComposer({
           >
             <Send className="size-5.5" aria-hidden="true" />
           </button>
+        </div>
+      )}
+      {(messageLength.isNearLimit || messageLength.isOverLimit) && !isRecording && (
+        <div
+          id="message-length-feedback"
+          className={`mt-1 px-1 text-right text-xs ${
+            messageLength.isOverLimit ? 'text-destructive' : 'text-muted-foreground'
+          }`}
+          role={messageLength.isOverLimit ? 'alert' : 'status'}
+          aria-live="polite"
+        >
+          {messageLength.isOverLimit
+            ? t('chat.messageTooLong', { max: MESSAGE_MAX_BODY_LENGTH })
+            : t('chat.messageLengthCounter', {
+                count: messageLength.count,
+                max: MESSAGE_MAX_BODY_LENGTH,
+              })}
         </div>
       )}
     </footer>
