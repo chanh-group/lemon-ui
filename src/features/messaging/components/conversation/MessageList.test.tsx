@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { MessageReplyBubbleQuote, StoryReplyQuote } from './MessageList'
+import { MediaBubble, MessageReplyBubbleQuote, StoryReplyQuote } from './MessageList'
 import { useReplyTarget } from '@/features/messaging/hooks/useReplyTarget'
 import type { MessageReplyTarget } from '@/features/messaging/types/message.types'
 
@@ -161,5 +161,84 @@ describe('MessageReplyBubbleQuote', () => {
     expect(screen.getByText('chat.replyUnavailableContent')).toBeTruthy()
     fireEvent.click(screen.getByRole('button'))
     expect(onJumpToMessage).not.toHaveBeenCalled()
+  })
+
+  it('uses the compact photo label instead of an image filename and retains that filename as alt text', () => {
+    const fileName = `${'Teemo-joins-2XKO-trailer-gameplay-and-release-date-'.repeat(2)}image.png`
+    mockedUseReplyTarget.mockReturnValue({
+      target: {
+        id: 'image-target',
+        senderId: 'u1',
+        kind: 'IMAGE',
+        body: null,
+        deletedAt: null,
+        attachments: [
+          {
+            id: 'image-1',
+            kind: 'IMAGE',
+            fileName,
+            mimeType: 'image/png',
+            sizeBytes: 100,
+            previewUrl: 'https://r2/image.png',
+            downloadUrl: 'https://r2/image.png',
+          },
+        ],
+      },
+      isLoading: false,
+      isUnavailable: false,
+    })
+
+    render(<MessageReplyBubbleQuote conversationId="c1" replyToId="image-target" />)
+
+    expect(screen.getByText('chat.photo')).toBeTruthy()
+    expect(screen.queryByText(fileName)).toBeNull()
+    expect(screen.getByRole('img', { name: fileName })).toBeTruthy()
+    expect(screen.getByRole('button').className).toContain('overflow-hidden')
+  })
+
+  it('keeps a document filename but constrains it to a truncating quote container', () => {
+    const fileName = `${'very-long-document-name-without-spaces-'.repeat(5)}report.pdf`
+    mockedUseReplyTarget.mockReturnValue({
+      target: {
+        id: 'file-target',
+        senderId: 'u1',
+        kind: 'FILE',
+        body: null,
+        deletedAt: null,
+        attachments: [
+          {
+            id: 'file-1',
+            kind: 'FILE',
+            fileName,
+            mimeType: 'application/pdf',
+            sizeBytes: 100,
+            previewUrl: '',
+            downloadUrl: 'https://r2/report.pdf',
+          },
+        ],
+      },
+      isLoading: false,
+      isUnavailable: false,
+    })
+
+    render(<MessageReplyBubbleQuote conversationId="c1" replyToId="file-target" />)
+
+    expect(screen.getByText(fileName).className).toContain('truncate')
+    expect(screen.getByRole('button').className).toContain('min-w-0')
+  })
+})
+
+describe('MediaBubble fallback', () => {
+  it('uses the compact photo label and protects the fallback layout from a long filename', () => {
+    render(
+      <MediaBubble
+        kind="photo"
+        label={`${'very-long-image-name-without-spaces-'.repeat(5)}image.png`}
+      />,
+    )
+
+    const label = screen.getByText('chat.photo')
+    expect(label.className).toContain('truncate')
+    expect(label.parentElement?.className).toContain('overflow-hidden')
   })
 })

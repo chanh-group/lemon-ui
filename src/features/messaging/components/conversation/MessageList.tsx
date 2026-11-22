@@ -134,20 +134,23 @@ function MediaIcon({ kind }: { kind: ChatMessage['kind'] }) {
   return <ImageIcon className="size-7" aria-hidden="true" />
 }
 
-function MediaBubble({ label, kind }: { label: string; kind: ChatMessage['kind'] }) {
+export function MediaBubble({ label, kind }: { label: string; kind: ChatMessage['kind'] }) {
   const { t } = useTranslation()
   const isGif = kind === 'gif'
+  const displayLabel = kind === 'photo' ? t('chat.photo') : label || t('chat.attachment')
   return (
     <span
       className={cn(
-        'flex aspect-video w-60 max-w-full flex-col items-center justify-center gap-1.5 rounded-xl text-xs font-medium',
+        'flex aspect-video w-60 max-w-full flex-col items-center justify-center gap-1.5 overflow-hidden rounded-xl p-2 text-xs font-medium',
         isGif
           ? 'bg-foreground text-primary'
           : 'bg-linear-to-br from-primary via-secondary to-ring text-foreground',
       )}
     >
       <MediaIcon kind={kind} />
-      {label || t('chat.attachment')}
+      <span className="w-full max-w-full truncate px-2 text-center select-none">
+        {displayLabel}
+      </span>
     </span>
   )
 }
@@ -257,7 +260,7 @@ export function MessageReplyBubbleQuote({
       onClick={quote.canNavigate ? () => onJumpToMessage?.(replyToId) : undefined}
       aria-disabled={!quote.canNavigate}
       className={cn(
-        'mb-1 flex max-w-full items-center gap-2 rounded border-l-2 border-muted-foreground/30 bg-muted/40 px-2 py-1 text-left text-[11px] text-muted-foreground hover:bg-muted/70',
+        'mb-1 flex min-w-0 max-w-full items-center gap-2 overflow-hidden rounded border-l-2 border-muted-foreground/30 bg-muted/40 px-2 py-1 text-left text-[11px] text-muted-foreground hover:bg-muted/70',
         !quote.canNavigate && 'cursor-default hover:bg-muted/40',
       )}
     >
@@ -270,7 +273,15 @@ export function MessageReplyBubbleQuote({
             className="size-9 shrink-0 rounded object-cover"
           />
         ) : (
-          <img src={quote.thumbnailUrl} alt="" className="size-9 shrink-0 rounded object-cover" />
+          <img
+            src={quote.thumbnailUrl}
+            alt={
+              target?.previewAttachment?.fileName ??
+              target?.attachments?.[0]?.fileName ??
+              quote.label
+            }
+            className="size-9 shrink-0 rounded object-cover"
+          />
         ))}
       <span className="min-w-0 flex-1">
         <span

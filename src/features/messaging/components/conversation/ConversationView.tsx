@@ -16,6 +16,7 @@ import { MessageList, type MessageListHandle } from './MessageList'
 import { MessageComposer, type PendingFile } from './MessageComposer'
 import type { MessageScrollPosition } from '@/features/messaging/utils/messageScrollPosition'
 import { clearConversationDraft } from '@/features/messaging/utils/draftStore'
+import { isImage } from '@/features/file/utils/fileTypes'
 import { ApiError } from '@/infrastructure/api/errors'
 
 interface ConversationViewProps {
@@ -445,7 +446,16 @@ export function ConversationView({
               </p>
               <p className="truncate text-muted-foreground">
                 {replyingTo.text ||
-                  (replyingTo.storyPreview ? t('chat.replyToStory') : t('chat.attachment'))}
+                  (replyingTo.storyPreview
+                    ? t('chat.replyToStory')
+                    : replyingTo.attachments?.[0] &&
+                        (replyingTo.attachments[0].kind === 'IMAGE' ||
+                          isImage(
+                            replyingTo.attachments[0].mimeType,
+                            replyingTo.attachments[0].fileName,
+                          ))
+                      ? t('chat.photo')
+                      : t('chat.attachment'))}
               </p>
             </div>
             <button

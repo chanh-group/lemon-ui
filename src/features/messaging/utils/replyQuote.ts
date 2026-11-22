@@ -1,4 +1,5 @@
 import type { MessageReplyTarget, ReplyContentCategory } from '../types/message.types'
+import { isImage, isVideo } from '@/features/file/utils/fileTypes'
 
 export type ReplyAvailability = 'loading' | 'available' | 'removed' | 'unavailable'
 
@@ -125,15 +126,30 @@ export function resolveReplyQuote(
       ? target.storyPreview?.caption || target.body || undefined
       : (target.body ?? undefined)
   if (!text) {
+    const attachment = target.previewAttachment ?? target.attachments?.[0]
+    const isTargetVideo = Boolean(
+      attachment &&
+      (attachment.kind === 'VIDEO' || isVideo(attachment.mimeType, attachment.fileName)),
+    )
+    const isTargetImage = Boolean(
+      attachment &&
+      (attachment.kind === 'IMAGE' ||
+        isImage(attachment.mimeType, attachment.fileName) ||
+        (Boolean(thumbnailUrl) && !isTargetVideo)),
+    )
+
     if (category === 'VOICE') {
       text = t('chat.voiceNoteLabel')
     } else if (category === 'STORY') {
       text = t('chat.replyToStory')
     } else if (category === 'ATTACHMENT') {
-      text =
-        target.previewAttachment?.fileName ||
-        target.attachments?.[0]?.fileName ||
-        t('chat.attachment')
+      if (isTargetImage) {
+        text = t('chat.photo')
+      } else if (isTargetVideo) {
+        text = t('chat.video')
+      } else {
+        text = attachment?.fileName || t('chat.attachment')
+      }
     }
   }
 
