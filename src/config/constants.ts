@@ -76,6 +76,12 @@ export const AVATAR_MAX_BYTES = 5 * 1024 * 1024
 /** Giới hạn dung lượng file upload trong chat. */
 export const CHAT_UPLOAD_MAX_BYTES = 25 * 1024 * 1024
 
+// contract: LemonCore domain/message/constants.ts MESSAGE_MAX_BODY_LENGTH
+export const MESSAGE_MAX_BODY_LENGTH = 4000
+
+/** Bắt đầu hiện bộ đếm độ dài khi người dùng đã dùng 90% giới hạn tin nhắn. */
+export const MESSAGE_LENGTH_WARNING_THRESHOLD = Math.floor(MESSAGE_MAX_BODY_LENGTH * 0.9)
+
 // contract: LemonCore domain/user/constants.ts USER_SEARCH_MIN_LENGTH (issue #59)
 export const USER_SEARCH_MIN_LENGTH = 2
 

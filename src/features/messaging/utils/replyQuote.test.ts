@@ -174,6 +174,78 @@ describe('replyQuote pure helper', () => {
     expect(resolved.thumbnailUrl).toBeUndefined()
   })
 
+  it('uses semantic labels for captionless image and video targets while retaining document filenames', async () => {
+    const tVi = await createT('vi')
+    const tEn = await createT('en')
+    const longImageName = `${'Teemo-joins-2XKO-trailer-gameplay-and-release-date-'.repeat(2)}image.png`
+
+    const image: MessageReplyTarget = {
+      id: 'm-image',
+      senderId: 'u1',
+      kind: 'IMAGE',
+      body: null,
+      deletedAt: null,
+      attachments: [
+        {
+          id: 'image-1',
+          kind: 'IMAGE',
+          fileName: longImageName,
+          mimeType: 'image/png',
+          sizeBytes: 100,
+          previewUrl: 'https://r2/image.png',
+          downloadUrl: 'https://r2/image.png',
+        },
+      ],
+    }
+    expect(resolveReplyQuote(image, tVi).label).toBe('Ảnh')
+    expect(resolveReplyQuote(image, tEn).label).toBe('Photo')
+
+    const video: MessageReplyTarget = {
+      ...image,
+      id: 'm-video',
+      kind: 'VIDEO',
+      attachments: [
+        { ...image.attachments![0], kind: 'VIDEO', fileName: 'clip.mp4', mimeType: 'video/mp4' },
+      ],
+    }
+    expect(resolveReplyQuote(video, tVi).label).toBe('Video')
+    expect(resolveReplyQuote(video, tEn).label).toBe('Video')
+
+    const document: MessageReplyTarget = {
+      ...image,
+      id: 'm-file',
+      kind: 'FILE',
+      attachments: [
+        {
+          ...image.attachments![0],
+          kind: 'FILE',
+          fileName: `${'very-long-document-name-without-spaces-'.repeat(5)}report.pdf`,
+          mimeType: 'application/pdf',
+        },
+      ],
+    }
+    expect(resolveReplyQuote(document, tVi).label).toBe(document.attachments![0].fileName)
+
+    // A preview URL alone must not relabel a non-image attachment as a photo.
+    const voice: MessageReplyTarget = {
+      id: 'm-voice-attachment',
+      senderId: 'u1',
+      kind: 'TEXT',
+      body: null,
+      deletedAt: null,
+      contentCategory: 'ATTACHMENT',
+      previewAttachment: {
+        id: 'a-audio',
+        kind: 'AUDIO',
+        fileName: 'voice-note.webm',
+        mimeType: 'audio/webm',
+        durationMs: 4500,
+        previewUrl: 'https://r2/voice.webm',
+      },
+    }
+    expect(resolveReplyQuote(voice, tVi).label).toBe('voice-note.webm')
+  })
+
   it('labels active voice notes, unknown content and story captions in both languages', async () => {
     const tVi = await createT('vi')
     const tEn = await createT('en')
@@ -248,7 +320,7 @@ describe('replyQuote pure helper', () => {
     }
     const resolved = resolveReplyQuote(target, t)
     expect(resolved.thumbnailUrl).toBe('https://r2/pic.jpg')
-    expect(resolved.label).toBe('pic.jpg')
+    expect(resolved.label).toBe('Ảnh')
   })
 
   it('renders a redacted story target as gone without navigation', async () => {

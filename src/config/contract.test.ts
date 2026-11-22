@@ -4,6 +4,8 @@ import {
   AVATAR_MAX_BYTES,
   FULL_NAME_MAX_LENGTH,
   FULL_NAME_MIN_LENGTH,
+  MESSAGE_LENGTH_WARNING_THRESHOLD,
+  MESSAGE_MAX_BODY_LENGTH,
   OTP_LENGTH,
   OTP_REGEX,
   PASSWORD_MIN_LENGTH,
@@ -50,5 +52,10 @@ describe('Core↔UI contract (issue #59)', () => {
 
   it('user search min length matches Core', () => {
     expect(USER_SEARCH_MIN_LENGTH).toBe(2)
+  })
+
+  it('message body limit matches Core (counted in code points)', () => {
+    expect(MESSAGE_MAX_BODY_LENGTH).toBe(4000)
+    expect(MESSAGE_LENGTH_WARNING_THRESHOLD).toBe(3600)
   })
 })

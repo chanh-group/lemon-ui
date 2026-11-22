@@ -12,6 +12,8 @@ vi.mock('react-i18next', () => ({
         'chat.failedMessage': 'Tin chưa gửi được',
         'common.retry': 'Thử lại',
         'common.close': 'Đóng',
+        'chat.messageTooLong': 'Tin nhắn vượt quá giới hạn {{max}} ký tự.',
+        'chat.messageLengthCounter': '{{count}} / {{max}}',
       })[key] ??
       fallback ??
       key,
@@ -28,7 +30,7 @@ type Submit = NonNullable<Parameters<typeof MessageComposer>[0]['onSubmit']>
 function renderComposer(conversationId: string, onSubmit: Submit) {
   setConversationDraft(conversationId, 'ok')
   render(<MessageComposer conversationId={conversationId} onSubmit={onSubmit} />)
-  return screen.getByRole('textbox') as HTMLInputElement
+  return screen.getByRole('textbox') as HTMLTextAreaElement
 }
 
 function deferred<T>() {
@@ -132,6 +134,63 @@ describe('MessageComposer pending send', () => {
     // Keydown standard Enter without composition
     fireEvent.keyDown(input, { key: 'Enter', shiftKey: false, isComposing: false })
     expect(onSubmit).toHaveBeenCalledOnce()
+  })
+
+  it('keeps Shift+Enter for a newline instead of submitting', () => {
+    const onSubmit = vi.fn().mockResolvedValue(true)
+    const input = renderComposer('shift-enter', onSubmit)
+
+    fireEvent.keyDown(input, { key: 'Enter', shiftKey: true })
+    expect(onSubmit).not.toHaveBeenCalled()
+  })
+
+  it('submits exactly 4000 code points', async () => {
+    const onSubmit = vi.fn().mockResolvedValue(true)
+    const input = renderComposer('message-boundary-valid', onSubmit)
+    const body = '😀'.repeat(4000)
+
+    fireEvent.change(input, { target: { value: body } })
+    fireEvent.click(screen.getByRole('button', { name: 'chat.sendMessage' }))
+
+    await waitFor(() =>
+      expect(onSubmit).toHaveBeenCalledWith(
+        body,
+        undefined,
+        undefined,
+        undefined,
+        expect.any(String),
+      ),
+    )
+  })
+
+  it('keeps an over-limit draft and prevents optimistic submission', () => {
+    const onSubmit = vi.fn().mockResolvedValue(true)
+    const input = renderComposer('message-boundary-invalid', onSubmit)
+    const body = '😀'.repeat(4001)
+
+    fireEvent.change(input, { target: { value: body } })
+
+    expect(input.value).toBe(body)
+    expect(input.getAttribute('aria-invalid')).toBe('true')
+    expect(screen.getByRole('alert').textContent).toContain('Tin nhắn vượt quá giới hạn')
+    expect(
+      (screen.getByRole('button', { name: 'chat.sendMessage' }) as HTMLButtonElement).disabled,
+    ).toBe(true)
+    fireEvent.keyDown(input, { key: 'Enter', isComposing: false })
+    expect(onSubmit).not.toHaveBeenCalled()
+  })
+
+  it('caps composer growth and enables internal scrolling after six lines', async () => {
+    const onSubmit = vi.fn().mockResolvedValue(true)
+    const input = renderComposer('autosize', onSubmit)
+    Object.defineProperty(input, 'scrollHeight', { configurable: true, value: 200 })
+
+    fireEvent.change(input, { target: { value: 'multiple lines' } })
+
+    await waitFor(() => {
+      expect(input.style.height).toBe('144px')
+      expect(input.style.overflowY).toBe('auto')
+    })
   })
 })
 

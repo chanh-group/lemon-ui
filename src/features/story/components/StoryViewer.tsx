@@ -18,8 +18,12 @@ import {
 import { UserAvatar } from '@/components/common/UserAvatar'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { TEXT_STORY_BG, storyDisplayName } from '@/features/story/data/storiesData'
-import { STORY_MAX_CAPTION_LENGTH } from '@/config/constants'
+import { MESSAGE_MAX_BODY_LENGTH, STORY_MAX_CAPTION_LENGTH } from '@/config/constants'
 import { cn } from '@/lib/utils'
+import {
+  getMessageLengthState,
+  isMessageWithinLimit,
+} from '@/features/messaging/utils/messageLength'
 import {
   useDeleteStory,
   useLikeStory,
@@ -71,6 +75,7 @@ export function StoryViewer({
   const [showViews, setShowViews] = useState(false)
   const [viewerTab, setViewerTab] = useState<'views' | 'reactions'>('views')
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const replyLength = getMessageLengthState(draft.trim())
   const videoRef = useRef<HTMLVideoElement>(null)
   const currentStoryId = useRef(story.id)
   const items = stories.length ? stories : [story]
@@ -200,7 +205,7 @@ export function StoryViewer({
   async function sendReply(event: React.FormEvent) {
     event.preventDefault()
     const text = draft.trim()
-    if (!text || reply.isPending) return
+    if (!text || reply.isPending || !isMessageWithinLimit(text)) return
     try {
       await reply.mutateAsync({ storyId: story.id, payload: { content: text } })
       setDraft('')
@@ -494,22 +499,42 @@ export function StoryViewer({
                 </div>
               )}
               {allowReplies && (
-                <form onSubmit={sendReply} className="flex gap-2">
+                <form onSubmit={sendReply} className="flex flex-wrap gap-2">
                   <input
                     value={draft}
                     onChange={(e) => setDraft(e.target.value)}
-                    maxLength={4000}
                     placeholder={t('chat.replyPlaceholder', { defaultValue: 'Trả lời tin...' })}
+                    aria-invalid={replyLength.isOverLimit || undefined}
+                    aria-describedby={
+                      replyLength.isNearLimit ? 'story-reply-length-feedback' : undefined
+                    }
                     className="min-w-0 flex-1 rounded-full border border-border bg-background px-4 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-ring"
                   />
                   <button
                     type="submit"
-                    disabled={!draft.trim() || reply.isPending}
+                    disabled={!draft.trim() || reply.isPending || replyLength.isOverLimit}
                     className={cn(actionClass, 'disabled:opacity-40')}
                     aria-label={t('chat.send', { defaultValue: 'Gửi' })}
                   >
                     <Send size={18} />
                   </button>
+                  {replyLength.isNearLimit && (
+                    <p
+                      id="story-reply-length-feedback"
+                      className={cn(
+                        'basis-full text-right text-xs',
+                        replyLength.isOverLimit ? 'text-destructive' : 'text-muted-foreground',
+                      )}
+                      role={replyLength.isOverLimit ? 'alert' : 'status'}
+                    >
+                      {replyLength.isOverLimit
+                        ? t('chat.messageTooLong', { max: MESSAGE_MAX_BODY_LENGTH })
+                        : t('chat.messageLengthCounter', {
+                            count: replyLength.count,
+                            max: MESSAGE_MAX_BODY_LENGTH,
+                          })}
+                    </p>
+                  )}
                 </form>
               )}
             </>

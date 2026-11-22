@@ -48,6 +48,8 @@ import type {
 } from '@/features/messaging/types/message.types'
 import type { MessageScrollPosition } from '@/features/messaging/utils/messageScrollPosition'
 import { isAudio, isImage, isVideo } from '@/features/file/utils/fileTypes'
+import { MESSAGE_MAX_BODY_LENGTH } from '@/config/constants'
+import { getMessageLengthState } from '@/features/messaging/utils/messageLength'
 import {
   useReactMessageMutation,
   useRevokeMessageMutation,
@@ -134,20 +136,28 @@ function MediaIcon({ kind }: { kind: ChatMessage['kind'] }) {
   return <ImageIcon className="size-7" aria-hidden="true" />
 }
 
-function MediaBubble({ label, kind }: { label: string; kind: ChatMessage['kind'] }) {
+export function MediaBubble({ label, kind }: { label: string; kind: ChatMessage['kind'] }) {
   const { t } = useTranslation()
   const isGif = kind === 'gif'
+  const displayLabel =
+    kind === 'photo'
+      ? t('chat.photo')
+      : kind === 'video'
+        ? t('chat.video')
+        : label || t('chat.attachment')
   return (
     <span
       className={cn(
-        'flex aspect-video w-60 max-w-full flex-col items-center justify-center gap-1.5 rounded-xl text-xs font-medium',
+        'flex aspect-video w-60 max-w-full flex-col items-center justify-center gap-1.5 overflow-hidden rounded-xl p-2 text-xs font-medium',
         isGif
           ? 'bg-foreground text-primary'
           : 'bg-linear-to-br from-primary via-secondary to-ring text-foreground',
       )}
     >
       <MediaIcon kind={kind} />
-      {label || t('chat.attachment')}
+      <span className="w-full max-w-full truncate px-2 text-center select-none">
+        {displayLabel}
+      </span>
     </span>
   )
 }
@@ -257,7 +267,7 @@ export function MessageReplyBubbleQuote({
       onClick={quote.canNavigate ? () => onJumpToMessage?.(replyToId) : undefined}
       aria-disabled={!quote.canNavigate}
       className={cn(
-        'mb-1 flex max-w-full items-center gap-2 rounded border-l-2 border-muted-foreground/30 bg-muted/40 px-2 py-1 text-left text-[11px] text-muted-foreground hover:bg-muted/70',
+        'mb-1 flex min-w-0 max-w-full items-center gap-2 overflow-hidden rounded border-l-2 border-muted-foreground/30 bg-muted/40 px-2 py-1 text-left text-[11px] text-muted-foreground hover:bg-muted/70',
         !quote.canNavigate && 'cursor-default hover:bg-muted/40',
       )}
     >
@@ -270,7 +280,15 @@ export function MessageReplyBubbleQuote({
             className="size-9 shrink-0 rounded object-cover"
           />
         ) : (
-          <img src={quote.thumbnailUrl} alt="" className="size-9 shrink-0 rounded object-cover" />
+          <img
+            src={quote.thumbnailUrl}
+            alt={
+              target?.previewAttachment?.fileName ??
+              target?.attachments?.[0]?.fileName ??
+              quote.label
+            }
+            className="size-9 shrink-0 rounded object-cover"
+          />
         ))}
       <span className="min-w-0 flex-1">
         <span
@@ -344,10 +362,11 @@ const MessageRowView = memo(function MessageRowView({
   const [editDraft, setEditDraft] = useState('')
   const [isSavingEdit, setIsSavingEdit] = useState(false)
   const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const editLength = getMessageLengthState(editDraft)
 
   const saveEdit = async () => {
     if (isSavingEdit || !onEdit) return
-    if (!editDraft.trim() || editDraft.length > 4000) return
+    if (!editDraft.trim() || editLength.isOverLimit) return
     if (editDraft === msg.text) {
       setIsEditing(false)
       return
@@ -587,11 +606,30 @@ const MessageRowView = memo(function MessageRowView({
                             }
                           }}
                           disabled={isSavingEdit}
-                          maxLength={4000}
                           rows={3}
                           aria-label={t('chat.editMessage')}
+                          aria-invalid={editLength.isOverLimit || undefined}
+                          aria-describedby={
+                            editLength.isNearLimit ? `edit-length-${msg.id}` : undefined
+                          }
                           className="min-h-20 w-full resize-y rounded-lg border border-border bg-background px-2.5 py-2 text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary"
                         />
+                        {editLength.isNearLimit && (
+                          <p
+                            id={`edit-length-${msg.id}`}
+                            className={`text-right text-xs ${
+                              editLength.isOverLimit ? 'text-destructive' : 'text-muted-foreground'
+                            }`}
+                            role={editLength.isOverLimit ? 'alert' : 'status'}
+                          >
+                            {editLength.isOverLimit
+                              ? t('chat.messageTooLong', { max: MESSAGE_MAX_BODY_LENGTH })
+                              : t('chat.messageLengthCounter', {
+                                  count: editLength.count,
+                                  max: MESSAGE_MAX_BODY_LENGTH,
+                                })}
+                          </p>
+                        )}
                         <div className="flex justify-end gap-2">
                           <button
                             type="button"
@@ -604,7 +642,12 @@ const MessageRowView = memo(function MessageRowView({
                           <button
                             type="button"
                             onClick={() => void saveEdit()}
-                            disabled={isSavingEdit || !editDraft.trim() || editDraft === msg.text}
+                            disabled={
+                              isSavingEdit ||
+                              !editDraft.trim() ||
+                              editLength.isOverLimit ||
+                              editDraft === msg.text
+                            }
                             className="rounded-md bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground disabled:opacity-50"
                           >
                             {t('chat.saveEdit')}

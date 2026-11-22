@@ -14,7 +14,7 @@ import { useConversationsQuery } from '@/features/conversation/hooks/useConversa
 import { useSendMessageMutation } from '@/features/messaging/hooks/useMessages'
 import type { ChatMessage } from '@/features/messaging/types/message.types'
 import type { Conversation } from '@/features/conversation/types/conversation.types'
-import { formatBytes } from '@/features/file/utils/fileTypes'
+import { formatBytes, isImage, isVideo } from '@/features/file/utils/fileTypes'
 import { cn } from '@/lib/utils'
 
 const SearchIcon = createIcon(SearchData)
@@ -77,6 +77,17 @@ export function ForwardMessageModal({
 
   const hasAttachments = Boolean(message.attachments && message.attachments.length > 0)
   const firstAttachment = message.attachments?.[0]
+  const isImageAttachment = Boolean(
+    firstAttachment &&
+    (firstAttachment.kind === 'IMAGE' ||
+      isImage(firstAttachment.mimeType, firstAttachment.fileName)),
+  )
+  const isVideoAttachment = Boolean(
+    firstAttachment &&
+    (firstAttachment.kind === 'VIDEO' ||
+      isVideo(firstAttachment.mimeType, firstAttachment.fileName)),
+  )
+  const isVisualAttachment = isImageAttachment || isVideoAttachment
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -94,10 +105,10 @@ export function ForwardMessageModal({
             <span>{t('chat.messagePreview', 'Nội dung chuyển tiếp:')}</span>
           </div>
 
-          <div className="rounded-xl border border-border/60 bg-card/80 p-2.5 flex items-center gap-3">
+          <div className="flex min-w-0 items-center gap-3 overflow-hidden rounded-xl border border-border/60 bg-card/80 p-2.5">
             {hasAttachments && firstAttachment ? (
               <div className="size-11 rounded-lg bg-muted flex items-center justify-center shrink-0 overflow-hidden border border-border/60">
-                {firstAttachment.kind === 'IMAGE' ? (
+                {isImageAttachment ? (
                   <img
                     src={firstAttachment.previewUrl}
                     alt={firstAttachment.fileName}
@@ -117,9 +128,18 @@ export function ForwardMessageModal({
               ) : null}
 
               {hasAttachments && firstAttachment ? (
-                <p className="text-[11px] text-muted-foreground truncate">
-                  {firstAttachment.fileName} ({formatBytes(firstAttachment.sizeBytes)})
-                </p>
+                isVisualAttachment ? (
+                  !message.text ? (
+                    <p className="text-xs font-medium text-foreground">
+                      {isImageAttachment ? t('chat.photo') : t('chat.video')}
+                    </p>
+                  ) : null
+                ) : (
+                  <p className="flex min-w-0 max-w-full items-center text-[11px] text-muted-foreground">
+                    <span className="min-w-0 truncate">{firstAttachment.fileName}</span>
+                    <span className="shrink-0"> ({formatBytes(firstAttachment.sizeBytes)})</span>
+                  </p>
+                )
               ) : null}
             </div>
           </div>
