@@ -1,4 +1,5 @@
 import { api } from '@/infrastructure/api/client'
+import { FRIENDS_PAGE_SIZE, FRIEND_REQUESTS_PAGE_SIZE } from '@/config/constants'
 import type { ConversationResponse } from '@/features/conversation/types/conversation.types'
 import type {
   ChatUser,
@@ -37,14 +38,16 @@ export async function getFriendRequests(): Promise<{
   outgoing: FriendRequest[]
 }> {
   const res = await api.get<FriendRequestsPageResponse>('/friends/requests', {
-    params: { limit: 20 },
+    params: { limit: FRIEND_REQUESTS_PAGE_SIZE },
   })
   return { incoming: res.data.incoming.items, outgoing: res.data.outgoing.items }
 }
 
 /** Danh sách bạn bè đã chấp nhận lời mời. */
 export async function getFriends(): Promise<ChatUser[]> {
-  const res = await api.get<CursorPage<ChatUser>>('/friends', { params: { limit: 50 } })
+  const res = await api.get<CursorPage<ChatUser>>('/friends', {
+    params: { limit: FRIENDS_PAGE_SIZE },
+  })
   return res.data.items
 }
 

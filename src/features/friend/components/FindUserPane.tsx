@@ -4,7 +4,11 @@ import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { useFindUserByEmail, useFindUserByUsername } from '@/features/friend/hooks/useFriends'
 import { useCreateDirectChatMutation } from '@/features/conversation/hooks/useConversations'
-import { conversationPath } from '@/config/constants'
+import {
+  USER_SEARCH_DEBOUNCE_MS,
+  USER_SEARCH_MIN_LENGTH,
+  conversationPath,
+} from '@/config/constants'
 import { PaneHeader } from './kit'
 import { SearchResultCard } from './SearchResultCard'
 
@@ -23,7 +27,7 @@ export function FindUserPane({
   const [value, setValue] = useState('')
   const [debouncedValue, setDebouncedValue] = useState('')
   useEffect(() => {
-    const timer = window.setTimeout(() => setDebouncedValue(value.trim()), 300)
+    const timer = window.setTimeout(() => setDebouncedValue(value.trim()), USER_SEARCH_DEBOUNCE_MS)
     return () => window.clearTimeout(timer)
   }, [value])
   const byUsername = useFindUserByUsername(mode === 'username' ? debouncedValue : '')
@@ -80,7 +84,7 @@ export function FindUserPane({
           </div>
         ) : finder.isError ? (
           <p className="px-5 pt-4 text-sm text-destructive">{t('chat.searchUsersError')}</p>
-        ) : debouncedValue.length >= 2 && !finder.isPending ? (
+        ) : debouncedValue.length >= USER_SEARCH_MIN_LENGTH && !finder.isPending ? (
           <p className="px-5 pt-4 text-sm text-muted-foreground">{t('chat.userNotFound')}</p>
         ) : null}
       </div>

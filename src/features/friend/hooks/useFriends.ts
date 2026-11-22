@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@/infrastructure/query/keys'
 import { ApiError } from '@/infrastructure/api/errors'
+import { FRIEND_STALE_MS, USER_SEARCH_MIN_LENGTH } from '@/config/constants'
 import type { ConversationResponse } from '@/features/conversation/types/conversation.types'
 import type { FriendRequest } from '../types/friend.types'
 import {
@@ -46,7 +47,7 @@ export function useFriendRequests() {
   return useQuery({
     queryKey: FRIEND_REQUESTS_KEY,
     queryFn: getFriendRequests,
-    staleTime: 30_000,
+    staleTime: FRIEND_STALE_MS,
   })
 }
 
@@ -54,7 +55,7 @@ export function useFriends() {
   return useQuery({
     queryKey: FRIENDS_KEY,
     queryFn: getFriends,
-    staleTime: 30_000,
+    staleTime: FRIEND_STALE_MS,
   })
 }
 
@@ -243,8 +244,8 @@ export function useFindUserByUsername(query: string) {
   return useQuery({
     queryKey: queryKeys.chat.userSearch('username', query),
     queryFn: () => findUserByUsername(query),
-    enabled: query.length >= 2,
-    staleTime: 30_000,
+    enabled: query.length >= USER_SEARCH_MIN_LENGTH,
+    staleTime: FRIEND_STALE_MS,
   })
 }
 
@@ -252,7 +253,7 @@ export function useFindUserByEmail(query: string) {
   return useQuery({
     queryKey: queryKeys.chat.userSearch('email', query),
     queryFn: () => findUserByEmail(query),
-    enabled: query.length >= 2,
-    staleTime: 30_000,
+    enabled: query.length >= USER_SEARCH_MIN_LENGTH,
+    staleTime: FRIEND_STALE_MS,
   })
 }
