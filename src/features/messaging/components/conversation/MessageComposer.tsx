@@ -14,6 +14,7 @@ import type { MessageAttachmentInput } from '@/features/messaging/types/message.
 import { formatBytes, isImage } from '@/features/file/utils/fileTypes'
 import { generateUUID } from '@/lib/utils'
 import { getConversationDraft, setConversationDraft } from '@/features/messaging/utils/draftStore'
+import { CHAT_UPLOAD_MAX_BYTES } from '@/config/constants'
 
 const Paperclip = createIcon(PaperclipData)
 const Send = createIcon(SendData)
@@ -22,7 +23,7 @@ const FileIcon = createIcon(FileData)
 const MicIcon = createIcon(MicData)
 const TrashIcon = createIcon(TrashData)
 
-const MAX_FILE_SIZE = 25 * 1024 * 1024 // 25MB
+const MAX_FILE_SIZE = CHAT_UPLOAD_MAX_BYTES
 
 /** Exact duration of a recorded blob (MediaRecorder WebM headers carry none). */
 async function getAudioDurationMs(blob: Blob): Promise<number | null> {

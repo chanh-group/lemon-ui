@@ -41,7 +41,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { ROUTES } from '@/config/constants'
+import { AVATAR_MAX_BYTES, ROUTES } from '@/config/constants'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { useMe } from '@/features/auth/api'
 import { cn } from '@/lib/utils'
@@ -437,7 +437,7 @@ export function ConversationInfoPanel({
       toast.error(t('chat.avatarInvalidType'))
       return
     }
-    if (file.size > 5 * 1024 * 1024) {
+    if (file.size > AVATAR_MAX_BYTES) {
       toast.error(t('chat.avatarFileTooLarge'))
       return
     }

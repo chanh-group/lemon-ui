@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { AVATAR_MAX_BYTES } from '@/config/constants'
 import { Camera01Icon as CameraData, CheckIcon as CheckData } from '@hugeicons/core-free-icons'
 import { createIcon } from '@/components/icons/hugeIcon'
 const Check = createIcon(CheckData)
@@ -232,7 +233,7 @@ export function GroupWizard({
       toast.error(t('chat.avatarInvalidType'))
       return
     }
-    if (file.size > 5 * 1024 * 1024) {
+    if (file.size > AVATAR_MAX_BYTES) {
       toast.error(t('chat.avatarFileTooLarge'))
       return
     }
