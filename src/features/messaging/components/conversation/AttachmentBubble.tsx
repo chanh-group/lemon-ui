@@ -240,6 +240,21 @@ export function AttachmentBubble({
   }
 
   const src = attachment.previewUrl || attachment.downloadUrl
+  const validDimensions =
+    typeof attachment.width === 'number' &&
+    Number.isFinite(attachment.width) &&
+    attachment.width > 0 &&
+    typeof attachment.height === 'number' &&
+    Number.isFinite(attachment.height) &&
+    attachment.height > 0
+  // Keep a bounded media box before the browser decodes the file, including legacy attachments without dimensions.
+  const ratio = validDimensions
+    ? Math.max(0.25, Math.min(4, attachment.width! / attachment.height!))
+    : 4 / 3
+  const mediaStyle: React.CSSProperties = {
+    aspectRatio: String(ratio),
+    width: `min(100%, ${288 * ratio}px)`,
+  }
 
   if (isImg && src) {
     return (
@@ -248,13 +263,15 @@ export function AttachmentBubble({
           'group relative max-w-xs sm:max-w-sm overflow-hidden bg-muted/40 cursor-pointer',
           hasCaption ? 'rounded-t-2xl' : 'rounded-2xl',
         )}
+        style={mediaStyle}
       >
         <img
           src={src}
           alt={attachment.fileName}
           onClick={handleCardClick}
           loading="lazy"
-          className="max-h-72 w-full object-cover transition-transform duration-200 hover:scale-[1.01]"
+          decoding="async"
+          className="h-full w-full object-contain transition-transform duration-200 hover:scale-[1.01]"
         />
       </div>
     )
@@ -285,8 +302,15 @@ export function AttachmentBubble({
           'group relative max-w-xs sm:max-w-sm overflow-hidden bg-black',
           hasCaption ? 'rounded-t-2xl' : 'rounded-2xl',
         )}
+        style={mediaStyle}
       >
-        <video src={src} controls playsInline preload="metadata" className="max-h-72 w-full" />
+        <video
+          src={src}
+          controls
+          playsInline
+          preload="metadata"
+          className="h-full w-full object-contain"
+        />
         {onOpenLightbox && (
           <button
             type="button"
