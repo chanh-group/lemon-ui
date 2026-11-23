@@ -94,7 +94,13 @@ describe('callApi', () => {
     })
 
     const result = await callApi.getActiveCall()
-    expect(api.get).toHaveBeenCalledWith('/calls/active')
+    expect(api.get).toHaveBeenCalledWith(
+      '/calls/active',
+      expect.objectContaining({
+        params: expect.objectContaining({ _t: expect.any(Number) }),
+        headers: expect.objectContaining({ 'Cache-Control': expect.any(String) }),
+      }),
+    )
     expect(result?.id).toBe('call-123')
   })
 

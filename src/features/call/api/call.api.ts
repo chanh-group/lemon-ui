@@ -68,7 +68,13 @@ export const callApi = {
 
   /** Lấy thông tin cuộc gọi đang hoạt động (phục vụ F5 reload recovery) */
   getActiveCall: async (): Promise<CallResponse | null> => {
-    const res = await api.get<ActiveCallResponse>('/calls/active')
+    const res = await api.get<ActiveCallResponse>('/calls/active', {
+      params: { _t: Date.now() },
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        Pragma: 'no-cache',
+      },
+    })
     return res.data?.call ?? null
   },
 

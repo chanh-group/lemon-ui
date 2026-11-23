@@ -73,10 +73,28 @@ export function CallScreen({
   const stopDialingSoundRef = useRef<(() => void) | null>(null)
   const hasInitiatedRef = useRef(false)
   const hasAcceptedRef = useRef(false)
+  const hasSetupRef = useRef(false)
   const answeredAtRef = useRef<number | null>(null)
   const activeCallRef = useRef<CallResponse | null>(null)
   const phaseRef = useRef<CallPhase>(phase)
   const isTerminatedRef = useRef(false)
+  const isReloadingRef = useRef(false)
+  const livekitDetailsRef = useRef<LiveKitConnectionDetails | null>(null)
+  const livekitRef = useRef(livekit)
+
+  useEffect(() => {
+    const onReloadKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'F5' || ((e.ctrlKey || e.metaKey) && (e.key === 'r' || e.key === 'R'))) {
+        isReloadingRef.current = true
+      }
+    }
+    window.addEventListener('keydown', onReloadKeyDown)
+    return () => window.removeEventListener('keydown', onReloadKeyDown)
+  }, [])
+
+  useEffect(() => {
+    livekitRef.current = livekit
+  }, [livekit])
 
   useEffect(() => {
     phaseRef.current = phase
@@ -85,6 +103,10 @@ export function CallScreen({
   useEffect(() => {
     activeCallRef.current = activeCall
   }, [activeCall])
+
+  useEffect(() => {
+    livekitDetailsRef.current = livekitDetails
+  }, [livekitDetails])
 
   const cachedPeer = (() => {
     if (typeof window === 'undefined' || !conversationId) return null
@@ -176,27 +198,149 @@ export function CallScreen({
     navigate(ROUTES.messages)
   }, [conversationId, livekit, onPreviewClose, previewCall, stopDialing, navigate, searchParams])
 
-  // Caller: Khởi tạo cuộc gọi duy nhất 1 lần khi màn hình mở ở trạng thái ringing
+  // Khởi tạo cuộc gọi mới hoặc phục hồi cuộc gọi đang diễn ra khi F5 reload
   useEffect(() => {
-    if (hasInitiatedRef.current || previewCall) return
-    const stateParam = searchParams.get('state')
-    if (stateParam === 'ringing' && conversationId) {
-      hasInitiatedRef.current = true
+    if (hasSetupRef.current || previewCall || !conversationId) return
+    hasSetupRef.current = true
 
-      const run = async () => {
-        // 1. Kích hoạt xin cấp quyền camera / microphone ngay lập tức
-        await livekit.requestMediaPermissions(media === 'video' ? 'VIDEO' : 'VOICE')
+    const stateParam = searchParams.get('state')
+    const paramCallId = searchParams.get('callId')
+
+    const setupCall = async () => {
+      // 1. Kích hoạt xin cấp quyền camera / microphone ngay lập tức
+      await livekitRef.current.requestMediaPermissions(media === 'video' ? 'VIDEO' : 'VOICE')
+
+      if (isTerminatedRef.current) return
+
+      // Trường hợp 1: Phục hồi hoặc chấp nhận cuộc gọi khi đã có callId trên URL
+      if (paramCallId) {
+        let currentActiveCall: CallResponse | null = null
+        try {
+          currentActiveCall = await callApi.getActiveCall()
+        } catch (err) {
+          console.warn('Could not query active call for recovery:', err)
+        }
 
         if (isTerminatedRef.current) return
 
-        // 2. Gọi API khởi tạo cuộc gọi đến backend
+        // 1A: Cuộc gọi đã ở trạng thái ACCEPTED (F5 reload khi đang trong cuộc gọi)
+        if (
+          currentActiveCall &&
+          currentActiveCall.id === paramCallId &&
+          currentActiveCall.status === 'ACCEPTED'
+        ) {
+          hasInitiatedRef.current = true
+          hasAcceptedRef.current = true
+          setActiveCall(currentActiveCall)
+          setPhase('active')
+          const nowIso = new Date().toISOString()
+          answeredAtRef.current = Date.parse(
+            currentActiveCall.answeredAt || currentActiveCall.startedAt || nowIso,
+          )
+          stopDialing()
+          playConnectedTone()
+
+          try {
+            const tokenData = await callApi.getCallToken(paramCallId)
+            if (isTerminatedRef.current) return
+            setLivekitDetails(tokenData)
+            livekitDetailsRef.current = tokenData
+            await livekitRef.current.connect(
+              tokenData.serverUrl,
+              tokenData.token,
+              media === 'video' ? 'VIDEO' : 'VOICE',
+            )
+          } catch (tokenErr) {
+            console.error('Failed to restore LiveKit connection on recovery:', tokenErr)
+          }
+          return
+        }
+
+        // 1B: Callee mở màn hình để chấp nhận cuộc gọi (state = active & callId)
+        if (stateParam === 'active') {
+          hasAcceptedRef.current = true
+
+          try {
+            const res = await callApi.acceptCall(paramCallId)
+            if (isTerminatedRef.current) {
+              sendBeaconCallTermination({
+                callId: paramCallId,
+                action: 'end',
+                reason: 'WINDOW_CLOSED',
+              })
+              try {
+                window.opener?.postMessage(
+                  {
+                    type: 'LEMON_CALL_TERMINATE',
+                    callId: paramCallId,
+                    action: 'end',
+                    reason: 'WINDOW_CLOSED',
+                  },
+                  '*',
+                )
+              } catch {
+                // ignore
+              }
+              return
+            }
+
+            const nowIso = new Date().toISOString()
+            answeredAtRef.current = Date.parse(res.answeredAt || nowIso)
+            setActiveCall({
+              id: res.id,
+              conversationId,
+              callerId: '',
+              media: media === 'video' ? 'VIDEO' : 'VOICE',
+              status: 'ACCEPTED',
+              startedAt: nowIso,
+              answeredAt: res.answeredAt,
+              endedAt: null,
+              durationSecs: 0,
+              livekit: res.livekit,
+            })
+            setLivekitDetails(res.livekit)
+            livekitDetailsRef.current = res.livekit
+            playConnectedTone()
+            await livekitRef.current.connect(
+              res.livekit.serverUrl,
+              res.livekit.token,
+              media === 'video' ? 'VIDEO' : 'VOICE',
+            )
+          } catch (err: unknown) {
+            if (isTerminatedRef.current) return
+            console.error('Failed to accept call:', err)
+            toast.error(t('chat.callAcceptError'))
+            setPhase('ended')
+            setEndReason('declined')
+          }
+          return
+        }
+
+        // 1C: Caller F5 reload trong khi cuộc gọi vẫn đang RINGING
+        if (
+          currentActiveCall &&
+          currentActiveCall.id === paramCallId &&
+          (currentActiveCall.status === 'RINGING' || currentActiveCall.status === 'INITIATED') &&
+          stateParam === 'ringing'
+        ) {
+          hasInitiatedRef.current = true
+          setActiveCall(currentActiveCall)
+          setPhase('ringing')
+          stopDialingSoundRef.current = playOutgoingDialingSound()
+          return
+        }
+      }
+
+      // Trường hợp 2: Caller khởi tạo cuộc gọi mới từ đầu (state = ringing, chưa có callId trên URL)
+      if (stateParam === 'ringing') {
+        hasInitiatedRef.current = true
+
         try {
           const res = await callApi.initiateCall({
             conversationId,
             media: media === 'video' ? 'VIDEO' : 'VOICE',
           })
 
-          // Nếu người dùng đóng cửa sổ hoặc thoát trong lúc request đang gửi:
           if (isTerminatedRef.current) {
             sendBeaconCallTermination({ callId: res.id, action: 'cancel' })
             try {
@@ -210,9 +354,20 @@ export function CallScreen({
             return
           }
 
+          // Cập nhật callId lên URL để nếu người dùng F5 reload thì nhận diện được cuộc gọi hiện tại
+          if (typeof window !== 'undefined') {
+            try {
+              const newUrl = new URL(window.location.href)
+              newUrl.searchParams.set('callId', res.id)
+              window.history.replaceState(null, '', newUrl.toString())
+            } catch {
+              // ignore
+            }
+          }
+
           setActiveCall(res)
           setLivekitDetails(res.livekit)
-          // 3. Phát âm thanh chuông tút tút cuộc gọi đi
+          livekitDetailsRef.current = res.livekit
           stopDialingSoundRef.current = playOutgoingDialingSound()
         } catch (err: unknown) {
           if (isTerminatedRef.current) return
@@ -222,96 +377,59 @@ export function CallScreen({
           setEndReason('cancelled')
         }
       }
-
-      void run()
     }
-  }, [conversationId, livekit, media, previewCall, searchParams, t])
 
-  // Callee: Chấp nhận cuộc gọi duy nhất 1 lần khi màn hình mở ở trạng thái active có callId
-  useEffect(() => {
-    if (hasAcceptedRef.current || previewCall) return
-    const stateParam = searchParams.get('state')
-    const callId = searchParams.get('callId')
-
-    if (stateParam === 'active' && callId && conversationId) {
-      hasAcceptedRef.current = true
-
-      const run = async () => {
-        // 1. Kích hoạt xin cấp quyền camera / microphone ngay lập tức
-        await livekit.requestMediaPermissions(media === 'video' ? 'VIDEO' : 'VOICE')
-
-        if (isTerminatedRef.current) return
-
-        // 2. Gọi API accept call
-        try {
-          const res = await callApi.acceptCall(callId)
-
-          // Nếu người dùng đóng cửa sổ trong lúc acceptCall đang gửi:
-          if (isTerminatedRef.current) {
-            sendBeaconCallTermination({ callId, action: 'end', reason: 'WINDOW_CLOSED' })
-            try {
-              window.opener?.postMessage(
-                { type: 'LEMON_CALL_TERMINATE', callId, action: 'end', reason: 'WINDOW_CLOSED' },
-                '*',
-              )
-            } catch {
-              // ignore
-            }
-            return
-          }
-
-          const nowIso = new Date().toISOString()
-          answeredAtRef.current = Date.parse(res.answeredAt || nowIso)
-          setActiveCall({
-            id: res.id,
-            conversationId,
-            callerId: '',
-            media: media === 'video' ? 'VIDEO' : 'VOICE',
-            status: 'ACCEPTED',
-            startedAt: nowIso,
-            answeredAt: res.answeredAt,
-            endedAt: null,
-            durationSecs: 0,
-            livekit: res.livekit,
-          })
-          setLivekitDetails(res.livekit)
-          playConnectedTone()
-          // 3. Kết nối vào LiveKit SFU Room
-          await livekit.connect(
-            res.livekit.serverUrl,
-            res.livekit.token,
-            media === 'video' ? 'VIDEO' : 'VOICE',
-          )
-        } catch (err: unknown) {
-          if (isTerminatedRef.current) return
-          console.error('Failed to accept call:', err)
-          toast.error(t('chat.callAcceptError'))
-          setPhase('ended')
-          setEndReason('declined')
-        }
-      }
-
-      void run()
-    }
-  }, [conversationId, livekit, media, previewCall, searchParams, t])
+    void setupCall()
+  }, [conversationId, media, previewCall, searchParams, stopDialing, t])
 
   // Lắng nghe các sự kiện Socket.IO trong cửa sổ đàm thoại
   useEffect(() => {
     const socket = getChatSocket()
 
     const onAccepted = async (payload: CallAcceptedPayload) => {
+      if (phaseRef.current === 'active') return
       stopDialing()
       playConnectedTone()
       setPhase('active')
       answeredAtRef.current = Date.parse(payload.answeredAt || new Date().toISOString())
 
       // Caller kết nối vào phòng LiveKit SFU khi Callee nhấc máy
-      if (livekitDetails) {
-        await livekit.connect(
-          livekitDetails.serverUrl,
-          livekitDetails.token,
-          media === 'video' ? 'VIDEO' : 'VOICE',
-        )
+      let targetDetails = payload.livekit || livekitDetailsRef.current
+      if (!targetDetails && payload.callId) {
+        try {
+          targetDetails = await callApi.getCallToken(payload.callId)
+          setLivekitDetails(targetDetails)
+          livekitDetailsRef.current = targetDetails
+        } catch (tokenErr) {
+          console.error('Failed to get call token in onAccepted:', tokenErr)
+        }
+      }
+
+      if (targetDetails) {
+        try {
+          await livekitRef.current.connect(
+            targetDetails.serverUrl,
+            targetDetails.token,
+            media === 'video' ? 'VIDEO' : 'VOICE',
+          )
+        } catch (connectErr) {
+          console.error('LiveKit initial connect error, attempting token refresh:', connectErr)
+          if (payload.callId) {
+            try {
+              const refreshed = await callApi.getCallToken(payload.callId)
+              setLivekitDetails(refreshed)
+              livekitDetailsRef.current = refreshed
+              await livekitRef.current.connect(
+                refreshed.serverUrl,
+                refreshed.token,
+                media === 'video' ? 'VIDEO' : 'VOICE',
+              )
+            } catch (refreshErr) {
+              console.error('LiveKit refreshed connect error:', refreshErr)
+              toast.error(t('chat.callConnectError', 'Lỗi kết nối phòng đàm thoại'))
+            }
+          }
+        }
       }
     }
 
@@ -325,7 +443,7 @@ export function CallScreen({
           ? `${t('chat.callEndedDeclined')} (${payload.reason})`
           : t('chat.callEndedDeclined'),
       )
-      livekit.disconnect()
+      livekitRef.current.disconnect()
 
       window.setTimeout(() => {
         handleClose()
@@ -338,7 +456,7 @@ export function CallScreen({
       setPhase('ended')
       setEndReason('cancelled')
       toast.info(t('chat.callEndedCancelled'))
-      livekit.disconnect()
+      livekitRef.current.disconnect()
 
       window.setTimeout(() => {
         handleClose()
@@ -348,10 +466,10 @@ export function CallScreen({
     const onEnded = (payload: CallEndedPayload) => {
       stopDialing()
       playHangupTone()
-      livekit.disconnect()
+      livekitRef.current.disconnect()
       setPhase('ended')
       setEndReason('ended')
-      setFinalSeconds(payload.durationSecs || seconds)
+      setFinalSeconds(payload.durationSecs || 0)
 
       window.setTimeout(() => {
         handleClose()
@@ -363,7 +481,7 @@ export function CallScreen({
       playHangupTone()
       setPhase('ended')
       setEndReason('cancelled')
-      livekit.disconnect()
+      livekitRef.current.disconnect()
 
       window.setTimeout(() => {
         handleClose()
@@ -383,7 +501,7 @@ export function CallScreen({
       socket.off('call:ended', onEnded)
       socket.off('call:missed', onMissed)
     }
-  }, [handleClose, livekit, livekitDetails, media, seconds, stopDialing, t])
+  }, [handleClose, media, stopDialing, t])
 
   // Đếm thời lượng cuộc gọi
   useEffect(() => {
@@ -401,24 +519,24 @@ export function CallScreen({
   // Giải phóng tài nguyên trên backend nếu người dùng tắt trình duyệt / tab đột ngột (nút X / Alt+F4)
   useEffect(() => {
     const handleWindowUnload = () => {
+      // Nếu người dùng đang reload (F5 / Ctrl+R): KHÔNG giải phóng cuộc gọi
+      // để bên Callee vẫn duy trì modal nhận cuộc gọi bình thường
+      if (isReloadingRef.current) return
+
       isTerminatedRef.current = true
       const call = activeCallRef.current
       const callId = call?.id || searchParams.get('callId')
       const currentPhase = phaseRef.current
 
-      if (callId && currentPhase !== 'ended') {
-        if (currentPhase === 'active') {
-          sendBeaconCallTermination({ callId, action: 'end', reason: 'WINDOW_CLOSED' })
-        } else if (currentPhase === 'ringing') {
-          sendBeaconCallTermination({ callId, action: 'cancel' })
-        }
+      if (callId && currentPhase === 'active') {
+        sendBeaconCallTermination({ callId, action: 'end', reason: 'WINDOW_CLOSED' })
 
         try {
           window.opener?.postMessage(
             {
               type: 'LEMON_CALL_TERMINATE',
               callId,
-              action: currentPhase === 'ringing' ? 'cancel' : 'end',
+              action: 'end',
               reason: 'WINDOW_CLOSED',
             },
             '*',
@@ -427,6 +545,9 @@ export function CallScreen({
           // ignore
         }
       }
+      // Lưu ý: Đối với pha ringing, không gửi cancel beacon trong unload để tránh hủy nhầm
+      // khi người dùng reload bằng nút trên trình duyệt. Nếu người dùng thực sự đóng cửa sổ nổi ("X"),
+      // tab chính (window.opener) sẽ phát hiện win.closed === true và tự động hủy sau 1 giây.
     }
 
     window.addEventListener('pagehide', handleWindowUnload)
@@ -488,6 +609,7 @@ export function CallScreen({
     setFinalSeconds(0)
     setSeconds(0)
     hasInitiatedRef.current = false
+    hasSetupRef.current = false
     setPhase('ringing')
   }
 

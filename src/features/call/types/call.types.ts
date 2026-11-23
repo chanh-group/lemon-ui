@@ -79,6 +79,7 @@ export interface CallAcceptedPayload {
   callId: string
   acceptedBy: string
   answeredAt: string
+  livekit?: LiveKitConnectionDetails
 }
 
 export interface CallRejectedPayload {
