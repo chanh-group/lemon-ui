@@ -9,7 +9,7 @@ import { useAuth } from '@/features/auth/api'
 import { useConversationQuery } from '@/features/conversation/hooks/useConversations'
 import { getChatSocket } from '@/lib/socket'
 import { cn } from '@/lib/utils'
-import { callApi } from '../../api/call.api'
+import { callApi, sendBeaconCallTermination } from '../../api/call.api'
 import { useLiveKitCall } from '../../hooks/useLiveKitCall'
 import { playConnectedTone, playHangupTone, playOutgoingDialingSound } from '../../utils/callSounds'
 import type {
@@ -75,6 +75,12 @@ export function CallScreen({
   const hasAcceptedRef = useRef(false)
   const answeredAtRef = useRef<number | null>(null)
   const activeCallRef = useRef<CallResponse | null>(null)
+  const phaseRef = useRef<CallPhase>(phase)
+  const isTerminatedRef = useRef(false)
+
+  useEffect(() => {
+    phaseRef.current = phase
+  }, [phase])
 
   useEffect(() => {
     activeCallRef.current = activeCall
@@ -116,8 +122,36 @@ export function CallScreen({
   }, [])
 
   const handleClose = useCallback(() => {
+    isTerminatedRef.current = true
     stopDialing()
     livekit.disconnect()
+
+    const callId = activeCallRef.current?.id || searchParams.get('callId')
+    const currentPhase = phaseRef.current
+
+    if (callId && currentPhase !== 'ended') {
+      if (currentPhase === 'ringing') {
+        void callApi.cancelCall(callId)
+        sendBeaconCallTermination({ callId, action: 'cancel' })
+      } else if (currentPhase === 'active') {
+        void callApi.endCall(callId, 'NORMAL')
+        sendBeaconCallTermination({ callId, action: 'end', reason: 'NORMAL' })
+      }
+
+      try {
+        window.opener?.postMessage(
+          {
+            type: 'LEMON_CALL_TERMINATE',
+            callId,
+            action: currentPhase === 'ringing' ? 'cancel' : 'end',
+            reason: 'NORMAL',
+          },
+          '*',
+        )
+      } catch {
+        // ignore
+      }
+    }
 
     if (conversationId && typeof window !== 'undefined') {
       try {
@@ -140,7 +174,7 @@ export function CallScreen({
     }
 
     navigate(ROUTES.messages)
-  }, [conversationId, livekit, onPreviewClose, previewCall, stopDialing, navigate])
+  }, [conversationId, livekit, onPreviewClose, previewCall, stopDialing, navigate, searchParams])
 
   // Caller: Khởi tạo cuộc gọi duy nhất 1 lần khi màn hình mở ở trạng thái ringing
   useEffect(() => {
@@ -153,17 +187,35 @@ export function CallScreen({
         // 1. Kích hoạt xin cấp quyền camera / microphone ngay lập tức
         await livekit.requestMediaPermissions(media === 'video' ? 'VIDEO' : 'VOICE')
 
+        if (isTerminatedRef.current) return
+
         // 2. Gọi API khởi tạo cuộc gọi đến backend
         try {
           const res = await callApi.initiateCall({
             conversationId,
             media: media === 'video' ? 'VIDEO' : 'VOICE',
           })
+
+          // Nếu người dùng đóng cửa sổ hoặc thoát trong lúc request đang gửi:
+          if (isTerminatedRef.current) {
+            sendBeaconCallTermination({ callId: res.id, action: 'cancel' })
+            try {
+              window.opener?.postMessage(
+                { type: 'LEMON_CALL_TERMINATE', callId: res.id, action: 'cancel' },
+                '*',
+              )
+            } catch {
+              // ignore
+            }
+            return
+          }
+
           setActiveCall(res)
           setLivekitDetails(res.livekit)
           // 3. Phát âm thanh chuông tút tút cuộc gọi đi
           stopDialingSoundRef.current = playOutgoingDialingSound()
         } catch (err: unknown) {
+          if (isTerminatedRef.current) return
           console.error('Failed to initiate call:', err)
           toast.error(t('chat.callInitiateError'))
           setPhase('ended')
@@ -188,9 +240,26 @@ export function CallScreen({
         // 1. Kích hoạt xin cấp quyền camera / microphone ngay lập tức
         await livekit.requestMediaPermissions(media === 'video' ? 'VIDEO' : 'VOICE')
 
+        if (isTerminatedRef.current) return
+
         // 2. Gọi API accept call
         try {
           const res = await callApi.acceptCall(callId)
+
+          // Nếu người dùng đóng cửa sổ trong lúc acceptCall đang gửi:
+          if (isTerminatedRef.current) {
+            sendBeaconCallTermination({ callId, action: 'end', reason: 'WINDOW_CLOSED' })
+            try {
+              window.opener?.postMessage(
+                { type: 'LEMON_CALL_TERMINATE', callId, action: 'end', reason: 'WINDOW_CLOSED' },
+                '*',
+              )
+            } catch {
+              // ignore
+            }
+            return
+          }
+
           const nowIso = new Date().toISOString()
           answeredAtRef.current = Date.parse(res.answeredAt || nowIso)
           setActiveCall({
@@ -214,6 +283,7 @@ export function CallScreen({
             media === 'video' ? 'VIDEO' : 'VOICE',
           )
         } catch (err: unknown) {
+          if (isTerminatedRef.current) return
           console.error('Failed to accept call:', err)
           toast.error(t('chat.callAcceptError'))
           setPhase('ended')
@@ -328,22 +398,44 @@ export function CallScreen({
     return () => window.clearInterval(timer)
   }, [phase])
 
-  // Giải phóng tài nguyên trên backend nếu người dùng tắt trình duyệt / tab đột ngột
+  // Giải phóng tài nguyên trên backend nếu người dùng tắt trình duyệt / tab đột ngột (nút X / Alt+F4)
   useEffect(() => {
-    const handleBeforeUnload = () => {
+    const handleWindowUnload = () => {
+      isTerminatedRef.current = true
       const call = activeCallRef.current
-      if (call) {
-        if (phase === 'active') {
-          void callApi.endCall(call.id, 'WINDOW_CLOSED')
-        } else if (phase === 'ringing') {
-          void callApi.cancelCall(call.id)
+      const callId = call?.id || searchParams.get('callId')
+      const currentPhase = phaseRef.current
+
+      if (callId && currentPhase !== 'ended') {
+        if (currentPhase === 'active') {
+          sendBeaconCallTermination({ callId, action: 'end', reason: 'WINDOW_CLOSED' })
+        } else if (currentPhase === 'ringing') {
+          sendBeaconCallTermination({ callId, action: 'cancel' })
+        }
+
+        try {
+          window.opener?.postMessage(
+            {
+              type: 'LEMON_CALL_TERMINATE',
+              callId,
+              action: currentPhase === 'ringing' ? 'cancel' : 'end',
+              reason: 'WINDOW_CLOSED',
+            },
+            '*',
+          )
+        } catch {
+          // ignore
         }
       }
     }
 
-    window.addEventListener('beforeunload', handleBeforeUnload)
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
-  }, [phase])
+    window.addEventListener('pagehide', handleWindowUnload)
+    window.addEventListener('beforeunload', handleWindowUnload)
+    return () => {
+      window.removeEventListener('pagehide', handleWindowUnload)
+      window.removeEventListener('beforeunload', handleWindowUnload)
+    }
+  }, [searchParams])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {

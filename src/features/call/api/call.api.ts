@@ -1,4 +1,5 @@
-import { api } from '@/infrastructure/api/client'
+import { api, API_BASE_URL } from '@/infrastructure/api/client'
+import { useAuthStore } from '@/infrastructure/auth/auth-store'
 import type {
   AcceptCallResponse,
   ActiveCallResponse,
@@ -8,6 +9,40 @@ import type {
   CallTokenResponse,
   InitiateCallResponse,
 } from '../types/call.types'
+
+/**
+ * Gửi yêu cầu giải phóng cuộc gọi (cancel / end) bằng fetch keepalive: true.
+ * Đảm bảo request vẫn được trình duyệt hoàn tất kể cả khi cửa sổ / tab bị đóng đột ngột (nút X / Alt+F4).
+ */
+export function sendBeaconCallTermination(params: {
+  callId: string
+  action: 'cancel' | 'end'
+  reason?: string
+}): void {
+  if (typeof window === 'undefined' || !params.callId) return
+
+  const token = useAuthStore.getState().accessToken
+  const endpoint = `${API_BASE_URL}/calls/${params.callId}/${params.action}`
+  const body =
+    params.action === 'end'
+      ? JSON.stringify({ reason: params.reason || 'WINDOW_CLOSED' })
+      : undefined
+
+  try {
+    void fetch(endpoint, {
+      method: 'POST',
+      keepalive: true,
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body,
+    })
+  } catch {
+    // Bỏ qua lỗi trình duyệt nếu không hỗ trợ fetch keepalive
+  }
+}
 
 export const callApi = {
   /** Khởi tạo cuộc gọi thoại / video mới */

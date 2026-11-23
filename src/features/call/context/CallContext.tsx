@@ -94,6 +94,23 @@ export function CallProvider({ children }: { children: ReactNode }) {
     }
   }, [dismissIncomingCall, status, stopRingtone, t])
 
+  // Lắng nghe tín hiệu giải phóng cuộc gọi từ popup window qua postMessage
+  useEffect(() => {
+    const onMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'LEMON_CALL_TERMINATE' && event.data.callId) {
+        const { callId, action, reason } = event.data
+        if (action === 'cancel') {
+          void callApi.cancelCall(callId)
+        } else if (action === 'end') {
+          void callApi.endCall(callId, reason || 'WINDOW_CLOSED')
+        }
+      }
+    }
+
+    window.addEventListener('message', onMessage)
+    return () => window.removeEventListener('message', onMessage)
+  }, [])
+
   const startCall = useCallback(
     ({
       conversationId,
@@ -107,7 +124,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
       peerAvatar?: string | null
     }) => {
       const uiMedia = toUiMedia(media)
-      openCallWindow(
+      const win = openCallWindow(
         conversationId,
         {
           media: uiMedia,
@@ -124,6 +141,32 @@ export function CallProvider({ children }: { children: ReactNode }) {
           )
         },
       )
+
+      if (win) {
+        // Fallback guard trên tab chính: nếu popup bị đóng đột ngột (nút X / crash),
+        // kiểm tra và dọn dẹp cuộc gọi còn kẹt ở trạng thái đổ chuông
+        const checkInterval = window.setInterval(() => {
+          if (win.closed) {
+            window.clearInterval(checkInterval)
+            void (async () => {
+              try {
+                const active = await callApi.getActiveCall()
+                if (
+                  active &&
+                  (active.status === 'RINGING' || active.status === 'INITIATED') &&
+                  active.conversationId === conversationId
+                ) {
+                  await callApi.cancelCall(active.id)
+                }
+              } catch {
+                // ignore
+              }
+            })()
+          }
+        }, 1000)
+
+        window.setTimeout(() => window.clearInterval(checkInterval), 60000)
+      }
     },
     [t],
   )
@@ -131,7 +174,6 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const acceptIncomingCall = useCallback(
     (overrideMedia?: CallMedia) => {
       if (!incomingCall) return
-      stopRingtone()
 
       const targetMedia = overrideMedia || incomingCall.media
       const uiMedia = toUiMedia(targetMedia)
@@ -140,10 +182,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
       const pName = incomingCall.caller.fullName || incomingCall.caller.username
       const pAvatar = incomingCall.caller.avatarUrl
 
-      setIncomingCall(null)
-
-      // Mở hẳn cửa sổ mới cho cuộc gọi
-      openCallWindow(
+      // Mở cửa sổ mới cho cuộc gọi TRƯỚC khi tắt chuông và xóa incoming modal
+      const win = openCallWindow(
         convId,
         {
           media: uiMedia,
@@ -161,6 +201,15 @@ export function CallProvider({ children }: { children: ReactNode }) {
           )
         },
       )
+
+      // Nếu popup bị chặn (win === null), KHÔNG xóa modal và KHÔNG tắt chuông
+      // để người dùng cho phép popup và bấm lại Chấp nhận
+      if (!win) {
+        return
+      }
+
+      stopRingtone()
+      setIncomingCall(null)
     },
     [incomingCall, stopRingtone, t],
   )

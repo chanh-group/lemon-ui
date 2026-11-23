@@ -1,11 +1,19 @@
+// @vitest-environment happy-dom
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { api } from '@/infrastructure/api/client'
-import { callApi } from './call.api'
+import { callApi, sendBeaconCallTermination } from './call.api'
 
 vi.mock('@/infrastructure/api/client', () => ({
+  API_BASE_URL: 'http://localhost:3000/api',
   api: {
     post: vi.fn(),
     get: vi.fn(),
+  },
+}))
+
+vi.mock('@/infrastructure/auth/auth-store', () => ({
+  useAuthStore: {
+    getState: vi.fn().mockReturnValue({ accessToken: 'mock-token' }),
   },
 }))
 
@@ -98,5 +106,41 @@ describe('callApi', () => {
     const result = await callApi.endCall('call-123', 'USER_HANGUP')
     expect(api.post).toHaveBeenCalledWith('/calls/call-123/end', { reason: 'USER_HANGUP' })
     expect(result.status).toBe('COMPLETED')
+  })
+
+  it('sendBeaconCallTermination dispatches keepalive fetch for cancel', () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+
+    sendBeaconCallTermination({ callId: 'call-456', action: 'cancel' })
+
+    expect(fetchMock).toHaveBeenCalledWith('http://localhost:3000/api/calls/call-456/cancel', {
+      method: 'POST',
+      keepalive: true,
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer mock-token',
+      },
+      body: undefined,
+    })
+  })
+
+  it('sendBeaconCallTermination dispatches keepalive fetch for end with reason', () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+
+    sendBeaconCallTermination({ callId: 'call-789', action: 'end', reason: 'WINDOW_CLOSED' })
+
+    expect(fetchMock).toHaveBeenCalledWith('http://localhost:3000/api/calls/call-789/end', {
+      method: 'POST',
+      keepalive: true,
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer mock-token',
+      },
+      body: JSON.stringify({ reason: 'WINDOW_CLOSED' }),
+    })
   })
 })
