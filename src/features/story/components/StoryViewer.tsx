@@ -5,7 +5,6 @@ import {
   ArrowLeft,
   ArrowRight,
   Eye,
-  EyeOff,
   Pause,
   Play,
   Trash2,
@@ -27,7 +26,6 @@ import {
 import {
   useDeleteStory,
   useLikeStory,
-  useMuteAuthor,
   useReactStory,
   useReplyStory,
   useStoryMedia,
@@ -97,7 +95,6 @@ export function StoryViewer({
   const reply = useReplyStory()
   const update = useUpdateStory()
   const remove = useDeleteStory()
-  const mute = useMuteAuthor()
   const [reaction, setReaction] = useState(story.viewerReaction ?? null)
   const [reactionKind, setReactionKind] = useState(story.myReactionKind ?? null)
   const isVideo = story.mediaType === 'video'
@@ -260,17 +257,6 @@ export function StoryViewer({
     }
   }
 
-  async function muteCurrentAuthor() {
-    if (!story.authorId) return
-    try {
-      await mute.mutateAsync(story.authorId)
-      onClose()
-      toast.success(t('chat.storyMuted'))
-    } catch {
-      toast.error(t('chat.storyActionError'))
-    }
-  }
-
   const name = storyDisplayName(story, t)
   const actionClass =
     'grid size-10 place-items-center rounded-full bg-background/75 text-foreground shadow-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring'
@@ -420,17 +406,6 @@ export function StoryViewer({
                   <Trash2 size={18} />
                 </button>
               </>
-            )}
-            {!story.mine && story.authorId && (
-              <button
-                type="button"
-                onClick={() => void muteCurrentAuthor()}
-                disabled={mute.isPending}
-                className={actionClass}
-                aria-label={t('chat.muteStory')}
-              >
-                <EyeOff size={18} />
-              </button>
             )}
           </div>
         </header>

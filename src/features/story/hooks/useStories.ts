@@ -8,18 +8,15 @@ import {
   type UpdateStoryPayload,
   createTextStory,
   getArchivedStories,
-  getMutedAuthors,
   getStoryReactions,
   getStorySettings,
   getStoryViews,
   getStoryMediaUrl,
   likeStory,
   listStories,
-  muteAuthor,
   reactStory,
   replyStory,
   unlikeStory,
-  unmuteAuthor,
   unreactStory,
   updateStorySettings,
   viewStory,
@@ -178,37 +175,6 @@ export function useUpdateStorySettings() {
     onSuccess: (data) => {
       queryClient.setQueryData(STORY_SETTINGS_KEY, data)
       queryClient.invalidateQueries({ queryKey: STORY_SETTINGS_KEY })
-    },
-  })
-}
-
-export const MUTED_AUTHORS_KEY = ['stories', 'mutes'] as const
-
-export function useMutedAuthors() {
-  return useQuery({
-    queryKey: MUTED_AUTHORS_KEY,
-    queryFn: () => getMutedAuthors(),
-  })
-}
-
-export function useMuteAuthor() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: (authorId: string) => muteAuthor(authorId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: STORIES_KEY })
-      queryClient.invalidateQueries({ queryKey: MUTED_AUTHORS_KEY })
-    },
-  })
-}
-
-export function useUnmuteAuthor() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: (authorId: string) => unmuteAuthor(authorId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: STORIES_KEY })
-      queryClient.invalidateQueries({ queryKey: MUTED_AUTHORS_KEY })
     },
   })
 }

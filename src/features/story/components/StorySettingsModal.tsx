@@ -7,15 +7,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Switch } from '@/components/ui/switch'
-import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
-import { useFriends } from '@/features/friend/hooks/useFriends'
-import {
-  useMutedAuthors,
-  useStorySettings,
-  useUnmuteAuthor,
-  useUpdateStorySettings,
-} from '@/features/story/hooks/useStories'
+import { useStorySettings, useUpdateStorySettings } from '@/features/story/hooks/useStories'
 
 interface StorySettingsModalProps {
   open: boolean
@@ -26,14 +19,6 @@ export function StorySettingsModal({ open, onOpenChange }: StorySettingsModalPro
   const { t } = useTranslation()
   const { data: settings, isLoading } = useStorySettings()
   const updateSettings = useUpdateStorySettings()
-  const {
-    data: mutedAuthors = [],
-    isLoading: mutesLoading,
-    isError: mutesError,
-  } = useMutedAuthors()
-  const { data: friends = [] } = useFriends()
-  const unmuteMutation = useUnmuteAuthor()
-
   const viewedReceipts = settings?.viewedReceiptsEnabled ?? true
   const archiveEnabled = settings?.archiveEnabled ?? true
 
@@ -52,15 +37,6 @@ export function StorySettingsModal({ open, onOpenChange }: StorySettingsModalPro
       toast.success(checked ? t('chat.storyArchiveEnabled') : t('chat.storyArchiveDisabled'))
     } catch {
       toast.error(t('chat.storySettingsError'))
-    }
-  }
-
-  const handleUnmute = async (authorId: string) => {
-    try {
-      await unmuteMutation.mutateAsync(authorId)
-      toast.success(t('chat.storyUnmuted'))
-    } catch {
-      toast.error(t('chat.storyUnmuteError'))
     }
   }
 
@@ -112,45 +88,6 @@ export function StorySettingsModal({ open, onOpenChange }: StorySettingsModalPro
                 onCheckedChange={handleToggleArchive}
               />
             </div>
-          </div>
-
-          {/* Section: Danh sách tác giả đã ẩn */}
-          <div className="space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              {t('chat.mutedStoriesTitle')} ({mutedAuthors.length})
-            </h3>
-            {mutesLoading ? (
-              <p className="px-1 text-xs text-muted-foreground">{t('common.loading')}</p>
-            ) : mutesError ? (
-              <p className="px-1 text-xs text-destructive">{t('common.errorMessage')}</p>
-            ) : mutedAuthors.length === 0 ? (
-              <p className="px-1 text-xs italic text-muted-foreground">
-                {t('chat.noMutedStories')}
-              </p>
-            ) : (
-              <div className="max-h-40 overflow-y-auto space-y-2 pr-1">
-                {mutedAuthors.map((authorId) => (
-                  <div
-                    key={authorId}
-                    className="flex items-center justify-between gap-2 rounded-lg border border-border bg-card p-2.5"
-                  >
-                    <span className="truncate text-xs font-medium text-card-foreground">
-                      {friends.find((friend) => friend.id === authorId)?.name ??
-                        t('chat.storyAuthorId', { id: authorId.slice(0, 8) })}
-                    </span>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={unmuteMutation.isPending}
-                      onClick={() => handleUnmute(authorId)}
-                      className="h-7 text-xs"
-                    >
-                      {t('chat.unmuteStory')}
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         </div>
       </DialogContent>
