@@ -37,6 +37,18 @@ export interface CallResponse {
   endedAt: string | null
   durationSecs: number
   endReason?: string | null
+  caller?: {
+    id: string
+    username: string
+    fullName?: string | null
+    avatarUrl?: string | null
+  }
+  callee?: {
+    id: string
+    username: string
+    fullName?: string | null
+    avatarUrl?: string | null
+  }
   livekit?: LiveKitConnectionDetails
 }
 
@@ -93,17 +105,24 @@ export interface CallCancelledPayload {
   cancelledBy: string
 }
 
+/**
+ * Lý do kết thúc cuộc gọi do BE gửi qua socket.
+ * `DISCONNECTED_TIMEOUT`: đối phương ngắt kết nối (tắt tab / mất mạng) trong lúc đổ chuông hoặc đang đàm thoại.
+ * `(string & {})` giữ cho type vẫn chấp nhận các lý do khác từ BE mà không mất autocomplete.
+ */
+export type CallEndReasonValue = 'DISCONNECTED_TIMEOUT' | 'CALLEE_OFFLINE' | (string & {})
+
 export interface CallMissedPayload {
   callId: string
   callerId: string
   media: CallMedia
-  reason: string
+  reason: CallEndReasonValue
 }
 
 export interface CallEndedPayload {
   callId: string
   endedBy: string
-  reason: string
+  reason: CallEndReasonValue
   durationSecs: number
 }
 

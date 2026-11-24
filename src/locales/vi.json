@@ -323,6 +323,7 @@
     "callUserBusy": "Đối phương hiện đang bận cuộc gọi khác.",
     "callReconnecting": "Mạng yếu, đang kết nối lại…",
     "callPeerDisconnected": "Đối phương tạm thời mất kết nối mạng.",
+    "callDisconnectedTimeout": "Đối phương hiện không trực tuyến hoặc đã đóng ứng dụng.",
     "callPeerReconnected": "Đối phương đã kết nối lại.",
     "callMicBlocked": "Lỗi mic",
     "callCameraBlocked": "Lỗi camera",

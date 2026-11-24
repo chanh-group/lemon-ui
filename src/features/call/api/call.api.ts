@@ -16,7 +16,7 @@ import type {
  */
 export function sendBeaconCallTermination(params: {
   callId: string
-  action: 'cancel' | 'end'
+  action: 'cancel' | 'end' | 'reject'
   reason?: string
 }): void {
   if (typeof window === 'undefined' || !params.callId) return
@@ -24,9 +24,12 @@ export function sendBeaconCallTermination(params: {
   const token = useAuthStore.getState().accessToken
   const endpoint = `${API_BASE_URL}/calls/${params.callId}/${params.action}`
   const body =
-    params.action === 'end'
-      ? JSON.stringify({ reason: params.reason || 'WINDOW_CLOSED' })
-      : undefined
+    params.action === 'cancel'
+      ? undefined
+      : JSON.stringify({
+          reason:
+            params.reason || (params.action === 'reject' ? 'CALLEE_OFFLINE' : 'WINDOW_CLOSED'),
+        })
 
   try {
     void fetch(endpoint, {

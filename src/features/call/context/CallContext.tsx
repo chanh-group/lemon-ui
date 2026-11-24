@@ -11,7 +11,7 @@ import { toast } from 'sonner'
 import { useTranslation } from 'react-i18next'
 import { getChatSocket } from '@/lib/socket'
 import { useAuth } from '@/features/auth/api'
-import { callApi } from '../api/call.api'
+import { callApi, sendBeaconCallTermination } from '../api/call.api'
 import { playIncomingRingtone } from '../utils/callSounds'
 import { openCallWindow } from '../utils/callWindow'
 import {
@@ -40,11 +40,12 @@ const CallContext = createContext<CallContextValue | null>(null)
 
 export function CallProvider({ children }: { children: ReactNode }) {
   const { t } = useTranslation()
-  const { status } = useAuth()
+  const { status, user } = useAuth()
 
   const [incomingCall, setIncomingCall] = useState<CallIncomingPayload | null>(null)
   const stopIncomingRingtoneRef = useRef<(() => void) | null>(null)
   const incomingCallRef = useRef<CallIncomingPayload | null>(null)
+  const isReloadingRef = useRef(false)
 
   // Đồng bộ ref với state để các socket listener đọc được incomingCall hiện tại
   // mà không cần đăng ký lại listener mỗi khi incomingCall thay đổi
@@ -64,6 +65,80 @@ export function CallProvider({ children }: { children: ReactNode }) {
     incomingCallRef.current = null
     setIncomingCall(null)
   }, [stopRingtone])
+
+  // Bắt sự kiện phím reload (F5 / Ctrl+R / Cmd+R) để phân biệt giữa F5 reload và tắt tab
+  useEffect(() => {
+    const onReloadKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'F5' || ((e.ctrlKey || e.metaKey) && (e.key === 'r' || e.key === 'R'))) {
+        isReloadingRef.current = true
+      }
+    }
+    window.addEventListener('keydown', onReloadKeyDown)
+    return () => window.removeEventListener('keydown', onReloadKeyDown)
+  }, [])
+
+  // Khi Callee tắt hẳn tab / trình duyệt (không phải F5 reload): gửi beacon reject ngay lập tức
+  useEffect(() => {
+    const handleWindowUnload = () => {
+      if (isReloadingRef.current) return
+      const current = incomingCallRef.current
+      if (current?.callId) {
+        sendBeaconCallTermination({
+          callId: current.callId,
+          action: 'reject',
+          reason: 'CALLEE_OFFLINE',
+        })
+      }
+    }
+
+    window.addEventListener('pagehide', handleWindowUnload)
+    window.addEventListener('beforeunload', handleWindowUnload)
+    return () => {
+      window.removeEventListener('pagehide', handleWindowUnload)
+      window.removeEventListener('beforeunload', handleWindowUnload)
+    }
+  }, [])
+
+  // Phục hồi cuộc gọi đang đổ chuông khi Callee F5 reload trang
+  useEffect(() => {
+    if (status !== 'authenticated') return
+    let isMounted = true
+
+    void (async () => {
+      try {
+        const active = await callApi.getActiveCall()
+        if (!isMounted || !active) return
+
+        // Nếu cuộc gọi đang ở trạng thái RINGING hoặc INITIATED và người dùng hiện tại là Callee:
+        // khôi phục lại modal IncomingCall và phát lại nhạc chuông cuộc gọi đến
+        if (
+          (active.status === 'RINGING' || active.status === 'INITIATED') &&
+          active.id &&
+          active.callerId !== user?.id
+        ) {
+          setIncomingCall({
+            callId: active.id,
+            conversationId: active.conversationId,
+            caller: {
+              id: active.callerId,
+              username: active.caller?.username || '',
+              fullName: active.caller?.fullName || null,
+              avatarUrl: active.caller?.avatarUrl || null,
+            },
+            media: active.media,
+          })
+          stopRingtone()
+          stopIncomingRingtoneRef.current = playIncomingRingtone()
+        }
+      } catch (err) {
+        console.warn('Failed to restore active incoming call on mount:', err)
+      }
+    })()
+
+    return () => {
+      isMounted = false
+    }
+  }, [status, stopRingtone, user?.id])
 
   // Lắng nghe các tín hiệu cuộc gọi đến trên Socket.IO
   useEffect(() => {

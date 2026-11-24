@@ -149,4 +149,22 @@ describe('callApi', () => {
       body: JSON.stringify({ reason: 'WINDOW_CLOSED' }),
     })
   })
+
+  it('sendBeaconCallTermination dispatches keepalive fetch for reject with default reason', () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+
+    sendBeaconCallTermination({ callId: 'call-999', action: 'reject' })
+
+    expect(fetchMock).toHaveBeenCalledWith('http://localhost:3000/api/calls/call-999/reject', {
+      method: 'POST',
+      keepalive: true,
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer mock-token',
+      },
+      body: JSON.stringify({ reason: 'CALLEE_OFFLINE' }),
+    })
+  })
 })

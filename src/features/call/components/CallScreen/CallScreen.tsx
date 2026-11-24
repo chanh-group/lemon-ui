@@ -453,9 +453,11 @@ export function CallScreen({
       setPhase('ended')
       setEndReason('declined')
       toast.info(
-        payload.reason
-          ? `${t('chat.callEndedDeclined')} (${payload.reason})`
-          : t('chat.callEndedDeclined'),
+        payload.reason === 'CALLEE_OFFLINE' || payload.reason === 'DISCONNECTED_TIMEOUT'
+          ? t('chat.callDisconnectedTimeout')
+          : payload.reason
+            ? `${t('chat.callEndedDeclined')} (${payload.reason})`
+            : t('chat.callEndedDeclined'),
       )
       livekitRef.current.disconnect()
 
@@ -487,6 +489,10 @@ export function CallScreen({
       setEndReason('ended')
       setFinalSeconds(payload.durationSecs || 0)
 
+      if (payload.reason === 'DISCONNECTED_TIMEOUT' || payload.reason === 'CALLEE_OFFLINE') {
+        toast.info(t('chat.callDisconnectedTimeout'))
+      }
+
       window.setTimeout(() => {
         handleClose()
       }, 2000)
@@ -499,6 +505,10 @@ export function CallScreen({
       setPhase('ended')
       setEndReason('cancelled')
       livekitRef.current.disconnect()
+
+      if (payload.reason === 'DISCONNECTED_TIMEOUT' || payload.reason === 'CALLEE_OFFLINE') {
+        toast.info(t('chat.callDisconnectedTimeout'))
+      }
 
       window.setTimeout(() => {
         handleClose()

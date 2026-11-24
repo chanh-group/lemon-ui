@@ -323,6 +323,7 @@
     "callUserBusy": "The peer is currently in another call.",
     "callReconnecting": "Weak connection, reconnecting…",
     "callPeerDisconnected": "Peer temporarily disconnected.",
+    "callDisconnectedTimeout": "The other user is currently offline or closed the app.",
     "callPeerReconnected": "Peer reconnected.",
     "callMicBlocked": "Mic error",
     "callCameraBlocked": "Camera error",
