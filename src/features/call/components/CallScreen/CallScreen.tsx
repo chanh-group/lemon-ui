@@ -200,6 +200,20 @@ export function CallScreen({
     navigate(ROUTES.messages)
   }, [conversationId, onPreviewClose, previewCall, stopDialing, navigate, searchParams])
 
+  useEffect(() => {
+    if (previewCall || typeof window === 'undefined' || !window.opener) return
+
+    const opener = window.opener
+    const interval = window.setInterval(() => {
+      if (opener.closed) {
+        window.clearInterval(interval)
+        handleClose()
+      }
+    }, 2000)
+
+    return () => window.clearInterval(interval)
+  }, [handleClose, previewCall])
+
   // Khởi tạo cuộc gọi mới hoặc phục hồi cuộc gọi đang diễn ra khi F5 reload
   useEffect(() => {
     if (hasSetupRef.current || previewCall || !conversationId) return
