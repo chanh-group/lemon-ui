@@ -16,6 +16,8 @@ import { playIncomingRingtone } from '../utils/callSounds'
 import { openCallWindow } from '../utils/callWindow'
 import {
   toUiMedia,
+  type CallCancelledPayload,
+  type CallEndedPayload,
   type CallIncomingPayload,
   type CallMedia,
   type CallMissedPayload,
@@ -42,6 +44,13 @@ export function CallProvider({ children }: { children: ReactNode }) {
 
   const [incomingCall, setIncomingCall] = useState<CallIncomingPayload | null>(null)
   const stopIncomingRingtoneRef = useRef<(() => void) | null>(null)
+  const incomingCallRef = useRef<CallIncomingPayload | null>(null)
+
+  // Đồng bộ ref với state để các socket listener đọc được incomingCall hiện tại
+  // mà không cần đăng ký lại listener mỗi khi incomingCall thay đổi
+  useEffect(() => {
+    incomingCallRef.current = incomingCall
+  }, [incomingCall])
 
   const stopRingtone = useCallback(() => {
     if (stopIncomingRingtoneRef.current) {
@@ -52,6 +61,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
 
   const dismissIncomingCall = useCallback(() => {
     stopRingtone()
+    incomingCallRef.current = null
     setIncomingCall(null)
   }, [stopRingtone])
 
@@ -66,17 +76,27 @@ export function CallProvider({ children }: { children: ReactNode }) {
       stopIncomingRingtoneRef.current = playIncomingRingtone()
     }
 
-    const onCancelled = () => {
+    const onCancelled = (payload: CallCancelledPayload) => {
+      // Chỉ tắt modal cuộc gọi đến nếu event này thuộc về đúng cuộc gọi đang rung
+      if (incomingCallRef.current && payload.callId !== incomingCallRef.current.callId) {
+        return
+      }
       dismissIncomingCall()
       toast.info(t('chat.callEndedCancelled'))
     }
 
     const onMissed = (payload: CallMissedPayload) => {
+      if (incomingCallRef.current && payload.callId !== incomingCallRef.current.callId) {
+        return
+      }
       dismissIncomingCall()
       toast.info(t('chat.missedCallNotice', { reason: payload.reason }))
     }
 
-    const onEnded = () => {
+    const onEnded = (payload: CallEndedPayload) => {
+      if (incomingCallRef.current && payload.callId !== incomingCallRef.current.callId) {
+        return
+      }
       dismissIncomingCall()
     }
 

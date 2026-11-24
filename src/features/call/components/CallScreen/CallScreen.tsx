@@ -14,7 +14,9 @@ import { useLiveKitCall } from '../../hooks/useLiveKitCall'
 import { playConnectedTone, playHangupTone, playOutgoingDialingSound } from '../../utils/callSounds'
 import type {
   CallAcceptedPayload,
+  CallCancelledPayload,
   CallEndedPayload,
+  CallMissedPayload,
   CallRejectedPayload,
   CallResponse,
   LiveKitConnectionDetails,
@@ -146,7 +148,7 @@ export function CallScreen({
   const handleClose = useCallback(() => {
     isTerminatedRef.current = true
     stopDialing()
-    livekit.disconnect()
+    livekitRef.current.disconnect()
 
     const callId = activeCallRef.current?.id || searchParams.get('callId')
     const currentPhase = phaseRef.current
@@ -196,7 +198,7 @@ export function CallScreen({
     }
 
     navigate(ROUTES.messages)
-  }, [conversationId, livekit, onPreviewClose, previewCall, stopDialing, navigate, searchParams])
+  }, [conversationId, onPreviewClose, previewCall, stopDialing, navigate, searchParams])
 
   // Khởi tạo cuộc gọi mới hoặc phục hồi cuộc gọi đang diễn ra khi F5 reload
   useEffect(() => {
@@ -386,7 +388,18 @@ export function CallScreen({
   useEffect(() => {
     const socket = getChatSocket()
 
+    // Chỉ xử lý event thuộc về cuộc gọi của màn hình hiện tại,
+    // tránh event trễ từ cuộc gọi cũ / tab khác làm tắt nhầm cuộc gọi đang diễn ra
+    const belongsToCurrentCall = (payload: { callId?: string }) => {
+      const currentCallId = activeCallRef.current?.id || searchParams.get('callId')
+      if (payload.callId && currentCallId && payload.callId !== currentCallId) {
+        return false
+      }
+      return true
+    }
+
     const onAccepted = async (payload: CallAcceptedPayload) => {
+      if (!belongsToCurrentCall(payload)) return
       if (phaseRef.current === 'active') return
       stopDialing()
       playConnectedTone()
@@ -434,6 +447,7 @@ export function CallScreen({
     }
 
     const onRejected = (payload: CallRejectedPayload) => {
+      if (!belongsToCurrentCall(payload)) return
       stopDialing()
       playHangupTone()
       setPhase('ended')
@@ -450,7 +464,8 @@ export function CallScreen({
       }, 2000)
     }
 
-    const onCancelled = () => {
+    const onCancelled = (payload: CallCancelledPayload) => {
+      if (!belongsToCurrentCall(payload)) return
       stopDialing()
       playHangupTone()
       setPhase('ended')
@@ -464,6 +479,7 @@ export function CallScreen({
     }
 
     const onEnded = (payload: CallEndedPayload) => {
+      if (!belongsToCurrentCall(payload)) return
       stopDialing()
       playHangupTone()
       livekitRef.current.disconnect()
@@ -476,7 +492,8 @@ export function CallScreen({
       }, 2000)
     }
 
-    const onMissed = () => {
+    const onMissed = (payload: CallMissedPayload) => {
+      if (!belongsToCurrentCall(payload)) return
       stopDialing()
       playHangupTone()
       setPhase('ended')
@@ -501,7 +518,7 @@ export function CallScreen({
       socket.off('call:ended', onEnded)
       socket.off('call:missed', onMissed)
     }
-  }, [handleClose, media, stopDialing, t])
+  }, [handleClose, media, searchParams, stopDialing, t])
 
   // Đếm thời lượng cuộc gọi
   useEffect(() => {
