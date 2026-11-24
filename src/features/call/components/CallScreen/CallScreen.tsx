@@ -622,14 +622,6 @@ export function CallScreen({
     }, 1000)
   }
 
-  const redial = () => {
-    setFinalSeconds(0)
-    setSeconds(0)
-    hasInitiatedRef.current = false
-    hasSetupRef.current = false
-    setPhase('ringing')
-  }
-
   const flipCamera = () => {
     void livekit.flipCamera()
   }
@@ -774,7 +766,6 @@ export function CallScreen({
               setPhase('active')
             }}
             onDecline={declineCall}
-            onRedial={redial}
             onClose={handleClose}
           />
         </div>

@@ -1,11 +1,10 @@
 import {
-  ArrowLeft01Icon as ArrowLeftData,
   CallEnd01Icon as CallEndData,
   CallIcon as PhoneData,
   CameraRotated01Icon as FlipCameraData,
+  Cancel01Icon as CancelData,
   Mic01Icon as MicData,
   MicOff01Icon as MicOffData,
-  PhoneIcon as PhoneCallData,
   Video01Icon as VideoData,
   VideoOffIcon as VideoOffData,
   VolumeHighIcon as SpeakerData,
@@ -16,13 +15,12 @@ import { createIcon } from '@/components/icons/hugeIcon'
 import { cn } from '@/lib/utils'
 import type { CallMedia, CallPhase } from './types'
 
-const ArrowLeft = createIcon(ArrowLeftData)
 const CallEnd = createIcon(CallEndData)
 const FlipCamera = createIcon(FlipCameraData)
 const Mic = createIcon(MicData)
 const MicOff = createIcon(MicOffData)
 const Phone = createIcon(PhoneData)
-const PhoneCall = createIcon(PhoneCallData)
+const Cancel = createIcon(CancelData)
 const Speaker = createIcon(SpeakerData)
 const SpeakerOff = createIcon(SpeakerOffData)
 const Video = createIcon(VideoData)
@@ -132,7 +130,7 @@ interface CallControlsProps {
   onEnd: () => void
   onAccept: (media: CallMedia) => void
   onDecline: () => void
-  onRedial: () => void
+  onRedial?: () => void
   onClose: () => void
 }
 
@@ -151,29 +149,20 @@ export function CallControls({
   onEnd,
   onAccept,
   onDecline,
-  onRedial,
   onClose,
 }: CallControlsProps) {
   const { t } = useTranslation()
 
   if (phase === 'ended') {
     return (
-      <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
-        <button
-          type="button"
-          onClick={onRedial}
-          className="inline-flex h-12 w-full max-w-70 cursor-pointer items-center justify-center gap-2 rounded-full bg-primary px-6 text-sm font-bold text-primary-foreground shadow-[0_14px_40px_-16px_rgba(0,230,118,0.9)] transition-all hover:brightness-105 active:scale-[0.98] sm:w-auto"
-        >
-          <PhoneCall className="size-4.5" aria-hidden="true" />
-          {t('chat.callAgain')}
-        </button>
+      <div className="flex flex-col items-center justify-center">
         <button
           type="button"
           onClick={onClose}
-          className="inline-flex h-12 w-full max-w-70 cursor-pointer items-center justify-center gap-2 rounded-full border border-white/15 bg-white/5 px-6 text-sm font-semibold text-white/85 transition-colors hover:bg-white/10 sm:w-auto"
+          className="inline-flex h-12 w-full max-w-70 cursor-pointer items-center justify-center gap-2 rounded-full border border-white/15 bg-white/10 px-8 text-sm font-semibold text-white shadow-lg backdrop-blur transition-all hover:bg-white/20 active:scale-[0.98] sm:w-auto"
         >
-          <ArrowLeft className="size-4.5" aria-hidden="true" />
-          {t('chat.callBackToChat')}
+          <Cancel className="size-4.5" aria-hidden="true" />
+          {t('chat.callCloseWindow', 'Đóng')}
         </button>
       </div>
     )

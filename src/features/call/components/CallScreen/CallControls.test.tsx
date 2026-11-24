@@ -91,4 +91,14 @@ describe('CallControls Soft Permission Fallback UI', () => {
     render(<CallControls {...defaultProps} phase="ringing" media="voice" />)
     expect(screen.queryByRole('button', { name: /camera/i })).toBeNull()
   })
+
+  it('renders only close button without redial button when phase is ended', () => {
+    const onClose = vi.fn()
+    render(<CallControls {...defaultProps} phase="ended" onClose={onClose} />)
+    expect(screen.queryByText('Gọi lại')).toBeNull()
+    const closeBtn = screen.getByRole('button', { name: /đóng/i })
+    expect(closeBtn).toBeDefined()
+    fireEvent.click(closeBtn)
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
 })

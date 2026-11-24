@@ -309,6 +309,7 @@
     "callDuration": "Duration",
     "callAgain": "Call again",
     "callBackToChat": "Back to chat",
+    "callCloseWindow": "Close",
     "callYou": "You",
     "callCameraOffSelf": "Camera off",
     "callUnknownPeer": "LemonChat user",
