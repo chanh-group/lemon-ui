@@ -676,6 +676,7 @@ export function CallScreen({
           remoteVideoTrack={livekit.remoteVideoTrack}
           remoteAudioTrack={livekit.remoteAudioTrack}
           localVideoTrack={livekit.localVideoTrack}
+          speakerOn={speakerOn}
         />
       ) : (
         <CallBackdrop>
@@ -689,6 +690,7 @@ export function CallScreen({
             endReason={endReason}
             remoteAudioTrack={livekit.remoteAudioTrack}
             isPeerSpeaking={livekit.isPeerSpeaking}
+            speakerOn={speakerOn}
           />
         </CallBackdrop>
       )}

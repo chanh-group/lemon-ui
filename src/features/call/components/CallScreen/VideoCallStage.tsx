@@ -20,6 +20,7 @@ interface VideoCallStageProps {
   remoteVideoTrack?: RemoteTrack | null
   remoteAudioTrack?: RemoteTrack | null
   localVideoTrack?: LocalTrack | null
+  speakerOn?: boolean
 }
 
 export function VideoCallStage({
@@ -33,6 +34,7 @@ export function VideoCallStage({
   remoteVideoTrack,
   remoteAudioTrack,
   localVideoTrack,
+  speakerOn = true,
 }: VideoCallStageProps) {
   const { t } = useTranslation()
   const remoteVideoRef = useRef<HTMLVideoElement>(null)
@@ -61,6 +63,14 @@ export function VideoCallStage({
     }
   }, [remoteAudioTrack])
 
+  // Đồng bộ trạng thái tắt/bật loa trực tiếp lên DOM property,
+  // đảm bảo âm thanh bị mute đúng trên mọi trình duyệt kể cả khi stream đang phát
+  useEffect(() => {
+    if (remoteAudioRef.current) {
+      remoteAudioRef.current.muted = !speakerOn
+    }
+  }, [speakerOn])
+
   // Gắn track video local vào thẻ preview PiP
   useEffect(() => {
     const localEl = localVideoRef.current
@@ -77,7 +87,7 @@ export function VideoCallStage({
   return (
     <section className="absolute inset-0 overflow-hidden bg-black">
       {/* Remote Audio Track Element */}
-      <audio ref={remoteAudioRef} autoPlay playsInline />
+      <audio ref={remoteAudioRef} autoPlay playsInline muted={!speakerOn} />
 
       {/* Hiển thị video remote nếu đã kết nối */}
       {hasRemoteVideo ? (

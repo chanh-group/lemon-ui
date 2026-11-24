@@ -34,6 +34,7 @@ interface VoiceCallStageProps {
   endReason: CallEndReason
   remoteAudioTrack?: RemoteTrack | null
   isPeerSpeaking?: boolean
+  speakerOn?: boolean
 }
 
 export function VoiceCallStage({
@@ -46,6 +47,7 @@ export function VoiceCallStage({
   endReason,
   remoteAudioTrack,
   isPeerSpeaking = false,
+  speakerOn = true,
 }: VoiceCallStageProps) {
   const { t } = useTranslation()
   const remoteAudioRef = useRef<HTMLAudioElement>(null)
@@ -59,6 +61,14 @@ export function VoiceCallStage({
       }
     }
   }, [remoteAudioTrack])
+
+  // Đồng bộ trạng thái tắt/bật loa trực tiếp lên DOM property,
+  // đảm bảo âm thanh bị mute đúng trên mọi trình duyệt kể cả khi stream đang phát
+  useEffect(() => {
+    if (remoteAudioRef.current) {
+      remoteAudioRef.current.muted = !speakerOn
+    }
+  }, [speakerOn])
 
   const isEnded = phase === 'ended'
   const isIncoming = phase === 'incoming'
@@ -81,7 +91,7 @@ export function VoiceCallStage({
   return (
     <section className="absolute inset-0 flex flex-col items-center justify-center px-6 pt-20 pb-46 text-center sm:pb-52">
       {/* Remote Audio Track Element */}
-      <audio ref={remoteAudioRef} autoPlay playsInline />
+      <audio ref={remoteAudioRef} autoPlay playsInline muted={!speakerOn} />
 
       <div className="relative mb-8 sm:mb-10">
         {showPulse && (
