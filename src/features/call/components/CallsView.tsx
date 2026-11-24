@@ -21,7 +21,6 @@ import { useNavigate } from 'react-router-dom'
 import { UserAvatar } from '@/components/common/UserAvatar'
 import { ROUTES } from '@/config/constants'
 import { cn } from '@/lib/utils'
-import { MOCK_CALLS } from '@/features/call/data/mockData'
 import { useCallHistory } from '@/features/call/hooks/useCallHistory'
 import { useConversationsQuery } from '@/features/conversation/hooks/useConversations'
 import type { CallEntry } from '@/features/call/types/call.types'
@@ -86,7 +85,7 @@ export function CallsView() {
   const callHistoryQuery = useCallHistory()
   const calls = useMemo(() => {
     const q = query.trim().toLowerCase()
-    const list = callHistoryQuery.data ?? MOCK_CALLS
+    const list = callHistoryQuery.data ?? []
     return list.filter(
       (c) => !q || c.name.toLowerCase().includes(q) || c.time.toLowerCase().includes(q),
     )

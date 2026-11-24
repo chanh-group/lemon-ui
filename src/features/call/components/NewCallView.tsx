@@ -16,7 +16,6 @@ import {
 } from '@/features/conversation/hooks/useConversations'
 import { useFriends } from '@/features/friend/hooks/useFriends'
 import type { ChatUser } from '@/features/friend/types/friend.types'
-import type { Conversation } from '@/features/conversation/types/conversation.types'
 import { Avatar, SearchBox } from '@/features/friend/components/kit'
 import { openCallWindow } from '@/features/call/utils/callWindow'
 
@@ -48,15 +47,6 @@ export function NewCallView() {
       ),
     [friendsQuery.data, normalizedQuery],
   )
-  const groups = useMemo(
-    () =>
-      (conversationsQuery.data ?? []).filter(
-        (conversation) =>
-          conversation.isGroup &&
-          (!normalizedQuery || conversation.name.toLocaleLowerCase().includes(normalizedQuery)),
-      ),
-    [conversationsQuery.data, normalizedQuery],
-  )
   const startDirectCall = async (friend: ChatUser, media: CallMedia) => {
     try {
       const conversation = await createDirectChat.mutateAsync(friend.id)
@@ -69,15 +59,6 @@ export function NewCallView() {
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : t('common.error'))
     }
-  }
-
-  const startGroupCall = (group: Conversation, media: CallMedia) => {
-    openCallWindow(group.id, {
-      media,
-      state: 'ringing',
-      peerName: group.name,
-      peerAvatar: group.partnerAvatar,
-    })
   }
 
   return (
@@ -146,46 +127,6 @@ export function NewCallView() {
                     aria-label={t('chat.startVideoCallWith', { name: friend.name })}
                     title={t('chat.videoCall')}
                     className="grid size-10 shrink-0 place-items-center rounded-xl text-foreground transition-colors hover:bg-muted disabled:cursor-wait disabled:opacity-50"
-                  >
-                    <Video className="size-5" aria-hidden="true" />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          <h2 className="px-2 pt-5 pb-2 text-sm font-semibold text-foreground">
-            {t('chat.newChatGroups')}
-          </h2>
-          {conversationsQuery.isPending ? (
-            <p className="px-2 py-3 text-sm text-muted-foreground">{t('chat.pending')}</p>
-          ) : conversationsQuery.isError ? (
-            <p className="px-2 py-3 text-sm text-destructive">{t('chat.conversationsLoadError')}</p>
-          ) : groups.length === 0 ? (
-            <p className="px-2 py-3 text-sm text-muted-foreground">{t('chat.noGroups')}</p>
-          ) : (
-            <ul className="flex flex-col gap-1">
-              {groups.map((group) => (
-                <li key={group.id} className="flex min-h-16 items-center gap-3 rounded-xl px-2">
-                  <Avatar name={group.name} src={group.partnerAvatar} square />
-                  <span className="min-w-0 flex-1 truncate text-[15px] text-foreground">
-                    {group.name}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => startGroupCall(group, 'voice')}
-                    aria-label={t('chat.startVoiceCallWith', { name: group.name })}
-                    title={t('chat.voiceCall')}
-                    className="grid size-10 shrink-0 place-items-center rounded-xl text-foreground transition-colors hover:bg-muted"
-                  >
-                    <Phone className="size-5" aria-hidden="true" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => startGroupCall(group, 'video')}
-                    aria-label={t('chat.startVideoCallWith', { name: group.name })}
-                    title={t('chat.videoCall')}
-                    className="grid size-10 shrink-0 place-items-center rounded-xl text-foreground transition-colors hover:bg-muted"
                   >
                     <Video className="size-5" aria-hidden="true" />
                   </button>

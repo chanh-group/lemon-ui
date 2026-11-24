@@ -9,7 +9,6 @@ import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { cn } from '@/lib/utils'
 import { conversationPath, ROUTES, type CallMedia } from '@/config/constants'
 import { emitTypingStart, emitTypingStop } from '@/lib/socket'
-import { MOCK_CALLS } from '@/features/call/data/mockData'
 import type {
   MessageAttachmentInput,
   MessageResponse,
@@ -121,7 +120,7 @@ export function ChatShell() {
 
   const callHistoryQuery = useCallHistory()
   const calls = useMemo(() => {
-    const list = callHistoryQuery.data ?? MOCK_CALLS
+    const list = callHistoryQuery.data ?? []
     return list.filter((c) => !q || c.name.toLowerCase().includes(q))
   }, [callHistoryQuery.data, q])
 
