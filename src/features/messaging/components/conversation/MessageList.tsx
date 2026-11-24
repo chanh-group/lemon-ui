@@ -48,6 +48,7 @@ import type {
 } from '@/features/messaging/types/message.types'
 import type { MessageScrollPosition } from '@/features/messaging/utils/messageScrollPosition'
 import { isAudio, isImage, isVideo } from '@/features/file/utils/fileTypes'
+import { TEXT_STORY_BG } from '@/features/story/data/storiesData'
 import { MESSAGE_MAX_BODY_LENGTH } from '@/config/constants'
 import { getMessageLengthState } from '@/features/messaging/utils/messageLength'
 import {
@@ -215,9 +216,11 @@ export function StoryReplyQuote({
       <span
         className={cn(
           'flex aspect-9/16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted text-center text-[8px] ring-1 ring-border',
+          // Nền tin văn bản = gradient cố định như lúc tạo (StoryViewer/StoriesArchivePage)
+          isTextStory && 'bg-linear-to-br',
+          isTextStory && (preview.background || TEXT_STORY_BG),
           isMe && 'self-end',
         )}
-        style={isTextStory ? { backgroundColor: preview.background || '#2a2a2a' } : undefined}
       >
         {isTextStory ? (
           <span className="line-clamp-4 wrap-break-words p-1 text-[8px] font-medium leading-tight text-foreground">

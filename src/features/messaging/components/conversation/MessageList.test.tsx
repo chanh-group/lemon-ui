@@ -53,6 +53,19 @@ describe('StoryReplyQuote', () => {
     expect(onOpen).toHaveBeenCalledWith('s1')
   })
 
+  it('paints a text story preview with the creation gradient instead of a black box (#51)', () => {
+    const { container } = render(
+      <StoryReplyQuote
+        preview={{ ...alivePreview, kind: 'TEXT', mediaUrl: null, caption: 'chsdhisoeksc' }}
+      />,
+    )
+
+    const box = container.querySelector('span[class*="aspect-9/16"]') as HTMLElement
+    expect(box.className).toContain('bg-linear-to-br')
+    expect(box.className).toContain('from-lime-300')
+    expect(box.getAttribute('style')).toBeNull()
+  })
+
   it('labels a captionless story reply without the untitled fallback', () => {
     render(
       <StoryReplyQuote
