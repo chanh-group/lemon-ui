@@ -16,6 +16,11 @@ export function IncomingCallModal() {
   const { t } = useTranslation()
   const { incomingCall, acceptIncomingCall, rejectIncomingCall } = useCall()
 
+  // Tuyệt đối không hiển thị modal cuộc gọi đến nếu đang ở trong màn hình cuộc gọi (/call/...)
+  if (typeof window !== 'undefined' && window.location.pathname.includes('/call/')) {
+    return null
+  }
+
   if (!incomingCall) return null
 
   const isVideo = incomingCall.media === 'VIDEO'

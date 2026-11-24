@@ -80,6 +80,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
   // Khi Callee tắt hẳn tab / trình duyệt (không phải F5 reload): gửi beacon reject ngay lập tức
   useEffect(() => {
     const handleWindowUnload = () => {
+      if (typeof window !== 'undefined' && window.location.pathname.includes('/call/')) return
       if (isReloadingRef.current) return
       const current = incomingCallRef.current
       if (current?.callId) {
@@ -102,6 +103,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
   // Phục hồi cuộc gọi đang đổ chuông khi Callee F5 reload trang
   useEffect(() => {
     if (status !== 'authenticated') return
+    // Cửa sổ đàm thoại riêng biệt (/call/...) không phục hồi modal cuộc gọi đến
+    if (typeof window !== 'undefined' && window.location.pathname.includes('/call/')) return
     let isMounted = true
 
     void (async () => {
@@ -143,6 +146,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
   // Lắng nghe các tín hiệu cuộc gọi đến trên Socket.IO
   useEffect(() => {
     if (status !== 'authenticated') return
+    // Cửa sổ đàm thoại riêng biệt (/call/...) không nhận modal cuộc gọi đến
+    if (typeof window !== 'undefined' && window.location.pathname.includes('/call/')) return
     const socket = getChatSocket()
 
     const onIncoming = (payload: CallIncomingPayload) => {

@@ -45,6 +45,14 @@ function RedirectIfAuthed({ children }: { children: ReactNode }) {
 export const router = createBrowserRouter(
   [
     {
+      path: ROUTES.call,
+      element: (
+        <RequireAuth>
+          <CallPage />
+        </RequireAuth>
+      ),
+    },
+    {
       element: <ApplicationLayout />,
       children: [
         {
@@ -107,14 +115,7 @@ export const router = createBrowserRouter(
             </RequireAuth>
           ),
         },
-        {
-          path: ROUTES.call,
-          element: (
-            <RequireAuth>
-              <CallPage />
-            </RequireAuth>
-          ),
-        },
+
         {
           path: ROUTES.newChat,
           element: (
