@@ -7,9 +7,8 @@ import { ApiError } from '@/infrastructure/api/errors'
 import { BrandMark } from '@/components/common/BrandMark'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { cn } from '@/lib/utils'
-import { callPath, conversationPath, ROUTES, type CallMedia } from '@/config/constants'
+import { conversationPath, ROUTES, type CallMedia } from '@/config/constants'
 import { emitTypingStart, emitTypingStop } from '@/lib/socket'
-import { MOCK_CALLS } from '@/features/call/data/mockData'
 import type {
   MessageAttachmentInput,
   MessageResponse,
@@ -46,7 +45,7 @@ import { MiddlePanel } from '@/features/shell/components/MiddlePanel'
 import { ConversationView } from '@/features/messaging/components/conversation'
 import { StoryViewer } from '@/features/story/components/StoryViewer'
 import { useAuth } from '@/features/auth/api'
-import { useCallWindow } from '@/features/call/components/CallScreen/CallWindowProvider'
+import { useCall, useCallHistory } from '@/features/call'
 
 const TYPING_HEARTBEAT_MS = 1_500
 
@@ -104,7 +103,7 @@ export function ChatShell() {
   const messagesQuery = useConversationMessagesQuery(selectedId, Boolean(selectedId))
   const sendMessageMutation = useSendMessageMutation(selectedId)
   const markReadMutation = useMarkReadMutation()
-  const callWindow = useCallWindow()
+  const { startCall: initiateCallSession } = useCall()
   const lastTypingSentAt = useRef(0)
   const lastReadAttempt = useRef<string | null>(null)
 
@@ -119,7 +118,11 @@ export function ChatShell() {
     [rawConversations, q],
   )
 
-  const calls = useMemo(() => MOCK_CALLS.filter((c) => !q || c.name.toLowerCase().includes(q)), [q])
+  const callHistoryQuery = useCallHistory()
+  const calls = useMemo(() => {
+    const list = callHistoryQuery.data ?? []
+    return list.filter((c) => !q || c.name.toLowerCase().includes(q))
+  }, [callHistoryQuery.data, q])
 
   const storiesQuery = useStoriesList(user?.id)
   useEffect(() => {
@@ -241,27 +244,12 @@ export function ChatShell() {
 
   const startCall = (media: CallMedia) => {
     if (!selected || selected.isGroup) return
-    const fallback = () =>
-      navigate(callPath(selected.id, { media, state: 'ringing' }), {
-        state: {
-          peerName: selected.name,
-          peerAvatar: selected.partnerAvatar,
-          from: conversationPath(selected.id),
-        },
-      })
-    if (
-      !callWindow.openCall(
-        {
-          conversationId: selected.id,
-          media,
-          peerName: selected.name,
-          peerAvatar: selected.partnerAvatar,
-          isGroup: selected.isGroup,
-        },
-        fallback,
-      )
-    )
-      fallback()
+    initiateCallSession({
+      conversationId: selected.id,
+      media,
+      peerName: selected.name,
+      peerAvatar: selected.partnerAvatar,
+    })
   }
 
   const markVisibleMessageRead = (messageId: string) => {

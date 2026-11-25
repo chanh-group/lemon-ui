@@ -22,4 +22,9 @@ export const queryKeys = {
     userSearch: (field: 'username' | 'email', query: string) =>
       ['chat', 'user-search', field, query] as const,
   },
+  calls: {
+    history: ['calls', 'history'] as const,
+    conversation: (conversationId: string) => ['calls', 'conversation', conversationId] as const,
+    active: ['calls', 'active'] as const,
+  },
 }

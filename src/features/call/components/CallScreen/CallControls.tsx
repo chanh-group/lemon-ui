@@ -1,11 +1,10 @@
 import {
-  ArrowLeft01Icon as ArrowLeftData,
   CallEnd01Icon as CallEndData,
   CallIcon as PhoneData,
   CameraRotated01Icon as FlipCameraData,
+  Cancel01Icon as CancelData,
   Mic01Icon as MicData,
   MicOff01Icon as MicOffData,
-  PhoneIcon as PhoneCallData,
   Video01Icon as VideoData,
   VideoOffIcon as VideoOffData,
   VolumeHighIcon as SpeakerData,
@@ -16,13 +15,12 @@ import { createIcon } from '@/components/icons/hugeIcon'
 import { cn } from '@/lib/utils'
 import type { CallMedia, CallPhase } from './types'
 
-const ArrowLeft = createIcon(ArrowLeftData)
 const CallEnd = createIcon(CallEndData)
 const FlipCamera = createIcon(FlipCameraData)
 const Mic = createIcon(MicData)
 const MicOff = createIcon(MicOffData)
 const Phone = createIcon(PhoneData)
-const PhoneCall = createIcon(PhoneCallData)
+const Cancel = createIcon(CancelData)
 const Speaker = createIcon(SpeakerData)
 const SpeakerOff = createIcon(SpeakerOffData)
 const Video = createIcon(VideoData)
@@ -52,6 +50,8 @@ interface ControlButtonProps {
   tone?: ControlTone
   size?: ControlSize
   pulse?: boolean
+  hasError?: boolean
+  errorTooltip?: string
 }
 
 function ControlButton({
@@ -61,6 +61,8 @@ function ControlButton({
   tone = 'glass',
   size = 'md',
   pulse = false,
+  hasError = false,
+  errorTooltip,
 }: ControlButtonProps) {
   return (
     <div className="flex w-18 flex-col items-center gap-2">
@@ -82,15 +84,28 @@ function ControlButton({
           type="button"
           onClick={onClick}
           aria-label={label}
-          title={label}
+          title={hasError && errorTooltip ? errorTooltip : label}
           className={cn(
             'relative grid cursor-pointer place-items-center rounded-full transition-all duration-150 outline-none active:scale-95 focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
             SIZE_CLASS[size],
-            TONE_CLASS[tone],
+            hasError
+              ? 'bg-amber-500/20 text-amber-200 ring-2 ring-amber-400/60 hover:bg-amber-500/30'
+              : TONE_CLASS[tone],
           )}
         >
           <Icon className={cn(size === 'lg' ? 'size-7' : 'size-6')} aria-hidden="true" />
         </button>
+
+        {/* Badge dấu '!' vàng/hổ phách cảnh báo lỗi cấp quyền thiết bị */}
+        {hasError && (
+          <span
+            className="pointer-events-none absolute -top-1 -right-1 flex size-5 items-center justify-center rounded-full bg-amber-500 text-[11px] font-bold text-slate-950 shadow-md ring-2 ring-slate-900"
+            title={errorTooltip}
+            aria-hidden="true"
+          >
+            !
+          </span>
+        )}
       </span>
       <span className="max-w-19 text-center text-[11px] leading-tight font-medium text-white/65">
         {label}
@@ -105,15 +120,17 @@ interface CallControlsProps {
   muted: boolean
   speakerOn: boolean
   cameraOn: boolean
+  hasMicError?: boolean
+  hasCameraError?: boolean
   onToggleMute: () => void
   onToggleSpeaker: () => void
   onToggleCamera: () => void
   onFlipCamera: () => void
-  onChangeMedia: (media: CallMedia) => void
+  onChangeMedia?: (media: CallMedia) => void
   onEnd: () => void
   onAccept: (media: CallMedia) => void
   onDecline: () => void
-  onRedial: () => void
+  onRedial?: () => void
   onClose: () => void
 }
 
@@ -123,37 +140,29 @@ export function CallControls({
   muted,
   speakerOn,
   cameraOn,
+  hasMicError = false,
+  hasCameraError = false,
   onToggleMute,
   onToggleSpeaker,
   onToggleCamera,
   onFlipCamera,
-  onChangeMedia,
   onEnd,
   onAccept,
   onDecline,
-  onRedial,
   onClose,
 }: CallControlsProps) {
   const { t } = useTranslation()
 
   if (phase === 'ended') {
     return (
-      <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
-        <button
-          type="button"
-          onClick={onRedial}
-          className="inline-flex h-12 w-full max-w-70 cursor-pointer items-center justify-center gap-2 rounded-full bg-primary px-6 text-sm font-bold text-primary-foreground shadow-[0_14px_40px_-16px_rgba(0,230,118,0.9)] transition-all hover:brightness-105 active:scale-[0.98] sm:w-auto"
-        >
-          <PhoneCall className="size-4.5" aria-hidden="true" />
-          {t('chat.callAgain')}
-        </button>
+      <div className="flex flex-col items-center justify-center">
         <button
           type="button"
           onClick={onClose}
-          className="inline-flex h-12 w-full max-w-70 cursor-pointer items-center justify-center gap-2 rounded-full border border-white/15 bg-white/5 px-6 text-sm font-semibold text-white/85 transition-colors hover:bg-white/10 sm:w-auto"
+          className="inline-flex h-12 w-full max-w-70 cursor-pointer items-center justify-center gap-2 rounded-full border border-white/15 bg-white/10 px-8 text-sm font-semibold text-white shadow-lg backdrop-blur transition-all hover:bg-white/20 active:scale-[0.98] sm:w-auto"
         >
-          <ArrowLeft className="size-4.5" aria-hidden="true" />
-          {t('chat.callBackToChat')}
+          <Cancel className="size-4.5" aria-hidden="true" />
+          {t('chat.callCloseWindow', 'Đóng')}
         </button>
       </div>
     )
@@ -170,21 +179,14 @@ export function CallControls({
           size="lg"
         />
         {media === 'video' ? (
-          <>
-            <ControlButton
-              icon={Phone}
-              label={t('chat.callAcceptVoice')}
-              onClick={() => onAccept('voice')}
-            />
-            <ControlButton
-              icon={Video}
-              label={t('chat.callAcceptVideo')}
-              onClick={() => onAccept('video')}
-              tone="accept"
-              size="lg"
-              pulse
-            />
-          </>
+          <ControlButton
+            icon={Video}
+            label={t('chat.callAcceptVideo')}
+            onClick={() => onAccept('video')}
+            tone="accept"
+            size="lg"
+            pulse
+          />
         ) : (
           <ControlButton
             icon={Phone}
@@ -202,33 +204,70 @@ export function CallControls({
   const micButton = (
     <ControlButton
       icon={muted ? MicOff : Mic}
-      label={muted ? t('chat.callUnmute') : t('chat.callMute')}
+      label={
+        hasMicError
+          ? t('chat.callMicBlocked', 'Lỗi Mic')
+          : muted
+            ? t('chat.callUnmute')
+            : t('chat.callMute')
+      }
       onClick={onToggleMute}
       tone={muted ? 'pressed' : 'glass'}
+      hasError={hasMicError}
+      errorTooltip={t(
+        'chat.callMicPermissionTooltip',
+        'Microphone chưa được cấp quyền. Bấm để thử lại',
+      )}
     />
   )
 
-  if (phase === 'active' && media === 'video') {
+  const cameraButton = (
+    <ControlButton
+      icon={cameraOn ? Video : VideoOff}
+      label={
+        hasCameraError
+          ? t('chat.callCameraBlocked', 'Lỗi Cam')
+          : cameraOn
+            ? t('chat.callCameraOff')
+            : t('chat.callCameraOn')
+      }
+      onClick={onToggleCamera}
+      tone={cameraOn ? 'glass' : 'pressed'}
+      hasError={hasCameraError}
+      errorTooltip={t(
+        'chat.callCameraPermissionTooltip',
+        'Camera chưa được cấp quyền. Bấm để thử lại',
+      )}
+    />
+  )
+
+  const speakerButton = (
+    <ControlButton
+      icon={speakerOn ? Speaker : SpeakerOff}
+      label={speakerOn ? t('chat.callSpeakerOn') : t('chat.callSpeakerOff')}
+      onClick={onToggleSpeaker}
+      tone={speakerOn ? 'glass' : 'pressed'}
+    />
+  )
+
+  const endCallButton = (
+    <ControlButton icon={CallEnd} label={t('chat.callEnd')} onClick={onEnd} tone="danger" />
+  )
+
+  if (media === 'video') {
     return (
       <div className="flex flex-wrap items-start justify-center gap-2 sm:gap-5">
         {micButton}
-        <ControlButton
-          icon={cameraOn ? Video : VideoOff}
-          label={cameraOn ? t('chat.callCameraOff') : t('chat.callCameraOn')}
-          onClick={onToggleCamera}
-          tone={cameraOn ? 'glass' : 'pressed'}
-        />
-        <ControlButton
-          icon={FlipCamera}
-          label={t('chat.callSwitchCamera')}
-          onClick={onFlipCamera}
-        />
-        <ControlButton
-          icon={Phone}
-          label={t('chat.callSwitchToVoice')}
-          onClick={() => onChangeMedia('voice')}
-        />
-        <ControlButton icon={CallEnd} label={t('chat.callEnd')} onClick={onEnd} tone="danger" />
+        {cameraButton}
+        {speakerButton}
+        {phase === 'active' && (
+          <ControlButton
+            icon={FlipCamera}
+            label={t('chat.callSwitchCamera')}
+            onClick={onFlipCamera}
+          />
+        )}
+        {endCallButton}
       </div>
     )
   }
@@ -236,18 +275,8 @@ export function CallControls({
   return (
     <div className="flex flex-wrap items-start justify-center gap-3 sm:gap-6">
       {micButton}
-      <ControlButton
-        icon={speakerOn ? Speaker : SpeakerOff}
-        label={speakerOn ? t('chat.callSpeakerOn') : t('chat.callSpeakerOff')}
-        onClick={onToggleSpeaker}
-        tone={speakerOn ? 'glass' : 'pressed'}
-      />
-      <ControlButton
-        icon={media === 'video' ? Phone : Video}
-        label={media === 'video' ? t('chat.callSwitchToVoice') : t('chat.callSwitchToVideo')}
-        onClick={() => onChangeMedia(media === 'video' ? 'voice' : 'video')}
-      />
-      <ControlButton icon={CallEnd} label={t('chat.callEnd')} onClick={onEnd} tone="danger" />
+      {speakerButton}
+      {endCallButton}
     </div>
   )
 }

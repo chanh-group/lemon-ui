@@ -1,3 +1,5 @@
+import { useEffect, useRef } from 'react'
+import type { LocalTrack, RemoteTrack } from 'livekit-client'
 import { VideoOffIcon as VideoOffData } from '@hugeicons/core-free-icons'
 import { useTranslation } from 'react-i18next'
 import { createIcon } from '@/components/icons/hugeIcon'
@@ -14,6 +16,11 @@ interface VideoCallStageProps {
   localAvatarUrl?: string | null
   seconds: number
   cameraOn: boolean
+  hasCameraError?: boolean
+  remoteVideoTrack?: RemoteTrack | null
+  remoteAudioTrack?: RemoteTrack | null
+  localVideoTrack?: LocalTrack | null
+  speakerOn?: boolean
 }
 
 export function VideoCallStage({
@@ -23,65 +30,134 @@ export function VideoCallStage({
   localAvatarUrl,
   seconds,
   cameraOn,
+  hasCameraError = false,
+  remoteVideoTrack,
+  remoteAudioTrack,
+  localVideoTrack,
+  speakerOn = true,
 }: VideoCallStageProps) {
   const { t } = useTranslation()
+  const remoteVideoRef = useRef<HTMLVideoElement>(null)
+  const remoteAudioRef = useRef<HTMLAudioElement>(null)
+  const localVideoRef = useRef<HTMLVideoElement>(null)
+
+  // Gắn track video remote vào thẻ video
+  useEffect(() => {
+    const videoEl = remoteVideoRef.current
+    if (remoteVideoTrack && videoEl) {
+      remoteVideoTrack.attach(videoEl)
+      return () => {
+        remoteVideoTrack.detach(videoEl)
+      }
+    }
+  }, [remoteVideoTrack])
+
+  // Gắn track audio remote vào thẻ audio để phát tiếng
+  useEffect(() => {
+    const audioEl = remoteAudioRef.current
+    if (remoteAudioTrack && audioEl) {
+      remoteAudioTrack.attach(audioEl)
+      return () => {
+        remoteAudioTrack.detach(audioEl)
+      }
+    }
+  }, [remoteAudioTrack])
+
+  // Đồng bộ trạng thái tắt/bật loa trực tiếp lên DOM property,
+  // đảm bảo âm thanh bị mute đúng trên mọi trình duyệt kể cả khi stream đang phát
+  useEffect(() => {
+    if (remoteAudioRef.current) {
+      remoteAudioRef.current.muted = !speakerOn
+    }
+  }, [speakerOn])
+
+  // Gắn track video local vào thẻ preview PiP
+  useEffect(() => {
+    const localEl = localVideoRef.current
+    if (localVideoTrack && localEl) {
+      localVideoTrack.attach(localEl)
+      return () => {
+        localVideoTrack.detach(localEl)
+      }
+    }
+  }, [localVideoTrack])
+
+  const hasRemoteVideo = Boolean(remoteVideoTrack)
 
   return (
-    <section className="absolute inset-0 overflow-hidden">
-      {/* "Remote video" placeholder — WebRTC chưa có nên dùng lớp gradient + avatar. */}
-      <div
-        className="absolute inset-0"
-        style={{
-          background:
-            'radial-gradient(circle at 22% 18%, rgba(0,230,118,0.24), transparent 34%), radial-gradient(circle at 78% 30%, rgba(250,204,21,0.12), transparent 28%), linear-gradient(145deg, #07120c 0%, #0c1d14 52%, #050a07 100%)',
-        }}
-        aria-hidden="true"
-      />
-      <div
-        aria-hidden="true"
-        className="absolute -left-24 top-1/4 size-96 rounded-full bg-emerald-500/15 blur-3xl animate-float-slow"
-      />
-      <div
-        aria-hidden="true"
-        className="absolute -right-30 bottom-1/4 size-80 rounded-full bg-lime-300/10 blur-3xl animate-float-y"
-      />
-      <div
-        aria-hidden="true"
-        className="absolute inset-0 opacity-[0.05]"
-        style={{
-          backgroundImage:
-            'repeating-linear-gradient(0deg, rgba(255,255,255,0.8) 0px, rgba(255,255,255,0.8) 1px, transparent 1px, transparent 4px)',
-        }}
-      />
+    <section className="absolute inset-0 overflow-hidden bg-black">
+      {/* Remote Audio Track Element */}
+      <audio ref={remoteAudioRef} autoPlay playsInline muted={!speakerOn} />
 
-      <div className="relative z-10 flex h-full flex-col items-center justify-center px-6 pt-24 pb-46 text-center sm:pb-52">
-        <div className="relative">
-          <span aria-hidden="true" className="absolute inset-0 rounded-full bg-white/5 blur-2xl" />
-          <UserAvatar
-            name={name}
-            src={avatarUrl}
-            className="relative size-32 ring-4 ring-white/15 shadow-[0_35px_100px_-25px_rgba(0,0,0,0.95)] sm:size-44"
-            fallbackClassName="text-4xl font-bold sm:text-5xl"
+      {/* Hiển thị video remote nếu đã kết nối */}
+      {hasRemoteVideo ? (
+        <video
+          ref={remoteVideoRef}
+          autoPlay
+          playsInline
+          className="absolute inset-0 size-full object-cover"
+        />
+      ) : (
+        /* Placeholder khi đối phương chưa bật cam hoặc đang đàm thoại */
+        <>
+          <div
+            className="absolute inset-0"
+            style={{
+              background:
+                'radial-gradient(circle at 22% 18%, rgba(0,230,118,0.24), transparent 34%), radial-gradient(circle at 78% 30%, rgba(250,204,21,0.12), transparent 28%), linear-gradient(145deg, #07120c 0%, #0c1d14 52%, #050a07 100%)',
+            }}
+            aria-hidden="true"
           />
-        </div>
-        <h1 className="mt-6 text-[clamp(1.7rem,4.5vw,2.5rem)] leading-tight font-semibold tracking-tight text-white">
-          {name}
-        </h1>
-        <div className="mt-2 flex items-center gap-2 text-sm text-white/65">
-          <span className="size-1.5 rounded-full bg-emerald-400" aria-hidden="true" />
-          <span className="font-mono tabular-nums">{formatCallDuration(seconds)}</span>
-        </div>
-      </div>
+          <div
+            aria-hidden="true"
+            className="absolute -left-24 top-1/4 size-96 rounded-full bg-emerald-500/15 blur-3xl animate-float-slow"
+          />
+          <div
+            aria-hidden="true"
+            className="absolute -right-30 bottom-1/4 size-80 rounded-full bg-lime-300/10 blur-3xl animate-float-y"
+          />
 
-      {/* Self-view PiP */}
+          <div className="relative z-10 flex h-full flex-col items-center justify-center px-6 pt-24 pb-46 text-center sm:pb-52">
+            <div className="relative">
+              <span
+                aria-hidden="true"
+                className="absolute inset-0 rounded-full bg-white/5 blur-2xl"
+              />
+              <UserAvatar
+                name={name}
+                src={avatarUrl}
+                className="relative size-32 ring-4 ring-white/15 shadow-[0_35px_100px_-25px_rgba(0,0,0,0.95)] sm:size-44"
+                fallbackClassName="text-4xl font-bold sm:text-5xl"
+              />
+            </div>
+            <h1 className="mt-6 text-[clamp(1.7rem,4.5vw,2.5rem)] leading-tight font-semibold tracking-tight text-white">
+              {name}
+            </h1>
+            <div className="mt-2 flex items-center gap-2 text-sm text-white/65">
+              <span className="size-1.5 rounded-full bg-emerald-400" aria-hidden="true" />
+              <span className="font-mono tabular-nums">{formatCallDuration(seconds)}</span>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Self-view PiP của người dùng */}
       <div className="absolute right-4 bottom-38 z-20 sm:right-8 sm:bottom-40">
         <div
           className={cn(
             'relative aspect-[3/4] w-24 overflow-hidden rounded-2xl border border-white/20 bg-[#0b1510] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.9)] sm:w-36',
-            !cameraOn && 'ring-1 ring-white/10',
+            (!cameraOn || hasCameraError) && 'ring-1 ring-white/10',
           )}
         >
-          {cameraOn ? (
+          {cameraOn && !hasCameraError && localVideoTrack ? (
+            <video
+              ref={localVideoRef}
+              autoPlay
+              playsInline
+              muted
+              className="size-full object-cover -scale-x-100"
+            />
+          ) : cameraOn && !hasCameraError ? (
             <>
               <div
                 className="absolute inset-0"
@@ -104,7 +180,9 @@ export function VideoCallStage({
             <div className="flex h-full flex-col items-center justify-center gap-2 px-2 text-center">
               <VideoOff className="size-5 text-white/40 sm:size-6" aria-hidden="true" />
               <span className="text-[10px] leading-tight font-medium text-white/50">
-                {t('chat.callCameraOffSelf')}
+                {hasCameraError
+                  ? t('chat.callCameraBlocked', 'Lỗi cấp quyền Cam')
+                  : t('chat.callCameraOffSelf')}
               </span>
             </div>
           )}

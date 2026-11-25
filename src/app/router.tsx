@@ -15,6 +15,7 @@ import { StoriesCreatePage } from '@/pages/StoriesCreatePage'
 import { StoriesArchivePage } from '@/pages/StoriesArchivePage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
 import { CallWindowHost } from '@/features/call/components/CallScreen/CallWindowProvider'
+import { CallProvider, IncomingCallModal } from '@/features/call'
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const { status } = useAuth()
@@ -43,6 +44,14 @@ function RedirectIfAuthed({ children }: { children: ReactNode }) {
 
 export const router = createBrowserRouter(
   [
+    {
+      path: ROUTES.call,
+      element: (
+        <RequireAuth>
+          <CallPage />
+        </RequireAuth>
+      ),
+    },
     {
       element: <ApplicationLayout />,
       children: [
@@ -106,14 +115,7 @@ export const router = createBrowserRouter(
             </RequireAuth>
           ),
         },
-        {
-          path: ROUTES.call,
-          element: (
-            <RequireAuth>
-              <CallPage />
-            </RequireAuth>
-          ),
-        },
+
         {
           path: ROUTES.newChat,
           element: (
@@ -165,9 +167,10 @@ export const router = createBrowserRouter(
 
 function ApplicationLayout() {
   return (
-    <>
+    <CallProvider>
       <Outlet />
       <CallWindowHost />
-    </>
+      <IncomingCallModal />
+    </CallProvider>
   )
 }

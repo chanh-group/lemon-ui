@@ -1,46 +1,36 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ArrowLeft01Icon as ArrowLeftData } from '@hugeicons/core-free-icons'
 import { toast } from 'sonner'
 import { createIcon } from '@/components/icons/hugeIcon'
-import {
-  ROUTES,
-  conversationPath,
-  type CallEndReason,
-  type CallMedia,
-  type CallPhase,
-} from '@/config/constants'
+import { ROUTES, type CallEndReason, type CallMedia, type CallPhase } from '@/config/constants'
 import { useAuth } from '@/features/auth/api'
 import { useConversationQuery } from '@/features/conversation/hooks/useConversations'
+import { getChatSocket } from '@/lib/socket'
 import { cn } from '@/lib/utils'
+import { callApi, sendBeaconCallTermination } from '../../api/call.api'
+import { useLiveKitCall } from '../../hooks/useLiveKitCall'
+import { playConnectedTone, playHangupTone, playOutgoingDialingSound } from '../../utils/callSounds'
+import type {
+  CallAcceptedPayload,
+  CallCancelledPayload,
+  CallEndedPayload,
+  CallMissedPayload,
+  CallRejectedPayload,
+  CallResponse,
+  LiveKitConnectionDetails,
+} from '../../types/call.types'
 import { CallControls } from './CallControls'
 import { VoiceCallStage } from './VoiceCallStage'
 import { VideoCallStage } from './VideoCallStage'
-import type { CallPreview, CallRouteState } from './types'
+import type { CallPreview } from './types'
 import { formatCallDuration } from './utils'
 
 const ArrowLeft = createIcon(ArrowLeftData)
 
-const VALID_PHASES: CallPhase[] = ['ringing', 'incoming', 'active', 'ended']
-const VALID_REASONS: CallEndReason[] = ['ended', 'declined', 'cancelled']
-
 function parseMedia(value: string | null): CallMedia {
   return value === 'video' ? 'video' : 'voice'
-}
-
-function parsePhase(value: string | null): CallPhase {
-  return VALID_PHASES.includes(value as CallPhase) ? (value as CallPhase) : 'ringing'
-}
-
-function parseReason(value: string | null): CallEndReason {
-  return VALID_REASONS.includes(value as CallEndReason) ? (value as CallEndReason) : 'ended'
-}
-
-interface CallPatch {
-  media?: CallMedia
-  state?: CallPhase
-  reason?: CallEndReason | null
 }
 
 export function CallScreen({
@@ -52,113 +42,562 @@ export function CallScreen({
   previewWindow?: Window
   onPreviewClose?: () => void
 } = {}) {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
   const { user } = useAuth()
   const navigate = useNavigate()
-  const location = useLocation()
   const { conversationId: routeConversationId } = useParams<{ conversationId: string }>()
   const conversationId = previewCall?.conversationId ?? routeConversationId
-  const [searchParams, setSearchParams] = useSearchParams()
+  const [searchParams] = useSearchParams()
 
-  const routeState = (location.state as CallRouteState | null) ?? null
-  const returnTo = routeState?.from
+  const livekit = useLiveKitCall()
+
   const conversationQuery = useConversationQuery(
     conversationId ?? null,
     Boolean(conversationId) && !previewCall,
   )
-  const [previewState, setPreviewState] = useState<{
-    media: CallMedia
-    phase: CallPhase
-    reason: CallEndReason | null
-  }>(() => ({ media: previewCall?.media ?? 'voice', phase: 'ringing', reason: null }))
-  const media = previewCall ? previewState.media : parseMedia(searchParams.get('media'))
-  const phase = previewCall ? previewState.phase : parsePhase(searchParams.get('state'))
-  const endReason = previewCall
-    ? (previewState.reason ?? 'ended')
-    : parseReason(searchParams.get('reason'))
+
+  const media: CallMedia = previewCall ? previewCall.media : parseMedia(searchParams.get('media'))
+
+  const initialPhase: CallPhase = previewCall
+    ? 'ringing'
+    : searchParams.get('state') === 'active'
+      ? 'active'
+      : 'ringing'
+
+  const [phase, setPhase] = useState<CallPhase>(initialPhase)
+  const [endReason, setEndReason] = useState<CallEndReason>('ended')
+  const [activeCall, setActiveCall] = useState<CallResponse | null>(null)
+  const [livekitDetails, setLivekitDetails] = useState<LiveKitConnectionDetails | null>(null)
+  const [seconds, setSeconds] = useState(0)
+  const [finalSeconds, setFinalSeconds] = useState(0)
+  const [speakerOn, setSpeakerOn] = useState(true)
+
+  const stopDialingSoundRef = useRef<(() => void) | null>(null)
+  const hasInitiatedRef = useRef(false)
+  const hasAcceptedRef = useRef(false)
+  const hasSetupRef = useRef(false)
+  const answeredAtRef = useRef<number | null>(null)
+  const activeCallRef = useRef<CallResponse | null>(null)
+  const phaseRef = useRef<CallPhase>(phase)
+  const isTerminatedRef = useRef(false)
+  const isReloadingRef = useRef(false)
+  const livekitDetailsRef = useRef<LiveKitConnectionDetails | null>(null)
+  const livekitRef = useRef(livekit)
+
+  useEffect(() => {
+    const onReloadKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'F5' || ((e.ctrlKey || e.metaKey) && (e.key === 'r' || e.key === 'R'))) {
+        isReloadingRef.current = true
+      }
+    }
+    window.addEventListener('keydown', onReloadKeyDown)
+    return () => window.removeEventListener('keydown', onReloadKeyDown)
+  }, [])
+
+  useEffect(() => {
+    livekitRef.current = livekit
+  }, [livekit])
+
+  useEffect(() => {
+    phaseRef.current = phase
+  }, [phase])
+
+  useEffect(() => {
+    activeCallRef.current = activeCall
+  }, [activeCall])
+
+  useEffect(() => {
+    livekitDetailsRef.current = livekitDetails
+  }, [livekitDetails])
+
+  const cachedPeer = (() => {
+    if (typeof window === 'undefined' || !conversationId) return null
+    try {
+      const raw =
+        sessionStorage.getItem(`lemon_call_peer_${conversationId}`) ||
+        localStorage.getItem(`lemon_call_peer_${conversationId}`)
+      return raw ? (JSON.parse(raw) as { peerName?: string; peerAvatar?: string | null }) : null
+    } catch {
+      return null
+    }
+  })()
 
   const isGroup = previewCall?.isGroup ?? conversationQuery.data?.isGroup ?? false
   const name =
     previewCall?.peerName ||
-    (isGroup && routeState?.peerName) ||
+    cachedPeer?.peerName ||
+    searchParams.get('peerName') ||
     conversationQuery.data?.name ||
-    routeState?.peerName ||
     t('chat.callUnknownPeer')
+
   const avatarUrl =
     previewCall?.peerAvatar ??
+    cachedPeer?.peerAvatar ??
     conversationQuery.data?.partnerAvatar ??
-    routeState?.peerAvatar ??
     null
+
   const localName = user?.fullName?.trim() || user?.username || t('chat.callYou')
 
-  const [muted, setMuted] = useState(false)
-  const [speakerOn, setSpeakerOn] = useState(true)
-  const [cameraOff, setCameraOff] = useState(false)
-  const [seconds, setSeconds] = useState(0)
-  const [finalSeconds, setFinalSeconds] = useState(0)
-  const cameraOn = media === 'video' && !cameraOff
-
-  const updateCall = useCallback(
-    (patch: CallPatch) => {
-      if (previewCall) {
-        setPreviewState((current) => ({
-          media: patch.media ?? current.media,
-          phase: patch.state ?? current.phase,
-          reason: patch.reason === null ? null : (patch.reason ?? current.reason),
-        }))
-        return
-      }
-      setSearchParams(
-        (prev) => {
-          const next = new URLSearchParams(prev)
-          if (patch.media) next.set('media', patch.media)
-          if (patch.state) next.set('state', patch.state)
-          if (patch.reason) next.set('reason', patch.reason)
-          else if (patch.reason === null) next.delete('reason')
-          return next
-        },
-        { replace: true, state: location.state },
-      )
-    },
-    [location.state, previewCall, setSearchParams],
-  )
+  const stopDialing = useCallback(() => {
+    if (stopDialingSoundRef.current) {
+      stopDialingSoundRef.current()
+      stopDialingSoundRef.current = null
+    }
+  }, [])
 
   const handleClose = useCallback(() => {
+    isTerminatedRef.current = true
+    stopDialing()
+    livekitRef.current.disconnect()
+
+    const callId = activeCallRef.current?.id || searchParams.get('callId')
+    const currentPhase = phaseRef.current
+
+    if (callId && currentPhase !== 'ended') {
+      if (currentPhase === 'ringing') {
+        void callApi.cancelCall(callId)
+        sendBeaconCallTermination({ callId, action: 'cancel' })
+      } else if (currentPhase === 'active') {
+        void callApi.endCall(callId, 'NORMAL')
+        sendBeaconCallTermination({ callId, action: 'end', reason: 'NORMAL' })
+      }
+
+      try {
+        window.opener?.postMessage(
+          {
+            type: 'LEMON_CALL_TERMINATE',
+            callId,
+            action: currentPhase === 'ringing' ? 'cancel' : 'end',
+            reason: 'NORMAL',
+          },
+          '*',
+        )
+      } catch {
+        // ignore
+      }
+    }
+
+    if (conversationId && typeof window !== 'undefined') {
+      try {
+        sessionStorage.removeItem(`lemon_call_peer_${conversationId}`)
+        localStorage.removeItem(`lemon_call_peer_${conversationId}`)
+      } catch {
+        // ignore
+      }
+    }
+
     if (previewCall) {
       onPreviewClose?.()
       return
     }
-    if (returnTo) {
-      navigate(returnTo)
-      return
-    }
-    if (conversationId) {
-      navigate(conversationPath(conversationId))
-      return
-    }
-    navigate(ROUTES.calls)
-  }, [conversationId, navigate, onPreviewClose, previewCall, returnTo])
 
-  // Đồng hồ cuộc gọi chỉ chạy khi đã kết nối.
+    // Nếu đang chạy trong cửa sổ riêng biệt được mở bởi window.open -> Đóng cửa sổ
+    if (typeof window !== 'undefined' && (window.opener || window.history.length <= 1)) {
+      window.close()
+      return
+    }
+
+    navigate(ROUTES.messages)
+  }, [conversationId, onPreviewClose, previewCall, stopDialing, navigate, searchParams])
+
+  useEffect(() => {
+    if (previewCall || typeof window === 'undefined' || !window.opener) return
+
+    const opener = window.opener
+    const interval = window.setInterval(() => {
+      if (opener.closed) {
+        window.clearInterval(interval)
+        handleClose()
+      }
+    }, 2000)
+
+    return () => window.clearInterval(interval)
+  }, [handleClose, previewCall])
+
+  // Khởi tạo cuộc gọi mới hoặc phục hồi cuộc gọi đang diễn ra khi F5 reload
+  useEffect(() => {
+    if (hasSetupRef.current || previewCall || !conversationId) return
+    hasSetupRef.current = true
+
+    const stateParam = searchParams.get('state')
+    const paramCallId = searchParams.get('callId')
+
+    const setupCall = async () => {
+      // 1. Kích hoạt xin cấp quyền camera / microphone ngay lập tức
+      await livekitRef.current.requestMediaPermissions(media === 'video' ? 'VIDEO' : 'VOICE')
+
+      if (isTerminatedRef.current) return
+
+      // Trường hợp 1: Phục hồi hoặc chấp nhận cuộc gọi khi đã có callId trên URL
+      if (paramCallId) {
+        let currentActiveCall: CallResponse | null = null
+        try {
+          currentActiveCall = await callApi.getActiveCall()
+        } catch (err) {
+          console.warn('Could not query active call for recovery:', err)
+        }
+
+        if (isTerminatedRef.current) return
+
+        // 1A: Cuộc gọi đã ở trạng thái ACCEPTED (F5 reload khi đang trong cuộc gọi)
+        if (
+          currentActiveCall &&
+          currentActiveCall.id === paramCallId &&
+          currentActiveCall.status === 'ACCEPTED'
+        ) {
+          hasInitiatedRef.current = true
+          hasAcceptedRef.current = true
+          setActiveCall(currentActiveCall)
+          setPhase('active')
+          const nowIso = new Date().toISOString()
+          answeredAtRef.current = Date.parse(
+            currentActiveCall.answeredAt || currentActiveCall.startedAt || nowIso,
+          )
+          stopDialing()
+          playConnectedTone()
+
+          try {
+            const tokenData = await callApi.getCallToken(paramCallId)
+            if (isTerminatedRef.current) return
+            setLivekitDetails(tokenData)
+            livekitDetailsRef.current = tokenData
+            await livekitRef.current.connect(
+              tokenData.serverUrl,
+              tokenData.token,
+              media === 'video' ? 'VIDEO' : 'VOICE',
+            )
+          } catch (tokenErr) {
+            console.error('Failed to restore LiveKit connection on recovery:', tokenErr)
+          }
+          return
+        }
+
+        // 1B: Callee mở màn hình để chấp nhận cuộc gọi (state = active & callId)
+        if (stateParam === 'active') {
+          hasAcceptedRef.current = true
+
+          try {
+            const res = await callApi.acceptCall(paramCallId)
+            if (isTerminatedRef.current) {
+              sendBeaconCallTermination({
+                callId: paramCallId,
+                action: 'end',
+                reason: 'WINDOW_CLOSED',
+              })
+              try {
+                window.opener?.postMessage(
+                  {
+                    type: 'LEMON_CALL_TERMINATE',
+                    callId: paramCallId,
+                    action: 'end',
+                    reason: 'WINDOW_CLOSED',
+                  },
+                  '*',
+                )
+              } catch {
+                // ignore
+              }
+              return
+            }
+
+            const nowIso = new Date().toISOString()
+            answeredAtRef.current = Date.parse(res.answeredAt || nowIso)
+            setActiveCall({
+              id: res.id,
+              conversationId,
+              callerId: '',
+              media: media === 'video' ? 'VIDEO' : 'VOICE',
+              status: 'ACCEPTED',
+              startedAt: nowIso,
+              answeredAt: res.answeredAt,
+              endedAt: null,
+              durationSecs: 0,
+              livekit: res.livekit,
+            })
+            setLivekitDetails(res.livekit)
+            livekitDetailsRef.current = res.livekit
+            playConnectedTone()
+            await livekitRef.current.connect(
+              res.livekit.serverUrl,
+              res.livekit.token,
+              media === 'video' ? 'VIDEO' : 'VOICE',
+            )
+          } catch (err: unknown) {
+            if (isTerminatedRef.current) return
+            console.error('Failed to accept call:', err)
+            toast.error(t('chat.callAcceptError'))
+            setPhase('ended')
+            setEndReason('declined')
+          }
+          return
+        }
+
+        // 1C: Caller F5 reload trong khi cuộc gọi vẫn đang RINGING
+        if (
+          currentActiveCall &&
+          currentActiveCall.id === paramCallId &&
+          (currentActiveCall.status === 'RINGING' || currentActiveCall.status === 'INITIATED') &&
+          stateParam === 'ringing'
+        ) {
+          hasInitiatedRef.current = true
+          setActiveCall(currentActiveCall)
+          setPhase('ringing')
+          stopDialingSoundRef.current = playOutgoingDialingSound()
+          return
+        }
+      }
+
+      // Trường hợp 2: Caller khởi tạo cuộc gọi mới từ đầu (state = ringing, chưa có callId trên URL)
+      if (stateParam === 'ringing') {
+        hasInitiatedRef.current = true
+
+        try {
+          const res = await callApi.initiateCall({
+            conversationId,
+            media: media === 'video' ? 'VIDEO' : 'VOICE',
+          })
+
+          if (isTerminatedRef.current) {
+            sendBeaconCallTermination({ callId: res.id, action: 'cancel' })
+            try {
+              window.opener?.postMessage(
+                { type: 'LEMON_CALL_TERMINATE', callId: res.id, action: 'cancel' },
+                '*',
+              )
+            } catch {
+              // ignore
+            }
+            return
+          }
+
+          // Cập nhật callId lên URL để nếu người dùng F5 reload thì nhận diện được cuộc gọi hiện tại
+          if (typeof window !== 'undefined') {
+            try {
+              const newUrl = new URL(window.location.href)
+              newUrl.searchParams.set('callId', res.id)
+              window.history.replaceState(null, '', newUrl.toString())
+            } catch {
+              // ignore
+            }
+          }
+
+          setActiveCall(res)
+          setLivekitDetails(res.livekit)
+          livekitDetailsRef.current = res.livekit
+          stopDialingSoundRef.current = playOutgoingDialingSound()
+        } catch (err: unknown) {
+          if (isTerminatedRef.current) return
+          console.error('Failed to initiate call:', err)
+          toast.error(t('chat.callInitiateError'))
+          setPhase('ended')
+          setEndReason('cancelled')
+        }
+      }
+    }
+
+    void setupCall()
+  }, [conversationId, media, previewCall, searchParams, stopDialing, t])
+
+  // Lắng nghe các sự kiện Socket.IO trong cửa sổ đàm thoại
+  useEffect(() => {
+    const socket = getChatSocket()
+
+    // Chỉ xử lý event thuộc về cuộc gọi của màn hình hiện tại,
+    // tránh event trễ từ cuộc gọi cũ / tab khác làm tắt nhầm cuộc gọi đang diễn ra
+    const belongsToCurrentCall = (payload: { callId?: string }) => {
+      const currentCallId = activeCallRef.current?.id || searchParams.get('callId')
+      if (payload.callId && currentCallId && payload.callId !== currentCallId) {
+        return false
+      }
+      return true
+    }
+
+    const onAccepted = async (payload: CallAcceptedPayload) => {
+      if (!belongsToCurrentCall(payload)) return
+      if (phaseRef.current === 'active') return
+      stopDialing()
+      playConnectedTone()
+      setPhase('active')
+      answeredAtRef.current = Date.parse(payload.answeredAt || new Date().toISOString())
+
+      // Caller kết nối vào phòng LiveKit SFU khi Callee nhấc máy
+      let targetDetails = payload.livekit || livekitDetailsRef.current
+      if (!targetDetails && payload.callId) {
+        try {
+          targetDetails = await callApi.getCallToken(payload.callId)
+          setLivekitDetails(targetDetails)
+          livekitDetailsRef.current = targetDetails
+        } catch (tokenErr) {
+          console.error('Failed to get call token in onAccepted:', tokenErr)
+        }
+      }
+
+      if (targetDetails) {
+        try {
+          await livekitRef.current.connect(
+            targetDetails.serverUrl,
+            targetDetails.token,
+            media === 'video' ? 'VIDEO' : 'VOICE',
+          )
+        } catch (connectErr) {
+          console.error('LiveKit initial connect error, attempting token refresh:', connectErr)
+          if (payload.callId) {
+            try {
+              const refreshed = await callApi.getCallToken(payload.callId)
+              setLivekitDetails(refreshed)
+              livekitDetailsRef.current = refreshed
+              await livekitRef.current.connect(
+                refreshed.serverUrl,
+                refreshed.token,
+                media === 'video' ? 'VIDEO' : 'VOICE',
+              )
+            } catch (refreshErr) {
+              console.error('LiveKit refreshed connect error:', refreshErr)
+              toast.error(t('chat.callConnectError', 'Lỗi kết nối phòng đàm thoại'))
+            }
+          }
+        }
+      }
+    }
+
+    const onRejected = (payload: CallRejectedPayload) => {
+      if (!belongsToCurrentCall(payload)) return
+      stopDialing()
+      playHangupTone()
+      setPhase('ended')
+      setEndReason('declined')
+      toast.info(
+        payload.reason === 'CALLEE_OFFLINE' || payload.reason === 'DISCONNECTED_TIMEOUT'
+          ? t('chat.callDisconnectedTimeout')
+          : payload.reason
+            ? `${t('chat.callEndedDeclined')} (${payload.reason})`
+            : t('chat.callEndedDeclined'),
+      )
+      livekitRef.current.disconnect()
+
+      window.setTimeout(() => {
+        handleClose()
+      }, 2000)
+    }
+
+    const onCancelled = (payload: CallCancelledPayload) => {
+      if (!belongsToCurrentCall(payload)) return
+      stopDialing()
+      playHangupTone()
+      setPhase('ended')
+      setEndReason('cancelled')
+      toast.info(t('chat.callEndedCancelled'))
+      livekitRef.current.disconnect()
+
+      window.setTimeout(() => {
+        handleClose()
+      }, 2000)
+    }
+
+    const onEnded = (payload: CallEndedPayload) => {
+      if (!belongsToCurrentCall(payload)) return
+      stopDialing()
+      playHangupTone()
+      livekitRef.current.disconnect()
+      setPhase('ended')
+      setEndReason('ended')
+      setFinalSeconds(payload.durationSecs || 0)
+
+      if (payload.reason === 'DISCONNECTED_TIMEOUT' || payload.reason === 'CALLEE_OFFLINE') {
+        toast.info(t('chat.callDisconnectedTimeout'))
+      }
+
+      window.setTimeout(() => {
+        handleClose()
+      }, 2000)
+    }
+
+    const onMissed = (payload: CallMissedPayload) => {
+      if (!belongsToCurrentCall(payload)) return
+      stopDialing()
+      playHangupTone()
+      setPhase('ended')
+      setEndReason('cancelled')
+      livekitRef.current.disconnect()
+
+      if (payload.reason === 'DISCONNECTED_TIMEOUT' || payload.reason === 'CALLEE_OFFLINE') {
+        toast.info(t('chat.callDisconnectedTimeout'))
+      }
+
+      window.setTimeout(() => {
+        handleClose()
+      }, 2000)
+    }
+
+    socket.on('call:accepted', onAccepted)
+    socket.on('call:rejected', onRejected)
+    socket.on('call:cancelled', onCancelled)
+    socket.on('call:ended', onEnded)
+    socket.on('call:missed', onMissed)
+
+    return () => {
+      socket.off('call:accepted', onAccepted)
+      socket.off('call:rejected', onRejected)
+      socket.off('call:cancelled', onCancelled)
+      socket.off('call:ended', onEnded)
+      socket.off('call:missed', onMissed)
+    }
+  }, [handleClose, media, searchParams, stopDialing, t])
+
+  // Đếm thời lượng cuộc gọi
   useEffect(() => {
     if (phase !== 'active') return
-    const startedAt = Date.now()
     const timer = window.setInterval(() => {
-      setSeconds(Math.floor((Date.now() - startedAt) / 1000))
-    }, 500)
+      if (answeredAtRef.current) {
+        setSeconds(Math.max(0, Math.floor((Date.now() - answeredAtRef.current) / 1000)))
+      } else {
+        setSeconds((prev) => prev + 1)
+      }
+    }, 1000)
     return () => window.clearInterval(timer)
   }, [phase])
 
-  /**
-   * Chưa có backend signaling/WebRTC nên cuộc gọi đi tự chuyển sang trạng thái
-   * đã kết nối sau ~3 giây để xem trước đầy đủ các màn hình.
-   * Khi tích hợp call gateway, thay timeout này bằng sự kiện ANSWER.
-   */
+  // Giải phóng tài nguyên trên backend nếu người dùng tắt trình duyệt / tab đột ngột (nút X / Alt+F4)
   useEffect(() => {
-    if (phase !== 'ringing') return
-    const timer = window.setTimeout(() => updateCall({ state: 'active' }), 3_200)
-    return () => window.clearTimeout(timer)
-  }, [phase, updateCall])
+    const handleWindowUnload = () => {
+      // Nếu người dùng đang reload (F5 / Ctrl+R): KHÔNG giải phóng cuộc gọi
+      // để bên Callee vẫn duy trì modal nhận cuộc gọi bình thường
+      if (isReloadingRef.current) return
+
+      isTerminatedRef.current = true
+      const call = activeCallRef.current
+      const callId = call?.id || searchParams.get('callId')
+      const currentPhase = phaseRef.current
+
+      if (callId && currentPhase === 'active') {
+        sendBeaconCallTermination({ callId, action: 'end', reason: 'WINDOW_CLOSED' })
+
+        try {
+          window.opener?.postMessage(
+            {
+              type: 'LEMON_CALL_TERMINATE',
+              callId,
+              action: 'end',
+              reason: 'WINDOW_CLOSED',
+            },
+            '*',
+          )
+        } catch {
+          // ignore
+        }
+      }
+      // Lưu ý: Đối với pha ringing, không gửi cancel beacon trong unload để tránh hủy nhầm
+      // khi người dùng reload bằng nút trên trình duyệt. Nếu người dùng thực sự đóng cửa sổ nổi ("X"),
+      // tab chính (window.opener) sẽ phát hiện win.closed === true và tự động hủy sau 1 giây.
+    }
+
+    window.addEventListener('pagehide', handleWindowUnload)
+    window.addEventListener('beforeunload', handleWindowUnload)
+    return () => {
+      window.removeEventListener('pagehide', handleWindowUnload)
+      window.removeEventListener('beforeunload', handleWindowUnload)
+    }
+  }, [searchParams])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -170,44 +609,59 @@ export function CallScreen({
   }, [handleClose, previewWindow])
 
   const endCall = () => {
-    setFinalSeconds(phase === 'active' ? seconds : finalSeconds)
-    updateCall({ state: 'ended', reason: phase === 'active' ? 'ended' : 'cancelled' })
+    setFinalSeconds(seconds)
+    setPhase('ended')
+    stopDialing()
+    playHangupTone()
+
+    const callId = activeCall?.id
+    if (callId) {
+      if (phase === 'ringing') {
+        void callApi.cancelCall(callId)
+      } else {
+        void callApi.endCall(callId, 'NORMAL')
+      }
+    }
+
+    livekit.disconnect()
+    window.setTimeout(() => {
+      handleClose()
+    }, 1200)
   }
 
   const declineCall = () => {
-    setFinalSeconds(0)
-    updateCall({ state: 'ended', reason: 'declined' })
-  }
+    setPhase('ended')
+    setEndReason('declined')
+    stopDialing()
+    playHangupTone()
 
-  const acceptCall = (acceptedMedia: CallMedia) => {
-    setCameraOff(false)
-    updateCall({ media: acceptedMedia, state: 'active', reason: null })
-  }
+    const callId = activeCall?.id || searchParams.get('callId')
+    if (callId) {
+      void callApi.rejectCall(callId)
+    }
 
-  const changeMedia = (nextMedia: CallMedia) => {
-    setCameraOff(false)
-    updateCall({ media: nextMedia, state: phase === 'ended' ? 'ended' : phase, reason: null })
-  }
-
-  const redial = () => {
-    setFinalSeconds(0)
-    setSeconds(0)
-    setMuted(false)
-    setSpeakerOn(true)
-    setCameraOff(false)
-    updateCall({ media, state: 'ringing', reason: null })
+    livekit.disconnect()
+    window.setTimeout(() => {
+      handleClose()
+    }, 1000)
   }
 
   const flipCamera = () => {
-    // Chưa có camera thật; hiện phản hồi để luồng UI hoàn chỉnh.
-    toast.info(t('chat.callFlipCameraToast'))
+    void livekit.flipCamera()
   }
 
   if (!conversationId && !previewCall) {
-    return <CallErrorScreen title={t('chat.callNotFound')} onClose={() => navigate(ROUTES.calls)} />
+    return (
+      <CallErrorScreen title={t('chat.callNotFound')} onClose={() => navigate(ROUTES.messages)} />
+    )
   }
 
-  if (conversationQuery.isPending && !routeState?.peerName && !previewCall) {
+  if (
+    conversationQuery.isPending &&
+    !searchParams.get('peerName') &&
+    !cachedPeer?.peerName &&
+    !previewCall
+  ) {
     return (
       <main className="relative flex h-dvh w-full flex-col overflow-hidden bg-[#07120c] text-white">
         <CallBackdrop />
@@ -222,16 +676,6 @@ export function CallScreen({
     )
   }
 
-  if (conversationQuery.isError && !routeState?.peerName && !previewCall) {
-    return (
-      <CallErrorScreen
-        title={t('chat.callNotFound')}
-        onClose={handleClose}
-        onRetry={() => void conversationQuery.refetch()}
-      />
-    )
-  }
-
   const isActiveVideo = phase === 'active' && media === 'video'
 
   return (
@@ -243,7 +687,12 @@ export function CallScreen({
           localName={localName}
           localAvatarUrl={user?.avatarUrl}
           seconds={seconds}
-          cameraOn={cameraOn}
+          cameraOn={!livekit.isCameraOff}
+          hasCameraError={livekit.hasCameraError}
+          remoteVideoTrack={livekit.remoteVideoTrack}
+          remoteAudioTrack={livekit.remoteAudioTrack}
+          localVideoTrack={livekit.localVideoTrack}
+          speakerOn={speakerOn}
         />
       ) : (
         <CallBackdrop>
@@ -255,20 +704,24 @@ export function CallScreen({
             isGroup={isGroup}
             seconds={phase === 'ended' ? finalSeconds : seconds}
             endReason={endReason}
+            remoteAudioTrack={livekit.remoteAudioTrack}
+            isPeerSpeaking={livekit.isPeerSpeaking}
+            speakerOn={speakerOn}
           />
         </CallBackdrop>
       )}
 
-      {/* Lớp tối để chữ và nút luôn đọc được trên video/voice stage. */}
+      {/* Lớp phủ chuyển màu gradient cho header và footer */}
       <div
-        className="pointer-events-none absolute inset-x-0 top-0 z-20 h-40 bg-linear-to-b from-black/65 via-black/25 to-transparent"
+        className="pointer-events-none absolute inset-x-0 top-0 z-20 h-40 bg-gradient-to-b from-black/65 via-black/25 to-transparent"
         aria-hidden="true"
       />
       <div
-        className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-72 bg-linear-to-t from-black/80 via-black/40 to-transparent"
+        className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-72 bg-gradient-to-t from-black/80 via-black/40 to-transparent"
         aria-hidden="true"
       />
 
+      {/* Header thanh điều hướng */}
       <header className="relative z-30 flex items-start justify-between gap-3 px-4 pt-[max(1rem,env(safe-area-inset-top))] sm:px-6">
         <button
           type="button"
@@ -302,12 +755,15 @@ export function CallScreen({
         <div className="size-11 shrink-0" aria-hidden="true" />
       </header>
 
-      <p className="relative z-30 mx-auto mt-3 rounded-full border border-white/15 bg-black/40 px-3 py-1 text-center text-xs font-medium text-white/80">
-        {i18n.resolvedLanguage?.startsWith('vi')
-          ? 'Bản xem trước giao diện — không có cuộc gọi thật'
-          : 'UI preview — no real call'}
-      </p>
+      {/* Thông báo mạng yếu nếu LiveKit đang reconnect */}
+      {livekit.isReconnecting && (
+        <div className="relative z-30 mx-auto mt-2 flex items-center gap-2 rounded-full bg-amber-500/20 px-4 py-1.5 text-xs font-semibold text-amber-300 ring-1 ring-amber-400/40 backdrop-blur animate-pulse">
+          <span className="size-2 rounded-full bg-amber-400" />
+          {t('chat.callReconnecting')}
+        </div>
+      )}
 
+      {/* Bảng điều khiển cuộc gọi */}
       <footer className="relative z-30 mt-auto px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:px-6">
         <div
           className={cn(
@@ -320,18 +776,20 @@ export function CallScreen({
           <CallControls
             phase={phase}
             media={media}
-            muted={muted}
+            muted={livekit.isMuted}
             speakerOn={speakerOn}
-            cameraOn={cameraOn}
-            onToggleMute={() => setMuted((value) => !value)}
-            onToggleSpeaker={() => setSpeakerOn((value) => !value)}
-            onToggleCamera={() => setCameraOff((value) => !value)}
+            cameraOn={!livekit.isCameraOff}
+            hasMicError={livekit.hasMicError}
+            hasCameraError={livekit.hasCameraError}
+            onToggleMute={livekit.toggleMicrophone}
+            onToggleSpeaker={() => setSpeakerOn((v) => !v)}
+            onToggleCamera={livekit.toggleCamera}
             onFlipCamera={flipCamera}
-            onChangeMedia={changeMedia}
             onEnd={endCall}
-            onAccept={acceptCall}
+            onAccept={() => {
+              setPhase('active')
+            }}
             onDecline={declineCall}
-            onRedial={redial}
             onClose={handleClose}
           />
         </div>
@@ -364,39 +822,20 @@ function CallBackdrop({ children }: { children?: ReactNode }) {
   )
 }
 
-function CallErrorScreen({
-  title,
-  onClose,
-  onRetry,
-}: {
-  title: string
-  onClose: () => void
-  onRetry?: () => void
-}) {
+function CallErrorScreen({ title, onClose }: { title: string; onClose: () => void }) {
   const { t } = useTranslation()
   return (
     <main className="relative flex h-dvh w-full flex-col overflow-hidden bg-[#07120c] text-white">
       <CallBackdrop />
       <div className="relative z-10 flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
         <p className="max-w-sm text-base font-semibold text-white/85">{title}</p>
-        <div className="flex flex-wrap items-center justify-center gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-full bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground transition-colors hover:brightness-105"
-          >
-            {t('chat.callBackToCalls')}
-          </button>
-          {onRetry && (
-            <button
-              type="button"
-              onClick={onRetry}
-              className="rounded-full border border-white/15 bg-white/5 px-5 py-2.5 text-sm font-semibold text-white/80 transition-colors hover:bg-white/10"
-            >
-              {t('common.retry')}
-            </button>
-          )}
-        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded-full bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground transition-colors hover:brightness-105"
+        >
+          {t('chat.callBackToCalls')}
+        </button>
       </div>
     </main>
   )
