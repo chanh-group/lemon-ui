@@ -34,11 +34,6 @@ describe('callApi', () => {
         answeredAt: null,
         endedAt: null,
         durationSecs: 0,
-        livekit: {
-          serverUrl: 'ws://localhost:7880',
-          room: 'call-123',
-          token: 'jwt-token',
-        },
       },
     }
     vi.mocked(api.post).mockResolvedValueOnce(mockResponse)
@@ -46,6 +41,7 @@ describe('callApi', () => {
     const result = await callApi.initiateCall({ conversationId: 'conv-456', media: 'VIDEO' })
     expect(api.post).toHaveBeenCalledWith('/calls', { conversationId: 'conv-456', media: 'VIDEO' })
     expect(result).toEqual(mockResponse.data)
+    expect(result).not.toHaveProperty('livekit')
   })
 
   it('acceptCall sends POST /calls/:id/accept', async () => {

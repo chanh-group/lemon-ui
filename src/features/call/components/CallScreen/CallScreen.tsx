@@ -382,8 +382,6 @@ export function CallScreen({
           }
 
           setActiveCall(res)
-          setLivekitDetails(res.livekit)
-          livekitDetailsRef.current = res.livekit
           stopDialingSoundRef.current = playOutgoingDialingSound()
         } catch (err: unknown) {
           if (isTerminatedRef.current) return
