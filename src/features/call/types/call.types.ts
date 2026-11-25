@@ -52,9 +52,7 @@ export interface CallResponse {
   livekit?: LiveKitConnectionDetails
 }
 
-export interface InitiateCallResponse extends CallResponse {
-  livekit: LiveKitConnectionDetails
-}
+export type InitiateCallResponse = Omit<CallResponse, 'livekit'>
 
 export interface AcceptCallResponse {
   id: string
