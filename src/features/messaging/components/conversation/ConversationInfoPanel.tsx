@@ -10,6 +10,7 @@ import {
   Download01Icon as DownloadData,
   Edit02Icon as EditData,
   File01Icon as FileData,
+  LoaderCircleIcon as LoaderData,
   Logout01Icon as LeaveData,
   MultiplicationSignIcon as CloseData,
   Notification01Icon as BellData,
@@ -82,6 +83,7 @@ const ChevronUp = createIcon(ChevronUpData)
 const UnfriendIcon = createIcon(UnfriendData)
 const BlockIcon = createIcon(BlockData)
 const LeaveIcon = createIcon(LeaveData)
+const Loader = createIcon(LoaderData)
 const CopyIcon = createIcon(CopyData)
 const CheckIcon = createIcon(CheckData)
 const CameraIcon = createIcon(CameraData)
@@ -306,7 +308,8 @@ export function ConversationInfoPanel({
     action: () => Promise<unknown>
     verifyApplied: () => Promise<boolean>
   } | null>(null)
-  const [isGroupActionPending, setIsGroupActionPending] = useState(false)
+  const [pendingActionKind, setPendingActionKind] = useState<string | null>(null)
+  const isGroupActionPending = pendingActionKind !== null
   const groupActionPendingRef = useRef(false)
 
   const friendData = useMemo(() => {
@@ -365,10 +368,11 @@ export function ConversationInfoPanel({
     action: () => Promise<unknown>,
     successKey: string,
     verifyApplied?: () => Promise<boolean>,
+    kind?: string,
   ) => {
     if (groupActionPendingRef.current) return false
     groupActionPendingRef.current = true
-    setIsGroupActionPending(true)
+    setPendingActionKind(kind ?? null)
     try {
       const outcome = await resolveGroupAction(action, verifyApplied)
       if (outcome === 'uncertain') {
@@ -399,7 +403,7 @@ export function ConversationInfoPanel({
     } finally {
       await refreshGroup().catch(() => undefined)
       groupActionPendingRef.current = false
-      setIsGroupActionPending(false)
+      setPendingActionKind(null)
     }
   }
 
@@ -746,6 +750,7 @@ export function ConversationInfoPanel({
                     () => updateGroup(conversation.id, title),
                     'chat.groupUpdated',
                     async () => (await getConversationById(conversation.id)).title === title,
+                    'rename',
                   ).then((success) => success && setGroupTitleEditing(false))
               }}
             >
@@ -757,7 +762,15 @@ export function ConversationInfoPanel({
                 className="min-w-0 flex-1 rounded-lg border border-border bg-background px-2 py-1.5 text-sm"
                 aria-label={t('chat.groupName')}
               />
-              <Button size="sm" type="submit" disabled={!groupTitleDraft.trim()}>
+              <Button
+                size="sm"
+                type="submit"
+                disabled={isGroupActionPending || !groupTitleDraft.trim()}
+                className="gap-1.5"
+              >
+                {pendingActionKind === 'rename' && (
+                  <Loader className="size-3.5 animate-spin" aria-hidden="true" />
+                )}
                 {t('chat.save')}
               </Button>
               <Button
@@ -1154,6 +1167,7 @@ export function ConversationInfoPanel({
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="min-w-40">
                           <DropdownMenuItem
+                            disabled={isGroupActionPending}
                             onClick={() =>
                               void runGroupAction(
                                 () =>
@@ -1179,6 +1193,7 @@ export function ConversationInfoPanel({
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
                             variant="destructive"
+                            disabled={isGroupActionPending}
                             onClick={() =>
                               setPendingGroupAction({
                                 description: t('chat.groupRemoveConfirm', {
@@ -1309,6 +1324,7 @@ export function ConversationInfoPanel({
                   <button
                     key={friend.id}
                     type="button"
+                    disabled={isGroupActionPending}
                     onClick={() =>
                       !isGroupActionPending &&
                       void runGroupAction(
@@ -1320,7 +1336,7 @@ export function ConversationInfoPanel({
                           ),
                       ).then((success) => success && setAddMembersOpen(false))
                     }
-                    className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left hover:bg-muted"
+                    className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left hover:bg-muted disabled:opacity-50"
                   >
                     <UserAvatar name={friend.name} src={friend.avatarUrl} className="size-9" />
                     <span className="min-w-0 flex-1 truncate text-sm">{friend.name}</span>
@@ -1408,7 +1424,8 @@ export function ConversationInfoPanel({
             </Button>
             <Button
               variant="destructive"
-              disabled={mustPromoteAdminBeforeLeaving}
+              disabled={mustPromoteAdminBeforeLeaving || isGroupActionPending}
+              className="gap-1.5"
               onClick={() =>
                 void runGroupAction(
                   () => leaveGroup(conversation.id),
@@ -1422,6 +1439,7 @@ export function ConversationInfoPanel({
                       throw error
                     }
                   },
+                  'leave',
                 ).then((success) => {
                   if (!success) return
                   setLeaveGroupOpen(false)
@@ -1430,6 +1448,9 @@ export function ConversationInfoPanel({
                 })
               }
             >
+              {pendingActionKind === 'leave' && (
+                <Loader className="size-3.5 animate-spin" aria-hidden="true" />
+              )}
               {t('chat.leaveGroupAction')}
             </Button>
           </DialogFooter>

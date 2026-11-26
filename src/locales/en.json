@@ -519,6 +519,8 @@
     "revokeForEveryone": "Delete for everyone",
     "messageDeletedForMe": "Message deleted for you",
     "messageDeleteFailed": "Could not delete message",
+    "deletingMessage": "Deleting for you…",
+    "revokingMessage": "Deleting for everyone…",
     "forward": "Forward",
     "pin": "Pin",
     "copyText": "Copy",

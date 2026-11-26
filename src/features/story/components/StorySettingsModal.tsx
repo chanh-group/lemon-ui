@@ -67,7 +67,7 @@ export function StorySettingsModal({ open, onOpenChange }: StorySettingsModalPro
               </div>
               <Switch
                 checked={viewedReceipts}
-                disabled={isLoading || updateSettings.isPending}
+                disabled={isLoading}
                 onCheckedChange={handleToggleReceipts}
               />
             </div>
@@ -84,7 +84,7 @@ export function StorySettingsModal({ open, onOpenChange }: StorySettingsModalPro
               </div>
               <Switch
                 checked={archiveEnabled}
-                disabled={isLoading || updateSettings.isPending}
+                disabled={isLoading}
                 onCheckedChange={handleToggleArchive}
               />
             </div>

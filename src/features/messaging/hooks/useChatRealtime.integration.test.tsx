@@ -350,3 +350,69 @@ describe('useChatRealtime group typing', () => {
     expect(result.current.typingUserIds).toEqual([])
   })
 })
+
+describe('useChatRealtime unread badge', () => {
+  it('does not double-count unread when the socket redelivers a known message', () => {
+    const friend = { id: 'friend-1', kind: 'DIRECT', isGroup: false, unreadCount: 0 }
+    queryClient.setQueryData(CHAT_QUERY_KEYS.conversations, [friend])
+    queryClient.setQueryData(CHAT_QUERY_KEYS.liveMessages(friend.id), [])
+
+    renderHook(() => useChatRealtime(friend.id), { wrapper })
+
+    const incoming = {
+      id: 'unread-echo-1',
+      conversationId: friend.id,
+      senderId: 'member-a',
+      kind: 'TEXT',
+      body: 'hello',
+      replyToId: null,
+      createdAt: '2026-11-17T12:00:00.000Z',
+      editedAt: null,
+      deletedAt: null,
+    }
+    const unreadNow = () =>
+      queryClient.getQueryData<(typeof friend)[]>(CHAT_QUERY_KEYS.conversations)?.[0].unreadCount
+
+    act(() => {
+      socket.emit('message:new', incoming)
+    })
+    expect(unreadNow()).toBe(1)
+
+    // Replay (echo/reconnect) — badge không được đếm đôi.
+    act(() => {
+      socket.emit('message:new', incoming)
+    })
+    expect(unreadNow()).toBe(1)
+  })
+
+  it('does not double-count unread on replay for a conversation without message cache', () => {
+    const active = { id: 'friend-active', kind: 'DIRECT', isGroup: false, unreadCount: 0 }
+    const friend = { id: 'friend-2', kind: 'DIRECT', isGroup: false, unreadCount: 0 }
+    queryClient.setQueryData(CHAT_QUERY_KEYS.conversations, [active, friend])
+
+    renderHook(() => useChatRealtime(active.id), { wrapper })
+
+    const incoming = {
+      id: 'unread-echo-2',
+      conversationId: friend.id,
+      senderId: 'member-a',
+      kind: 'TEXT',
+      body: 'hello',
+      replyToId: null,
+      createdAt: '2026-11-17T12:00:00.000Z',
+      editedAt: null,
+      deletedAt: null,
+    }
+    const unreadNow = () =>
+      queryClient.getQueryData<(typeof friend)[]>(CHAT_QUERY_KEYS.conversations)?.[1].unreadCount
+
+    act(() => {
+      socket.emit('message:new', incoming)
+    })
+    // Replay khi hội thoại không active và không có message cache — vẫn không đếm đôi.
+    act(() => {
+      socket.emit('message:new', incoming)
+    })
+    expect(unreadNow()).toBe(1)
+  })
+})

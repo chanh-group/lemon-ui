@@ -519,6 +519,8 @@
     "revokeForEveryone": "Thu hồi với mọi người",
     "messageDeletedForMe": "Đã xóa tin nhắn ở phía bạn",
     "messageDeleteFailed": "Không thể xóa tin nhắn",
+    "deletingMessage": "Đang xóa ở phía bạn…",
+    "revokingMessage": "Đang thu hồi…",
     "forward": "Chuyển tiếp",
     "pin": "Ghim",
     "copyText": "Sao chép",

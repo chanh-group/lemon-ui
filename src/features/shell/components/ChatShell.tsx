@@ -28,6 +28,7 @@ import {
   useGroupMembersQuery,
 } from '@/features/conversation/hooks/useConversations'
 import { useChatRealtime } from '@/features/messaging/hooks/useMessagingRealtime'
+import { useMarkReadCoalescer } from '@/features/messaging/hooks/useMarkReadCoalescer'
 import { useStoriesList } from '@/features/story/hooks/useStories'
 import { getStoryById } from '@/features/story/api/stories.api'
 import {
@@ -252,19 +253,26 @@ export function ChatShell() {
     })
   }
 
-  const markVisibleMessageRead = (messageId: string) => {
-    if (!selectedId) return
-    const attempt = `${selectedId}:${messageId}`
-    if (lastReadAttempt.current === attempt) return
+  // Gom các lần check thấy tin trong thời gian ngắn thành 1 POST /read (mở hội thoại
+  // bắn nhiều lần); đổi hội thoại/unmount flush ngay, không bỏ mark-read đang chờ.
+  const queueMarkRead = useMarkReadCoalescer(selectedId, ({ conversationId, messageId }) => {
+    const attempt = `${conversationId}:${messageId}`
     lastReadAttempt.current = attempt
     markReadMutation.mutate(
-      { conversationId: selectedId, lastReadMessageId: messageId },
+      { conversationId, lastReadMessageId: messageId },
       {
         onError: () => {
           if (lastReadAttempt.current === attempt) lastReadAttempt.current = null
         },
       },
     )
+  })
+
+  const markVisibleMessageRead = (messageId: string) => {
+    if (!selectedId) return
+    const attempt = `${selectedId}:${messageId}`
+    if (lastReadAttempt.current === attempt) return
+    queueMarkRead({ conversationId: selectedId, messageId })
   }
 
   const handleSend = async (

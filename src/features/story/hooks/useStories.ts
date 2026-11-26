@@ -172,9 +172,38 @@ export function useUpdateStorySettings() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (payload: Partial<UserStorySettings>) => updateStorySettings(payload),
+    // Toggle phải lật ngay: áp payload lên cache ở onMutate, chỉ hoàn tác các trường
+    // của chính mutation khi lỗi để không đè thao tác toggle khác đang bay.
+    onMutate: async (payload) => {
+      await queryClient.cancelQueries({ queryKey: STORY_SETTINGS_KEY })
+      const previous = queryClient.getQueryData<UserStorySettings>(STORY_SETTINGS_KEY)
+      queryClient.setQueryData<UserStorySettings>(STORY_SETTINGS_KEY, (old) =>
+        old ? { ...old, ...payload } : old,
+      )
+      return { previous }
+    },
+    onError: (_error, payload, context) => {
+      const previous = context?.previous
+      if (!previous) return
+      queryClient.setQueryData<UserStorySettings>(STORY_SETTINGS_KEY, (old) => {
+        if (!old) return old
+        // Chỉ hoàn tác trường còn đúng giá trị mutation này vừa set — không đè
+        // thao tác toggle cùng field diễn ra sau đó.
+        return Object.fromEntries(
+          Object.entries(old).map(([key, value]) => [
+            key,
+            key in payload && value === payload[key as keyof UserStorySettings]
+              ? previous[key as keyof UserStorySettings]
+              : value,
+          ]),
+        ) as UserStorySettings
+      })
+    },
+    // shortcut: 2 toggle cùng field liên tiếp không serialize — response về muộn có thể
+    // đè state mới cho tới khi invalidate refetch xong; upgrade nếu thấy switch nhấp nháy.
     onSuccess: (data) => {
       queryClient.setQueryData(STORY_SETTINGS_KEY, data)
-      queryClient.invalidateQueries({ queryKey: STORY_SETTINGS_KEY })
+      void queryClient.invalidateQueries({ queryKey: STORY_SETTINGS_KEY })
     },
   })
 }
