@@ -308,8 +308,8 @@ export function ConversationInfoPanel({
     action: () => Promise<unknown>
     verifyApplied: () => Promise<boolean>
   } | null>(null)
+  const [isGroupActionPending, setIsGroupActionPending] = useState(false)
   const [pendingActionKind, setPendingActionKind] = useState<string | null>(null)
-  const isGroupActionPending = pendingActionKind !== null
   const groupActionPendingRef = useRef(false)
 
   const friendData = useMemo(() => {
@@ -372,6 +372,7 @@ export function ConversationInfoPanel({
   ) => {
     if (groupActionPendingRef.current) return false
     groupActionPendingRef.current = true
+    setIsGroupActionPending(true)
     setPendingActionKind(kind ?? null)
     try {
       const outcome = await resolveGroupAction(action, verifyApplied)
@@ -403,6 +404,7 @@ export function ConversationInfoPanel({
     } finally {
       await refreshGroup().catch(() => undefined)
       groupActionPendingRef.current = false
+      setIsGroupActionPending(false)
       setPendingActionKind(null)
     }
   }
@@ -1334,13 +1336,19 @@ export function ConversationInfoPanel({
                           (await getGroupMembers(conversation.id)).some(
                             (item) => item.id === friend.id,
                           ),
+                        `add-member:${friend.id}`,
                       ).then((success) => success && setAddMembersOpen(false))
                     }
                     className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left hover:bg-muted disabled:opacity-50"
                   >
                     <UserAvatar name={friend.name} src={friend.avatarUrl} className="size-9" />
                     <span className="min-w-0 flex-1 truncate text-sm">{friend.name}</span>
-                    <span className="text-xs text-primary">{t('chat.add')}</span>
+                    <span className="flex items-center gap-1 text-xs text-primary">
+                      {pendingActionKind === `add-member:${friend.id}` && (
+                        <Loader className="size-3.5 animate-spin" aria-hidden="true" />
+                      )}
+                      {t('chat.add')}
+                    </span>
                   </button>
                 ))}
             </div>

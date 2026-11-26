@@ -199,10 +199,19 @@ export function useUpdateStorySettings() {
         ) as UserStorySettings
       })
     },
-    // shortcut: 2 toggle cùng field liên tiếp không serialize — response về muộn có thể
-    // đè state mới cho tới khi invalidate refetch xong; upgrade nếu thấy switch nhấp nháy.
-    onSuccess: (data) => {
-      queryClient.setQueryData(STORY_SETTINGS_KEY, data)
+    // Chỉ áp các field thuộc payload khi reconcile thành công — response của request
+    // khác field về muộn có thể chứa giá trị cũ, không được đè thao tác đang bay;
+    // và không đè field đã có ý định mới hơn (giá trị hiện tại khác payload của mình).
+    onSuccess: (data, payload) => {
+      queryClient.setQueryData<UserStorySettings>(STORY_SETTINGS_KEY, (old) => {
+        if (!old) return data
+        const applied = Object.fromEntries(
+          (Object.keys(payload) as Array<keyof UserStorySettings>)
+            .filter((key) => old[key] === payload[key])
+            .map((key) => [key, data[key]]),
+        ) as Partial<UserStorySettings>
+        return { ...old, ...applied }
+      })
       void queryClient.invalidateQueries({ queryKey: STORY_SETTINGS_KEY })
     },
   })

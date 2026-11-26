@@ -93,4 +93,32 @@ describe('useUpdateStorySettings', () => {
     await act(async () => rejectFirst(new Error('offline')))
     expect(current().viewedReceiptsEnabled).toBe(true)
   })
+
+  it('applies success per field without clobbering another pending toggle', async () => {
+    const { hook, current } = setup()
+    let resolveFirst!: (value: UserStorySettings) => void
+    let resolveSecond!: (value: UserStorySettings) => void
+    mocks.update
+      .mockImplementationOnce(() => new Promise((r) => (resolveFirst = r)))
+      .mockImplementationOnce(() => new Promise((r) => (resolveSecond = r)))
+
+    await act(async () => {
+      hook.result.current.mutate({ viewedReceiptsEnabled: false })
+    })
+    await act(async () => {
+      hook.result.current.mutate({ archiveEnabled: false })
+    })
+    expect(current()).toMatchObject({ viewedReceiptsEnabled: false, archiveEnabled: false })
+
+    // Response của request đầu về SAU, mang giá trị cũ của field thứ hai — không được đè.
+    await act(async () =>
+      resolveFirst({ ...settings, viewedReceiptsEnabled: false, archiveEnabled: true }),
+    )
+    expect(current().archiveEnabled).toBe(false)
+
+    await act(async () =>
+      resolveSecond({ ...settings, viewedReceiptsEnabled: false, archiveEnabled: false }),
+    )
+    expect(current()).toMatchObject({ viewedReceiptsEnabled: false, archiveEnabled: false })
+  })
 })
