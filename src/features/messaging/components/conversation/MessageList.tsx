@@ -11,6 +11,8 @@ import {
   type RefObject,
 } from 'react'
 import { useTranslation } from 'react-i18next'
+import { AxiosError } from 'axios'
+import { ApiError } from '@/infrastructure/api/errors'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import {
   ArrowTurnBackwardIcon as ReplyData,
@@ -307,7 +309,45 @@ export function MessageReplyBubbleQuote({
   )
 }
 
-const MessageRowView = memo(function MessageRowView({
+type PendingMessageAction = 'revoke' | 'delete'
+
+function isUncertainMessageActionError(error: unknown) {
+  if (error instanceof ApiError) return error.status === 0 || error.status >= 500
+  if (error instanceof AxiosError) return !error.response || error.response.status >= 500
+  return false
+}
+
+export function usePendingMessageActions(conversationId?: string) {
+  const active = useRef(new Set<string>())
+  const [pending, setPending] = useState<Record<string, PendingMessageAction>>({})
+  const keyFor = useCallback(
+    (messageId: string) => JSON.stringify([conversationId, messageId]),
+    [conversationId],
+  )
+  const run = useCallback(
+    async (messageId: string, action: PendingMessageAction, request: () => Promise<unknown>) => {
+      const key = keyFor(messageId)
+      if (active.current.has(key)) return false
+      active.current.add(key)
+      setPending((current) => ({ ...current, [key]: action }))
+      try {
+        await request()
+        return true
+      } finally {
+        active.current.delete(key)
+        setPending((current) => {
+          const next = { ...current }
+          delete next[key]
+          return next
+        })
+      }
+    },
+    [keyFor],
+  )
+  return { pending, keyFor, run }
+}
+
+export const MessageRowView = memo(function MessageRowView({
   conversationId,
   group,
   messageIndex,
@@ -327,6 +367,7 @@ const MessageRowView = memo(function MessageRowView({
   onOpenStoryReply,
   onRetryMessage,
   highlighted,
+  pendingAction,
 }: {
   conversationId?: string
   group: MessageGroup
@@ -347,6 +388,7 @@ const MessageRowView = memo(function MessageRowView({
   onOpenStoryReply?: (storyId: string) => void
   onRetryMessage?: (messageId: string) => void
   highlighted?: boolean
+  pendingAction?: PendingMessageAction
 }) {
   const { t } = useTranslation()
   const isMe = group.fromMe
@@ -410,6 +452,7 @@ const MessageRowView = memo(function MessageRowView({
       <button
         type="button"
         onClick={() => onDeleteForMe(msg.id)}
+        disabled={Boolean(pendingAction)}
         aria-label={t('chat.deleteMessage')}
         title={t('chat.deleteMessage')}
         className="grid size-8 shrink-0 place-items-center rounded-full border border-border bg-card text-destructive hover:bg-muted"
@@ -427,6 +470,7 @@ const MessageRowView = memo(function MessageRowView({
       >
         <MessageActionPill
           message={msg}
+          disabled={Boolean(pendingAction)}
           attachment={firstAttachment}
           isMe={isMe}
           onPreview={handleQuickPreview}
@@ -465,6 +509,7 @@ const MessageRowView = memo(function MessageRowView({
   return (
     <div
       data-message-id={msg.id}
+      aria-busy={Boolean(pendingAction)}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
       onTouchCancel={handleTouchEnd}
@@ -678,6 +723,14 @@ const MessageRowView = memo(function MessageRowView({
               </div>
             </div>
 
+            {pendingAction && (
+              <span role="status" className="mt-1 px-1 text-[11px] text-muted-foreground">
+                {pendingAction === 'revoke'
+                  ? t('chat.messageRevoking', 'Đang thu hồi tin nhắn…')
+                  : t('chat.messageDeleting', 'Đang xóa tin nhắn…')}
+              </span>
+            )}
+
             {msg.editedAt && !msg.deletedAt && !isEditing && (
               <span className="mt-1 px-1 text-[11px] text-muted-foreground">
                 {t('chat.messageEditedLabel')}
@@ -705,6 +758,7 @@ const MessageRowView = memo(function MessageRowView({
                         e.stopPropagation()
                         onReact?.(msg.id, emoji)
                       }}
+                      disabled={Boolean(pendingAction)}
                       className={cn(
                         'flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs shadow-xs transition-all active:scale-95 cursor-pointer select-none',
                         myReaction
@@ -853,24 +907,35 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
   const editMutation = useEditMessageMutation(conversationId ?? null)
   const deleteForMeMutation = useDeleteMessageForMeMutation(conversationId ?? null)
   const reactMutation = useReactMessageMutation(conversationId ?? null)
-  const revokeMessage = revokeMutation.mutate
+  const revokeMessage = revokeMutation.mutateAsync
   const editMessage = editMutation.mutateAsync
-  const deleteForMe = deleteForMeMutation.mutate
+  const deleteForMe = deleteForMeMutation.mutateAsync
   const reactMessage = reactMutation.mutate
+  const {
+    pending: pendingActions,
+    keyFor: pendingKeyFor,
+    run: runPendingAction,
+  } = usePendingMessageActions(conversationId)
 
   // Callback ổn định để memo của từng row không bị phá khi list re-render lúc cuộn.
   const handleRevokeMessage = useCallback(
     (messageId: string) => {
-      revokeMessage(messageId, {
-        onSuccess: () => {
-          toast.success(t('chat.messageRevoked'))
-        },
-        onError: () => {
-          toast.error(t('chat.messageRevokeFailed'))
-        },
-      })
+      void runPendingAction(messageId, 'revoke', () => revokeMessage(messageId))
+        .then((completed) => {
+          if (completed) toast.success(t('chat.messageRevoked'))
+        })
+        .catch((error: unknown) => {
+          toast.error(
+            isUncertainMessageActionError(error)
+              ? t(
+                  'chat.messageActionUncertain',
+                  'Không thể xác nhận kết quả. Hãy tải lại hội thoại.',
+                )
+              : t('chat.messageRevokeFailed'),
+          )
+        })
     },
-    [revokeMessage, t],
+    [revokeMessage, runPendingAction, t],
   )
 
   const handleEditMessage = useCallback(
@@ -896,12 +961,22 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
 
   const handleDeleteForMe = useCallback(
     (messageId: string) => {
-      deleteForMe(messageId, {
-        onSuccess: () => toast.success(t('chat.messageDeletedForMe')),
-        onError: () => toast.error(t('chat.messageDeleteFailed')),
-      })
+      void runPendingAction(messageId, 'delete', () => deleteForMe(messageId))
+        .then((completed) => {
+          if (completed) toast.success(t('chat.messageDeletedForMe'))
+        })
+        .catch((error: unknown) => {
+          toast.error(
+            isUncertainMessageActionError(error)
+              ? t(
+                  'chat.messageActionUncertain',
+                  'Không thể xác nhận kết quả. Hãy tải lại hội thoại.',
+                )
+              : t('chat.messageDeleteFailed'),
+          )
+        })
     },
-    [deleteForMe, t],
+    [deleteForMe, runPendingAction, t],
   )
 
   const handleForwardMessage = useCallback((message: ChatMessage) => {
@@ -1079,6 +1154,7 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
         conversationId={conversationId}
         group={row.group}
         messageIndex={row.messageIndex}
+        pendingAction={pendingActions[pendingKeyFor(row.group.messages[row.messageIndex].id)]}
         senderLabel={senderLabel}
         senderAvatarUrl={senderAvatarUrl}
         currentUserId={currentUserId}

@@ -21,6 +21,13 @@ interface ErrorEnvelope {
 
 interface RetryableConfig extends InternalAxiosRequestConfig {
   _refreshed?: boolean
+  _sessionGeneration?: number
+}
+
+function assertSession(generation: number) {
+  if (useAuthStore.getState().generation !== generation) {
+    throw new ApiError(INVALID_SESSION, 401, 'Session changed')
+  }
 }
 
 export const API_BASE_URL = env.API_URL
@@ -36,17 +43,26 @@ export const api: AxiosInstance = axios.create({
   headers: { 'Content-Type': 'application/json' },
 })
 
-api.interceptors.request.use((config) => {
-  const token = useAuthStore.getState().accessToken
-  if (token) {
-    config.headers.set('Authorization', `Bearer ${token}`)
-  }
-  config.headers.set('Accept-Language', i18n.language.startsWith('vi') ? 'vi' : 'en')
-  return config
-})
+api.interceptors.request.use(
+  (config) => {
+    const request = config as RetryableConfig
+    const { accessToken, generation } = useAuthStore.getState()
+    request._sessionGeneration ??= generation
+    assertSession(request._sessionGeneration)
+    if (accessToken) config.headers.set('Authorization', `Bearer ${accessToken}`)
+    config.headers.set('Accept-Language', i18n.language.startsWith('vi') ? 'vi' : 'en')
+    return config
+  },
+  (error: unknown) => {
+    throw error
+  },
+  { synchronous: true },
+)
 
 /** Unwrap `{ success: true, data }` → caller đọc `res.data` là payload thật. */
 api.interceptors.response.use((response) => {
+  const generation = (response.config as RetryableConfig)._sessionGeneration
+  if (generation !== undefined) assertSession(generation)
   const payload = response.data as SuccessEnvelope<unknown> | undefined
   if (payload && payload.success === true) {
     response.data = payload.data
@@ -55,9 +71,11 @@ api.interceptors.response.use((response) => {
 })
 
 /** Singleflight refresh: N request 401 cùng lúc chỉ 1 lần POST /auth/refresh. */
-let refreshPromise: Promise<string> | null = null
+const refreshPromises = new Map<number, Promise<string>>()
 
-function silentRefresh(): Promise<string> {
+function silentRefresh(generation: number): Promise<string> {
+  assertSession(generation)
+  let refreshPromise = refreshPromises.get(generation)
   if (!refreshPromise) {
     refreshPromise = axios
       .post<SuccessEnvelope<{ accessToken: string }>>(authEndpoints.refresh, undefined, {
@@ -70,15 +88,17 @@ function silentRefresh(): Promise<string> {
       .then((res) => {
         const token = res.data.data?.accessToken
         if (!token) throw new ApiError(INVALID_SESSION, 401, 'Missing access token')
-        useAuthStore.getState().setAccessToken(token)
+        assertSession(generation)
+        useAuthStore.getState().refreshAccessToken(token, generation)
         return token
       })
       .catch((error: unknown) => {
         throw toApiError(error)
       })
       .finally(() => {
-        refreshPromise = null
+        refreshPromises.delete(generation)
       })
+    refreshPromises.set(generation, refreshPromise)
   }
   return refreshPromise
 }
@@ -95,15 +115,18 @@ api.interceptors.response.use(
     const status = error.response?.status ?? 0
 
     if (status === 401 && original && !original._refreshed && !isAuthCredentialPath(original.url)) {
+      const generation = original._sessionGeneration
+      if (generation === undefined) throw toApiError(error)
+      assertSession(generation)
       original._refreshed = true
       try {
-        const token = await silentRefresh()
-        original.headers.set('Authorization', `Bearer ${token}`)
-        return await api.request(original)
+        await silentRefresh(generation)
       } catch (refreshError) {
-        useAuthStore.getState().reset()
+        if (useAuthStore.getState().generation === generation) useAuthStore.getState().reset()
         throw refreshError
       }
+      assertSession(generation)
+      return api.request(original)
     }
     throw toApiError(error)
   },

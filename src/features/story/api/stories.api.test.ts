@@ -4,6 +4,7 @@ import {
   createMediaStory,
   getArchivedStories,
   getStorageUsage,
+  getStoryById,
   getStoryReactions,
   getStoryViews,
   listStories,
@@ -22,6 +23,28 @@ afterEach(() => {
 })
 
 describe('story API contract', () => {
+  it('maps the single-story reaction and view fields returned by the server', async () => {
+    api.get = vi.fn().mockResolvedValue({
+      data: {
+        id: 's',
+        userId: 'u',
+        kind: 'TEXT',
+        caption: 'hello',
+        createdAt: '2026-01-01T12:34:56.000Z',
+        hasViewed: true,
+        myReaction: '👍',
+        myReactionKind: 'REACTION',
+      },
+    }) as unknown as typeof api.get
+    const story = await getStoryById('s')
+    expect(story).toMatchObject({
+      viewed: true,
+      viewerHasViewed: true,
+      viewerReaction: '👍',
+      myReactionKind: 'REACTION',
+    })
+  })
+
   it('maps the grouped feed with owner, video, view and reaction state', async () => {
     api.get = vi.fn(() =>
       Promise.resolve({

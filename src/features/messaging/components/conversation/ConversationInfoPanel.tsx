@@ -296,6 +296,7 @@ export function ConversationInfoPanel({
   const [showAllMembers, setShowAllMembers] = useState(false)
   const [disbandGroupOpen, setDisbandGroupOpen] = useState(false)
   const [isDisbandingGroup, setIsDisbandingGroup] = useState(false)
+  const disbandingGroupRef = useRef(false)
   const [isUploadingGroupAvatar, setIsUploadingGroupAvatar] = useState(false)
   const groupAvatarInput = useRef<HTMLInputElement>(null)
   const memberSection = useRef<HTMLElement>(null)
@@ -307,6 +308,7 @@ export function ConversationInfoPanel({
     verifyApplied: () => Promise<boolean>
   } | null>(null)
   const [isGroupActionPending, setIsGroupActionPending] = useState(false)
+  const [activeGroupAction, setActiveGroupAction] = useState<string | null>(null)
   const groupActionPendingRef = useRef(false)
 
   const friendData = useMemo(() => {
@@ -365,10 +367,12 @@ export function ConversationInfoPanel({
     action: () => Promise<unknown>,
     successKey: string,
     verifyApplied?: () => Promise<boolean>,
+    actionId?: string,
   ) => {
-    if (groupActionPendingRef.current) return false
+    if (groupActionPendingRef.current || disbandingGroupRef.current) return false
     groupActionPendingRef.current = true
     setIsGroupActionPending(true)
+    setActiveGroupAction(actionId ?? null)
     try {
       const outcome = await resolveGroupAction(action, verifyApplied)
       if (outcome === 'uncertain') {
@@ -400,6 +404,7 @@ export function ConversationInfoPanel({
       await refreshGroup().catch(() => undefined)
       groupActionPendingRef.current = false
       setIsGroupActionPending(false)
+      setActiveGroupAction(null)
     }
   }
 
@@ -450,7 +455,8 @@ export function ConversationInfoPanel({
   }
 
   const handleDisbandGroup = async () => {
-    if (isDisbandingGroup) return
+    if (disbandingGroupRef.current || groupActionPendingRef.current) return
+    disbandingGroupRef.current = true
     setIsDisbandingGroup(true)
     let disbanded = false
     try {
@@ -486,6 +492,7 @@ export function ConversationInfoPanel({
       onClose()
       navigate(ROUTES.messages)
     }
+    disbandingGroupRef.current = false
     setIsDisbandingGroup(false)
   }
 
@@ -718,7 +725,7 @@ export function ConversationInfoPanel({
                 <button
                   type="button"
                   onClick={() => groupAvatarInput.current?.click()}
-                  disabled={isUploadingGroupAvatar}
+                  disabled={isUploadingGroupAvatar || isGroupActionPending || isDisbandingGroup}
                   aria-label={t('chat.chooseGroupAvatar')}
                   className="absolute -right-1 -bottom-1 grid size-8 place-items-center rounded-full bg-primary text-primary-foreground disabled:opacity-50"
                 >
@@ -746,6 +753,7 @@ export function ConversationInfoPanel({
                     () => updateGroup(conversation.id, title),
                     'chat.groupUpdated',
                     async () => (await getConversationById(conversation.id)).title === title,
+                    'rename',
                   ).then((success) => success && setGroupTitleEditing(false))
               }}
             >
@@ -757,13 +765,19 @@ export function ConversationInfoPanel({
                 className="min-w-0 flex-1 rounded-lg border border-border bg-background px-2 py-1.5 text-sm"
                 aria-label={t('chat.groupName')}
               />
-              <Button size="sm" type="submit" disabled={!groupTitleDraft.trim()}>
-                {t('chat.save')}
+              <Button
+                size="sm"
+                type="submit"
+                disabled={!groupTitleDraft.trim() || isGroupActionPending || isDisbandingGroup}
+                aria-busy={activeGroupAction === 'rename'}
+              >
+                {activeGroupAction === 'rename' ? t('common.loading') : t('chat.save')}
               </Button>
               <Button
                 size="sm"
                 type="button"
                 variant="ghost"
+                disabled={isGroupActionPending || isDisbandingGroup}
                 onClick={() => setGroupTitleEditing(false)}
               >
                 {t('chat.cancel')}
@@ -781,6 +795,7 @@ export function ConversationInfoPanel({
                     setGroupTitleDraft(conversation.name)
                     setGroupTitleEditing(true)
                   }}
+                  disabled={isGroupActionPending || isDisbandingGroup}
                   aria-label={t('chat.editGroupName')}
                   title={t('chat.editGroupName')}
                   className="grid size-7 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -828,7 +843,11 @@ export function ConversationInfoPanel({
             <button
               type="button"
               onClick={() => setAddMembersOpen(true)}
-              disabled={(conversation.memberCount ?? activeMembers.length) >= GROUP_MAX_MEMBERS}
+              disabled={
+                isGroupActionPending ||
+                isDisbandingGroup ||
+                (conversation.memberCount ?? activeMembers.length) >= GROUP_MAX_MEMBERS
+              }
               title={
                 (conversation.memberCount ?? activeMembers.length) >= GROUP_MAX_MEMBERS
                   ? t('chat.groupFull')
@@ -1141,12 +1160,19 @@ export function ConversationInfoPanel({
                     <span className="text-[10px] text-muted-foreground">
                       {t(`chat.groupRole${member.role}`)}
                     </span>
+                    {activeGroupAction === `role:${member.id}` && (
+                      <span role="status" className="text-xs text-muted-foreground">
+                        {t('common.loading')}
+                      </span>
+                    )}
                     {canManageGroup && currentUserId && member.id !== currentUserId && (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <button
                             type="button"
                             aria-label={`${t('chat.moreOptions')} ${member.fullName || member.username}`}
+                            disabled={isGroupActionPending || isDisbandingGroup}
+                            aria-busy={activeGroupAction === `role:${member.id}`}
                             className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
                           >
                             <MoreIcon className="size-4" aria-hidden="true" />
@@ -1169,8 +1195,10 @@ export function ConversationInfoPanel({
                                       item.id === member.id &&
                                       item.role === (member.role === 'ADMIN' ? 'MEMBER' : 'ADMIN'),
                                   ),
+                                `role:${member.id}`,
                               )
                             }
+                            disabled={isGroupActionPending || isDisbandingGroup}
                           >
                             {member.role === 'ADMIN'
                               ? t('chat.groupDemote')
@@ -1179,6 +1207,7 @@ export function ConversationInfoPanel({
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
                             variant="destructive"
+                            disabled={isGroupActionPending || isDisbandingGroup}
                             onClick={() =>
                               setPendingGroupAction({
                                 description: t('chat.groupRemoveConfirm', {
@@ -1250,6 +1279,7 @@ export function ConversationInfoPanel({
               {conversation.isGroup && (
                 <button
                   type="button"
+                  disabled={isGroupActionPending || isDisbandingGroup}
                   onClick={() => setLeaveGroupOpen(true)}
                   className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium text-destructive transition-colors hover:bg-destructive/10 dark:hover:bg-destructive/20"
                 >
@@ -1260,6 +1290,7 @@ export function ConversationInfoPanel({
               {conversation.isGroup && canManageGroup && (
                 <button
                   type="button"
+                  disabled={isGroupActionPending || isDisbandingGroup}
                   onClick={() => setDisbandGroupOpen(true)}
                   className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium text-destructive transition-colors hover:bg-destructive/10 dark:hover:bg-destructive/20"
                 >
@@ -1291,7 +1322,12 @@ export function ConversationInfoPanel({
         onClose={() => setSelectedMediaAttachment(null)}
       />
 
-      <Dialog open={addMembersOpen} onOpenChange={setAddMembersOpen}>
+      <Dialog
+        open={addMembersOpen}
+        onOpenChange={(open) => {
+          if (!isGroupActionPending) setAddMembersOpen(open)
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{t('chat.groupAddMembers')}</DialogTitle>
@@ -1309,6 +1345,8 @@ export function ConversationInfoPanel({
                   <button
                     key={friend.id}
                     type="button"
+                    disabled={isGroupActionPending || isDisbandingGroup}
+                    aria-busy={activeGroupAction === `add:${friend.id}`}
                     onClick={() =>
                       !isGroupActionPending &&
                       void runGroupAction(
@@ -1318,13 +1356,18 @@ export function ConversationInfoPanel({
                           (await getGroupMembers(conversation.id)).some(
                             (item) => item.id === friend.id,
                           ),
+                        `add:${friend.id}`,
                       ).then((success) => success && setAddMembersOpen(false))
                     }
                     className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left hover:bg-muted"
                   >
                     <UserAvatar name={friend.name} src={friend.avatarUrl} className="size-9" />
                     <span className="min-w-0 flex-1 truncate text-sm">{friend.name}</span>
-                    <span className="text-xs text-primary">{t('chat.add')}</span>
+                    <span className="text-xs text-primary">
+                      {activeGroupAction === `add:${friend.id}`
+                        ? t('common.loading')
+                        : t('chat.add')}
+                    </span>
                   </button>
                 ))}
             </div>
@@ -1390,7 +1433,12 @@ export function ConversationInfoPanel({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={leaveGroupOpen} onOpenChange={setLeaveGroupOpen}>
+      <Dialog
+        open={leaveGroupOpen}
+        onOpenChange={(open) => {
+          if (!isGroupActionPending) setLeaveGroupOpen(open)
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
@@ -1403,12 +1451,17 @@ export function ConversationInfoPanel({
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setLeaveGroupOpen(false)}>
+            <Button
+              variant="outline"
+              disabled={isGroupActionPending || isDisbandingGroup}
+              onClick={() => setLeaveGroupOpen(false)}
+            >
               {t('chat.cancel')}
             </Button>
             <Button
               variant="destructive"
-              disabled={mustPromoteAdminBeforeLeaving}
+              disabled={mustPromoteAdminBeforeLeaving || isGroupActionPending || isDisbandingGroup}
+              aria-busy={activeGroupAction === 'leave'}
               onClick={() =>
                 void runGroupAction(
                   () => leaveGroup(conversation.id),
@@ -1422,6 +1475,7 @@ export function ConversationInfoPanel({
                       throw error
                     }
                   },
+                  'leave',
                 ).then((success) => {
                   if (!success) return
                   setLeaveGroupOpen(false)
@@ -1430,13 +1484,18 @@ export function ConversationInfoPanel({
                 })
               }
             >
-              {t('chat.leaveGroupAction')}
+              {activeGroupAction === 'leave' ? t('common.loading') : t('chat.leaveGroupAction')}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={disbandGroupOpen} onOpenChange={setDisbandGroupOpen}>
+      <Dialog
+        open={disbandGroupOpen}
+        onOpenChange={(open) => {
+          if (!isDisbandingGroup) setDisbandGroupOpen(open)
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
@@ -1454,7 +1513,7 @@ export function ConversationInfoPanel({
             </Button>
             <Button
               variant="destructive"
-              disabled={isDisbandingGroup}
+              disabled={isDisbandingGroup || isGroupActionPending}
               onClick={() => void handleDisbandGroup()}
             >
               {isDisbandingGroup ? t('common.loading') : t('chat.disbandGroup')}

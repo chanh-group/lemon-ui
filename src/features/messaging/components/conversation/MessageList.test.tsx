@@ -1,7 +1,13 @@
 // @vitest-environment happy-dom
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, renderHook, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { MediaBubble, MessageReplyBubbleQuote, StoryReplyQuote } from './MessageList'
+import {
+  MediaBubble,
+  MessageReplyBubbleQuote,
+  MessageRowView,
+  StoryReplyQuote,
+  usePendingMessageActions,
+} from './MessageList'
 import { useReplyTarget } from '@/features/messaging/hooks/useReplyTarget'
 import type { MessageReplyTarget } from '@/features/messaging/types/message.types'
 
@@ -29,6 +35,119 @@ const alivePreview = {
   background: null,
   mediaUrl: 'https://r2/s1.jpg',
 }
+
+describe('message action pending', () => {
+  it('guards duplicate actions synchronously and lets other messages proceed', async () => {
+    const { result } = renderHook(() => usePendingMessageActions('c1'))
+    let finish!: () => void
+    const request = vi.fn(() => new Promise<void>((resolve) => (finish = resolve)))
+    let first!: Promise<boolean>
+    let duplicate!: Promise<boolean>
+    await act(async () => {
+      first = result.current.run('m1', 'revoke', request)
+      duplicate = result.current.run('m1', 'delete', request)
+    })
+    expect(request).toHaveBeenCalledTimes(1)
+    expect(await duplicate).toBe(false)
+    expect(result.current.pending[result.current.keyFor('m1')]).toBe('revoke')
+    await act(async () => {
+      expect(await result.current.run('m2', 'delete', async () => {})).toBe(true)
+    })
+    expect(result.current.pending[result.current.keyFor('m1')]).toBe('revoke')
+    await act(async () => {
+      finish()
+      expect(await first).toBe(true)
+    })
+    expect(result.current.pending[result.current.keyFor('m1')]).toBeUndefined()
+  })
+
+  it('clears pending after failure and isolates conversation keys', async () => {
+    const { result, rerender } = renderHook(({ id }) => usePendingMessageActions(id), {
+      initialProps: { id: 'c1' },
+    })
+    await act(async () => {
+      await expect(
+        result.current.run('m1', 'delete', async () => {
+          throw new Error('offline')
+        }),
+      ).rejects.toThrow('offline')
+    })
+    expect(result.current.pending[result.current.keyFor('m1')]).toBeUndefined()
+    const firstKey = result.current.keyFor('m1')
+    rerender({ id: 'c2' })
+    expect(result.current.keyFor('m1')).not.toBe(firstKey)
+  })
+
+  it('keeps an already revoked message visible and disables deletion while pending', () => {
+    render(
+      <MessageRowView
+        conversationId="c1"
+        group={{
+          fromMe: false,
+          messages: [
+            {
+              id: 'm2',
+              fromMe: false,
+              text: '',
+              kind: 'text',
+              time: '10:00',
+              createdAt: '2026-01-01',
+              deletedAt: '2026-01-02',
+            },
+          ],
+        }}
+        messageIndex={0}
+        senderLabel="User"
+        onOpenLightbox={vi.fn()}
+        onOpenDocument={vi.fn()}
+        onDeleteForMe={vi.fn()}
+        pendingAction="delete"
+      />,
+    )
+    expect(screen.getByText('chat.messageRevokedText')).toBeTruthy()
+    expect(screen.getByRole('status').textContent).toBe('chat.messageDeleting')
+    expect(
+      screen.getByRole('button', { name: 'chat.deleteMessage' }).hasAttribute('disabled'),
+    ).toBe(true)
+  })
+
+  it('keeps the message visible and disables its actions while revoking', () => {
+    render(
+      <MessageRowView
+        conversationId="c1"
+        group={{
+          fromMe: true,
+          messages: [
+            {
+              id: 'm1',
+              fromMe: true,
+              text: 'Hello',
+              kind: 'text',
+              time: '10:00',
+              createdAt: '2026-01-01',
+            },
+          ],
+        }}
+        messageIndex={0}
+        senderLabel="User"
+        onOpenLightbox={vi.fn()}
+        onOpenDocument={vi.fn()}
+        onRevoke={vi.fn()}
+        onDeleteForMe={vi.fn()}
+        onReply={vi.fn()}
+        pendingAction="revoke"
+      />,
+    )
+    expect(screen.getByText('Hello')).toBeTruthy()
+    expect(screen.getByRole('status').textContent).toBe('chat.messageRevoking')
+    expect(screen.getByRole('button', { name: 'Tùy chọn khác' }).hasAttribute('disabled')).toBe(
+      true,
+    )
+    expect(screen.getByRole('button', { name: 'chat.replyMessage' }).hasAttribute('disabled')).toBe(
+      true,
+    )
+  })
+})
 
 describe('StoryReplyQuote', () => {
   it('shows the gone label and stays inert when the story preview is redacted', () => {

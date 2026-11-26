@@ -38,7 +38,7 @@ export function subscribeCrossTabAuth(onLogout: () => void): () => void {
  * Fail = anonymous. Module-level promise chống StrictMode double-rotate.
  */
 export async function bootstrapSession(): Promise<void> {
-  const { accessToken, setAccessToken, markAnonymous } = useAuthStore.getState()
+  const { accessToken, generation, setAccessToken, markAnonymous } = useAuthStore.getState()
   if (accessToken) return
 
   if (isAuthBypass()) {
@@ -53,14 +53,15 @@ export async function bootstrapSession(): Promise<void> {
 
   try {
     const res = await api.post<{ accessToken: string }>(authEndpoints.refresh)
-    setAccessToken(res.data.accessToken)
+    if (useAuthStore.getState().generation === generation) setAccessToken(res.data.accessToken)
   } catch {
-    markAnonymous()
+    if (useAuthStore.getState().generation === generation) markAnonymous()
   }
 }
 
 /** Đăng xuất: thu hồi server (idempotent) + clear local + báo tab khác. */
 export async function signOutEverywhere(clearCache: () => void): Promise<void> {
+  const { generation } = useAuthStore.getState()
   try {
     if (!isAuthBypass()) {
       await api.post(authEndpoints.logout)
@@ -70,9 +71,11 @@ export async function signOutEverywhere(clearCache: () => void): Promise<void> {
       console.warn('logout failed, logging out locally', toApiError(error).code)
     }
   } finally {
-    clearCache()
-    removeItem(DEV_SESSION_KEY)
-    useAuthStore.getState().reset()
-    broadcastAuth('logout')
+    if (useAuthStore.getState().generation === generation) {
+      clearCache()
+      removeItem(DEV_SESSION_KEY)
+      useAuthStore.getState().reset()
+      broadcastAuth('logout')
+    }
   }
 }
