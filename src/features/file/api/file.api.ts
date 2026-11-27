@@ -19,6 +19,7 @@ export async function uploadBinaryToUrl(
     await new Promise<void>((resolve, reject) => {
       const request = new XMLHttpRequest()
       request.open('PUT', uploadUrl)
+      request.timeout = 15_000
       request.withCredentials = false
       request.setRequestHeader('Content-Type', mimeType)
       request.upload.onprogress = (event) => {
@@ -33,6 +34,7 @@ export async function uploadBinaryToUrl(
         else reject(new Error(`Upload lên máy chủ lưu trữ thất bại (${request.status})`))
       }
       request.onerror = () => reject(new Error('Upload lên máy chủ lưu trữ thất bại'))
+      request.ontimeout = () => reject(new Error('Upload lên máy chủ lưu trữ quá thời hạn'))
       request.onabort = () => reject(new Error('Upload lên máy chủ lưu trữ bị hủy'))
       request.send(file)
     })

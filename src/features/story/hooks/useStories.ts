@@ -68,14 +68,20 @@ export function useReactStory() {
     mutationFn: ({
       storyId,
       reaction,
+      generation,
     }: {
       storyId: string
       reaction: StoryReactionType | string
-    }) => reactStory(storyId, reaction),
-    onSuccess: (_data, variables) => {
+      generation: number
+    }) => {
+      if (generation !== useAuthStore.getState().generation) throw new Error('Session changed')
+      return reactStory(storyId, reaction)
+    },
+    onSuccess: (_data, { storyId, generation }) => {
+      if (generation !== useAuthStore.getState().generation) return
       queryClient.invalidateQueries({ queryKey: STORIES_KEY })
-      queryClient.invalidateQueries({ queryKey: STORY_REACTIONS_KEY(variables.storyId) })
-      queryClient.invalidateQueries({ queryKey: STORY_VIEWS_KEY(variables.storyId) })
+      queryClient.invalidateQueries({ queryKey: STORY_REACTIONS_KEY(storyId) })
+      queryClient.invalidateQueries({ queryKey: STORY_VIEWS_KEY(storyId) })
     },
   })
 }
@@ -83,8 +89,12 @@ export function useReactStory() {
 export function useUnreactStory() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (storyId: string) => unreactStory(storyId),
-    onSuccess: (_data, storyId) => {
+    mutationFn: ({ storyId, generation }: { storyId: string; generation: number }) => {
+      if (generation !== useAuthStore.getState().generation) throw new Error('Session changed')
+      return unreactStory(storyId)
+    },
+    onSuccess: (_data, { storyId, generation }) => {
+      if (generation !== useAuthStore.getState().generation) return
       queryClient.invalidateQueries({ queryKey: STORIES_KEY })
       queryClient.invalidateQueries({ queryKey: STORY_REACTIONS_KEY(storyId) })
       queryClient.invalidateQueries({ queryKey: STORY_VIEWS_KEY(storyId) })
@@ -139,8 +149,12 @@ export function useStoryViews(storyId?: string) {
 export function useLikeStory() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (storyId: string) => likeStory(storyId),
-    onSuccess: (_data, storyId) => {
+    mutationFn: ({ storyId, generation }: { storyId: string; generation: number }) => {
+      if (generation !== useAuthStore.getState().generation) throw new Error('Session changed')
+      return likeStory(storyId)
+    },
+    onSuccess: (_data, { storyId, generation }) => {
+      if (generation !== useAuthStore.getState().generation) return
       queryClient.invalidateQueries({ queryKey: STORIES_KEY })
       queryClient.invalidateQueries({ queryKey: STORY_VIEWS_KEY(storyId) })
       queryClient.invalidateQueries({ queryKey: STORY_REACTIONS_KEY(storyId) })
@@ -151,8 +165,12 @@ export function useLikeStory() {
 export function useUnlikeStory() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (storyId: string) => unlikeStory(storyId),
-    onSuccess: (_data, storyId) => {
+    mutationFn: ({ storyId, generation }: { storyId: string; generation: number }) => {
+      if (generation !== useAuthStore.getState().generation) throw new Error('Session changed')
+      return unlikeStory(storyId)
+    },
+    onSuccess: (_data, { storyId, generation }) => {
+      if (generation !== useAuthStore.getState().generation) return
       queryClient.invalidateQueries({ queryKey: STORIES_KEY })
       queryClient.invalidateQueries({ queryKey: STORY_VIEWS_KEY(storyId) })
       queryClient.invalidateQueries({ queryKey: STORY_REACTIONS_KEY(storyId) })

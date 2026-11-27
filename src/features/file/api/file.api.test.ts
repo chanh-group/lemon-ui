@@ -65,6 +65,25 @@ describe('file uploads', () => {
     ).rejects.toThrow('(403)')
   })
 
+  it('rejects a timed-out direct upload so the caller can fall back', async () => {
+    class MockRequest {
+      withCredentials = false
+      status = 0
+      timeout = 0
+      upload = {}
+      ontimeout?: () => void
+      open() {}
+      setRequestHeader() {}
+      send() {
+        this.ontimeout?.()
+      }
+    }
+    vi.stubGlobal('XMLHttpRequest', MockRequest)
+    await expect(
+      uploadBinaryToUrl('https://upload.example.test/avatar', new Blob(), 'image/png', vi.fn()),
+    ).rejects.toThrow('quá thời hạn')
+  })
+
   it('reports backend fallback progress only when total is known', async () => {
     vi.mocked(api.post).mockResolvedValue({ data: { objectKey: 'key' } })
     const progress = vi.fn()

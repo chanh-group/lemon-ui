@@ -337,23 +337,21 @@ describe('useChatRealtime reconnect access', () => {
     ).toBe(0)
   })
 
-  it('reconciles newer messages without guessing their unread state', async () => {
+  it('counts a newer unread message locally after an older read event', () => {
     const conversation = { id: 'friend-1', kind: 'DIRECT', unreadCount: 0 }
     queryClient.setQueryData(CHAT_QUERY_KEYS.conversations, [conversation])
-    const invalidate = vi.spyOn(queryClient, 'invalidateQueries')
     renderHook(() => useChatRealtime(conversation.id), { wrapper })
     act(() => {
       socket.emit('read:updated', {
         conversationId: conversation.id,
         userId: 'viewer',
-        lastReadMessageId: 'old-message',
+        lastReadMessageId: 'old-cursor-unique',
         readAt: '2026-11-20T00:00:00.000Z',
       })
     })
-    invalidate.mockClear()
     act(() => {
       socket.emit('message:new', {
-        id: 'new-message',
+        id: 'new-message-after-read-unique',
         conversationId: conversation.id,
         senderId: 'friend',
         kind: 'TEXT',
@@ -364,20 +362,13 @@ describe('useChatRealtime reconnect access', () => {
     expect(
       queryClient.getQueryData<(typeof conversation)[]>(CHAT_QUERY_KEYS.conversations)?.[0]
         .unreadCount,
-    ).toBe(0)
-    await waitFor(() =>
-      expect(invalidate).toHaveBeenCalledWith({ queryKey: CHAT_QUERY_KEYS.conversations }),
-    )
-    expect(invalidate).not.toHaveBeenCalledWith({
-      queryKey: CHAT_QUERY_KEYS.messages(conversation.id),
-    })
+    ).toBe(1)
   })
 
-  it('does not reuse a read cursor across conversations or sessions', async () => {
+  it('does not reuse a read cursor across conversations or sessions', () => {
     const first = { id: 'first', kind: 'DIRECT', unreadCount: 0 }
     const second = { id: 'second', kind: 'DIRECT', unreadCount: 0 }
     queryClient.setQueryData(CHAT_QUERY_KEYS.conversations, [first, second])
-    const invalidate = vi.spyOn(queryClient, 'invalidateQueries')
     const { rerender } = renderHook(({ id }: { id: string }) => useChatRealtime(id), {
       wrapper,
       initialProps: { id: first.id },
@@ -386,15 +377,14 @@ describe('useChatRealtime reconnect access', () => {
       socket.emit('read:updated', {
         conversationId: first.id,
         userId: 'viewer',
-        lastReadMessageId: 'message',
+        lastReadMessageId: 'cursor-first-unique',
         readAt: '2026-11-20T00:00:00.000Z',
       }),
     )
     rerender({ id: second.id })
-    invalidate.mockClear()
     act(() =>
       socket.emit('message:new', {
-        id: 'message',
+        id: 'cursor-cross-conv-unique',
         conversationId: second.id,
         senderId: 'friend',
         kind: 'TEXT',
@@ -402,14 +392,15 @@ describe('useChatRealtime reconnect access', () => {
         createdAt: '2026-11-20T00:00:01.000Z',
       }),
     )
-    await waitFor(() =>
-      expect(invalidate).toHaveBeenCalledWith({ queryKey: CHAT_QUERY_KEYS.conversations }),
-    )
-    invalidate.mockClear()
+    const unread = (index: number) =>
+      queryClient.getQueryData<(typeof first)[]>(CHAT_QUERY_KEYS.conversations)?.[index].unreadCount
+    expect(unread(0)).toBe(0)
+    expect(unread(1)).toBe(1)
+
     useAuthStore.getState().setAccessToken('new-session')
     act(() =>
       socket.emit('message:new', {
-        id: 'message',
+        id: 'cursor-after-session-unique',
         conversationId: first.id,
         senderId: 'friend',
         kind: 'TEXT',
@@ -417,9 +408,7 @@ describe('useChatRealtime reconnect access', () => {
         createdAt: '2026-11-20T00:00:01.000Z',
       }),
     )
-    await waitFor(() =>
-      expect(invalidate).toHaveBeenCalledWith({ queryKey: CHAT_QUERY_KEYS.conversations }),
-    )
+    expect(unread(0)).toBe(1)
   })
 
   it('does not restore revoked content when a stale edit event arrives', () => {

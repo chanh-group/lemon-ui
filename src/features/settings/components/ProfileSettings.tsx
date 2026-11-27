@@ -31,6 +31,7 @@ import {
 } from '@/components/ui/dialog'
 import { presignFile, uploadBinaryToUrl, uploadFileViaBackend } from '@/features/file/api/file.api'
 import { isAuthBypass } from '@/config/env'
+import { ApiError, INVALID_SESSION } from '@/infrastructure/api/errors'
 import { cn } from '@/lib/utils'
 import { AVATAR_MAX_BYTES, FULL_NAME_MAX_LENGTH, USER_BIO_MAX_LENGTH } from '@/config/constants'
 
@@ -53,6 +54,14 @@ const AVATAR_MIME_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif']
 
 export function ProfileSettings() {
   const { t } = useTranslation()
+  const showUpdateError = (err: unknown) =>
+    toast.error(
+      err instanceof ApiError && err.code === INVALID_SESSION
+        ? t('chat.sessionChanged')
+        : err instanceof Error
+          ? err.message
+          : t('chat.profileUpdateFailed'),
+    )
   const { data: user, isPending, refetch } = useMe()
   const updateProfileMutation = useUpdateProfile()
   const logout = useLogout()
@@ -119,7 +128,7 @@ export function ProfileSettings() {
       toast.success(t('chat.profileUpdated'))
       setIsEditingName(false)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t('chat.profileUpdateFailed'))
+      showUpdateError(err)
     }
   }
 
@@ -145,7 +154,7 @@ export function ProfileSettings() {
       toast.success(t('chat.profileUpdated'))
       setIsEditingBio(false)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t('chat.profileUpdateFailed'))
+      showUpdateError(err)
     }
   }
 
@@ -269,7 +278,7 @@ export function ProfileSettings() {
       toast.success(finalAvatarUrl === null ? t('chat.avatarRemoved') : t('chat.avatarUpdated'))
       handleCloseAvatarDialog()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t('chat.profileUpdateFailed'))
+      showUpdateError(err)
     } finally {
       avatarSavePending.current = false
       setAvatarSavePhase(null)

@@ -94,7 +94,6 @@ export function StoryViewer({
     queryKey: reactionKey(story.id, generation),
     queryFn: async () => null,
     enabled: false,
-    gcTime: Infinity,
   })
   const items = stories.length ? stories : [story]
   const index = items.findIndex((item) => item.id === story.id)

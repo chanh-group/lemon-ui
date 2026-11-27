@@ -1186,7 +1186,6 @@ export function ConversationInfoPanel({
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="min-w-40">
                           <DropdownMenuItem
-                            disabled={isGroupActionPending}
                             onClick={() =>
                               void runGroupAction(
                                 () =>

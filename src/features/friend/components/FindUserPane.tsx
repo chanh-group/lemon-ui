@@ -78,10 +78,7 @@ export function FindUserPane({
         <label className="chat-search group flex items-center gap-2 rounded-lg border border-border bg-muted px-3.5 py-2.5 transition-all duration-150 focus-within:border-ring focus-within:bg-card">
           <input
             value={value}
-            onChange={(e) => {
-              requestGeneration.current += 1
-              setValue(e.target.value)
-            }}
+            onChange={(e) => setValue(e.target.value)}
             placeholder={
               mode === 'username' ? t('chat.searchPeopleHint') : t('chat.searchByEmailHint')
             }

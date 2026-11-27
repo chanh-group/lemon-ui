@@ -52,7 +52,7 @@ describe('opening a direct chat from search', () => {
     expect(mocks.navigate).toHaveBeenCalledTimes(1)
   })
 
-  it('does not navigate from a result after the search changes', async () => {
+  it('still navigates when the search changes while the chat is opening', async () => {
     let resolve!: (value: { id: string }) => void
     mocks.open.mockReturnValue(
       new Promise((done) => {
@@ -63,7 +63,7 @@ describe('opening a direct chat from search', () => {
     fireEvent.click(screen.getByRole('button', { name: 'message' }))
     fireEvent.change(screen.getByLabelText('search'), { target: { value: 'new search' } })
     await act(async () => resolve({ id: 'conversation-1' }))
-    expect(mocks.navigate).not.toHaveBeenCalled()
+    expect(mocks.navigate).toHaveBeenCalledWith('/messages/conversation-1')
     await waitFor(() => expect(screen.getByRole('button', { name: 'message' })).toBeTruthy())
   })
 

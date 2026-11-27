@@ -525,6 +525,7 @@
     "avatarUploading": "Đang tải ảnh lên",
     "avatarSaving": "Đang lưu ảnh đại diện…",
     "storyReactionUncertain": "Không thể xác nhận cảm xúc. Hãy kiểm tra lại sau.",
+    "sessionChanged": "Phiên đăng nhập đã thay đổi. Vui lòng thử lại.",
     "forward": "Chuyển tiếp",
     "pin": "Ghim",
     "copyText": "Sao chép",

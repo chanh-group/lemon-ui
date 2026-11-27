@@ -525,6 +525,7 @@
     "avatarUploading": "Uploading image",
     "avatarSaving": "Saving profile photo…",
     "storyReactionUncertain": "Could not confirm the reaction. Please check again later.",
+    "sessionChanged": "Your session changed. Please try again.",
     "forward": "Forward",
     "pin": "Pin",
     "copyText": "Copy",

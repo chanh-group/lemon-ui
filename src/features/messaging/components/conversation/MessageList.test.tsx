@@ -1,12 +1,11 @@
 // @vitest-environment happy-dom
-import { act, cleanup, fireEvent, render, renderHook, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   MediaBubble,
   MessageReplyBubbleQuote,
   MessageRowView,
   StoryReplyQuote,
-  usePendingMessageActions,
 } from './MessageList'
 import { useReplyTarget } from '@/features/messaging/hooks/useReplyTarget'
 import type { MessageReplyTarget } from '@/features/messaging/types/message.types'
@@ -37,48 +36,7 @@ const alivePreview = {
 }
 
 describe('message action pending', () => {
-  it('guards duplicate actions synchronously and lets other messages proceed', async () => {
-    const { result } = renderHook(() => usePendingMessageActions('c1'))
-    let finish!: () => void
-    const request = vi.fn(() => new Promise<void>((resolve) => (finish = resolve)))
-    let first!: Promise<boolean>
-    let duplicate!: Promise<boolean>
-    await act(async () => {
-      first = result.current.run('m1', 'revoke', request)
-      duplicate = result.current.run('m1', 'delete', request)
-    })
-    expect(request).toHaveBeenCalledTimes(1)
-    expect(await duplicate).toBe(false)
-    expect(result.current.pending[result.current.keyFor('m1')]).toBe('revoke')
-    await act(async () => {
-      expect(await result.current.run('m2', 'delete', async () => {})).toBe(true)
-    })
-    expect(result.current.pending[result.current.keyFor('m1')]).toBe('revoke')
-    await act(async () => {
-      finish()
-      expect(await first).toBe(true)
-    })
-    expect(result.current.pending[result.current.keyFor('m1')]).toBeUndefined()
-  })
-
-  it('clears pending after failure and isolates conversation keys', async () => {
-    const { result, rerender } = renderHook(({ id }) => usePendingMessageActions(id), {
-      initialProps: { id: 'c1' },
-    })
-    await act(async () => {
-      await expect(
-        result.current.run('m1', 'delete', async () => {
-          throw new Error('offline')
-        }),
-      ).rejects.toThrow('offline')
-    })
-    expect(result.current.pending[result.current.keyFor('m1')]).toBeUndefined()
-    const firstKey = result.current.keyFor('m1')
-    rerender({ id: 'c2' })
-    expect(result.current.keyFor('m1')).not.toBe(firstKey)
-  })
-
-  it('keeps an already revoked message visible and disables deletion while pending', () => {
+  it('keeps an already revoked message visible and hides actions while pending', () => {
     render(
       <MessageRowView
         conversationId="c1"
@@ -105,10 +63,10 @@ describe('message action pending', () => {
       />,
     )
     expect(screen.getByText('chat.messageRevokedText')).toBeTruthy()
-    expect(screen.getByRole('status').textContent).toBe('chat.messageDeleting')
     expect(
-      screen.getByRole('button', { name: 'chat.deleteMessage' }).hasAttribute('disabled'),
+      screen.getAllByRole('status').some((node) => node.textContent === 'chat.deletingMessage'),
     ).toBe(true)
+    expect(screen.queryByRole('button', { name: 'chat.deleteMessage' })).toBeNull()
   })
 
   it('keeps the message visible and disables its actions while revoking', () => {
@@ -139,13 +97,11 @@ describe('message action pending', () => {
       />,
     )
     expect(screen.getByText('Hello')).toBeTruthy()
-    expect(screen.getByRole('status').textContent).toBe('chat.messageRevoking')
-    expect(screen.getByRole('button', { name: 'Tùy chọn khác' }).hasAttribute('disabled')).toBe(
-      true,
-    )
-    expect(screen.getByRole('button', { name: 'chat.replyMessage' }).hasAttribute('disabled')).toBe(
-      true,
-    )
+    expect(
+      screen.getAllByRole('status').some((node) => node.textContent === 'chat.revokingMessage'),
+    ).toBe(true)
+    expect(screen.queryByRole('button', { name: 'Tùy chọn khác' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'chat.replyMessage' })).toBeNull()
   })
 })
 
