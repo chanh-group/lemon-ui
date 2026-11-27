@@ -36,7 +36,10 @@ describe('story storage after deletion', () => {
     await act(async () => {
       await result.current.deletion.mutateAsync('story-1')
     })
-    expect(result.current.storage.data?.usedBytes).toBe(5)
+    expect(client.getQueryData<{ usedBytes: number }>(queryKeys.chat.storyStorage)?.usedBytes).toBe(
+      5,
+    )
+    await waitFor(() => expect(result.current.storage.data?.usedBytes).toBe(5))
     expect(storage).toHaveBeenCalledTimes(2)
     unmount()
     client.clear()
