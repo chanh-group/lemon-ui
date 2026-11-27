@@ -653,7 +653,13 @@
     "storyStorageError": "Không thể tải dung lượng kho tin.",
     "storyTrimStart": "Điểm bắt đầu",
     "storyTrimEnd": "Điểm kết thúc",
-    "storyTrimPlayhead": "Vị trí phát"
+    "storyTrimPlayhead": "Vị trí phát",
+    "storyAudienceLabel": "Ai có thể xem tin?",
+    "storyAudienceAll": "Tất cả bạn bè",
+    "storyAudienceOnly": "Chỉ bạn bè được chọn",
+    "storyAudienceExcept": "Bạn bè ngoại trừ",
+    "storyAudienceNoFriends": "Không có bạn bè để chọn.",
+    "storyAudienceRequired": "Hãy chọn ít nhất một bạn bè và kiểm tra danh sách trước khi đăng."
   },
   "theme": {
     "toLight": "Chuyển sang chế độ sáng",

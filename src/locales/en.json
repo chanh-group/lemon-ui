@@ -653,7 +653,13 @@
     "storyStorageError": "Unable to load story storage.",
     "storyTrimStart": "Start time",
     "storyTrimEnd": "End time",
-    "storyTrimPlayhead": "Playback position"
+    "storyTrimPlayhead": "Playback position",
+    "storyAudienceLabel": "Who can see your story?",
+    "storyAudienceAll": "All friends",
+    "storyAudienceOnly": "Selected friends only",
+    "storyAudienceExcept": "Friends except",
+    "storyAudienceNoFriends": "No friends available.",
+    "storyAudienceRequired": "Select at least one friend and check the list before sharing."
   },
   "theme": {
     "toLight": "Switch to light mode",

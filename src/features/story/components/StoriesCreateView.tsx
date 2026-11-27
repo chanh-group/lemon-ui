@@ -32,6 +32,8 @@ import { ChooseStoryType } from './ChooseStoryType'
 import { TextStoryEditor } from './TextStoryEditor'
 import { MediaStoryEditor } from './MediaStoryEditor'
 import { StorySettingsModal } from './StorySettingsModal'
+import { StoryAudienceSelector, type StoryAudienceMode } from './StoryAudienceSelector'
+import { useFriends } from '@/features/friend/hooks/useFriends'
 import { storyDisplayName, storyTime } from '@/features/story/data/storiesData'
 import { groupStories } from '@/features/story/utils/storyGroups'
 
@@ -62,6 +64,32 @@ export function StoriesCreateView() {
       /* Editing remains available when storage is blocked. */
     }
   }
+  const [audienceMode, setAudienceMode] = useState<StoryAudienceMode>('ALL_FRIENDS')
+  const [audienceIds, setAudienceIds] = useState<string[]>([])
+  const friends = useFriends()
+  const audienceReady =
+    audienceMode === 'ALL_FRIENDS' ||
+    (!friends.isLoading &&
+      !friends.isError &&
+      audienceIds.length > 0 &&
+      audienceIds.every((id) => friends.data?.some((friend) => friend.id === id)))
+  const audience = {
+    audienceMode,
+    audienceUserIds: audienceMode === 'ALL_FRIENDS' ? undefined : audienceIds,
+  }
+  const selector = (
+    <StoryAudienceSelector
+      mode={audienceMode}
+      selected={audienceIds}
+      friends={friends.data ?? []}
+      loading={friends.isLoading}
+      error={friends.isError}
+      onChange={(mode, ids) => {
+        setAudienceMode(mode)
+        setAudienceIds(ids)
+      }}
+    />
+  )
   const [viewingOwn, setViewingOwn] = useState<StoryEntry | null>(null)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [mediaControls, setMediaControls] = useState<HTMLDivElement | null>(null)
@@ -76,24 +104,38 @@ export function StoriesCreateView() {
   const showingEditor = step !== 'choose'
 
   const shareText = (payload: CreateTextStoryPayload) => {
-    createText.mutate(payload, {
-      onError: (error) => toast.error(error.message),
-      onSuccess: () => {
-        changeDraft('')
-        toast.success(t('chat.storyCreated'))
-        backToStories()
+    if (!audienceReady) {
+      toast.error(t('chat.storyAudienceRequired'))
+      return
+    }
+    createText.mutate(
+      { ...payload, ...audience },
+      {
+        onError: (error) => toast.error(error.message),
+        onSuccess: () => {
+          changeDraft('')
+          toast.success(t('chat.storyCreated'))
+          backToStories()
+        },
       },
-    })
+    )
   }
 
   const shareMedia = (payload: CreateMediaStoryPayload) => {
-    createMedia.mutate(payload, {
-      onError: (error) => toast.error(error.message),
-      onSuccess: () => {
-        toast.success(t('chat.storyCreated'))
-        backToStories()
+    if (!audienceReady) {
+      toast.error(t('chat.storyAudienceRequired'))
+      return
+    }
+    createMedia.mutate(
+      { ...payload, ...audience },
+      {
+        onError: (error) => toast.error(error.message),
+        onSuccess: () => {
+          toast.success(t('chat.storyCreated'))
+          backToStories()
+        },
       },
-    })
+    )
   }
 
   const shareMediaPayload = (file: File, captionText: string, durationMs?: number) =>
@@ -166,6 +208,10 @@ export function StoriesCreateView() {
             <p className="truncate text-xs text-muted-foreground">{t('chat.addToStoryHint')}</p>
           </div>
         </div>
+
+        {showingEditor && (
+          <div className={step === 'text' ? 'hidden md:block' : ''}>{selector}</div>
+        )}
 
         {/* Trên mobile, panel lựa chọn nằm dưới thông tin tài khoản; panel desktop bị ẩn ở breakpoint md. */}
         {step === 'choose' && (
@@ -268,6 +314,7 @@ export function StoriesCreateView() {
       {/* Mobile (<md): editor mở overlay toàn màn */}
       {step === 'text' && (
         <div className="fixed inset-x-0 bottom-16 top-0 z-40 overflow-y-auto bg-background md:hidden">
+          {selector}
           <TextStoryEditor
             onDiscard={() => {
               changeDraft('')
