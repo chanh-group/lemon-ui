@@ -73,6 +73,9 @@ export function ProfileSettings() {
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null)
   const [isRemovingAvatar, setIsRemovingAvatar] = useState(false)
   const [isSavingAvatar, setIsSavingAvatar] = useState(false)
+  const [avatarSavePhase, setAvatarSavePhase] = useState<'uploading' | 'saving' | null>(null)
+  const [avatarUploadPercent, setAvatarUploadPercent] = useState<number | null>(null)
+  const avatarSavePending = useRef(false)
   const [isDragging, setIsDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
@@ -162,7 +165,7 @@ export function ProfileSettings() {
   }
 
   const handleFileChange = async (file?: File) => {
-    if (!file) return
+    if (!file || avatarSavePending.current) return
     if (!AVATAR_MIME_TYPES.includes(file.type)) {
       toast.error(t('chat.avatarInvalidType'))
       return
@@ -191,6 +194,10 @@ export function ProfileSettings() {
   }
 
   const handleSaveAvatar = async () => {
+    if (avatarSavePending.current) return
+    avatarSavePending.current = true
+    setAvatarSavePhase(selectedFile && !isRemovingAvatar ? 'uploading' : 'saving')
+    setAvatarUploadPercent(null)
     setIsSavingAvatar(true)
     try {
       let finalAvatarUrl: string | null | undefined = undefined
@@ -220,14 +227,21 @@ export function ProfileSettings() {
           }
           if (presignRes) {
             try {
-              await uploadBinaryToUrl(presignRes.uploadUrl, selectedFile, mimeType)
+              await uploadBinaryToUrl(
+                presignRes.uploadUrl,
+                selectedFile,
+                mimeType,
+                setAvatarUploadPercent,
+              )
               avatarUrl = presignRes.avatarUrl
             } catch {
+              setAvatarUploadPercent(null)
               const fallback = await uploadFileViaBackend(
                 selectedFile,
                 'USER_AVATAR',
                 undefined,
                 selectedFile.name,
+                setAvatarUploadPercent,
               )
               avatarUrl = fallback.avatarUrl
             }
@@ -237,6 +251,7 @@ export function ProfileSettings() {
               'USER_AVATAR',
               undefined,
               selectedFile.name,
+              setAvatarUploadPercent,
             )
             avatarUrl = fallback.avatarUrl
           }
@@ -249,12 +264,16 @@ export function ProfileSettings() {
         return
       }
 
+      setAvatarSavePhase('saving')
       await updateProfileMutation.mutateAsync({ avatarUrl: finalAvatarUrl })
       toast.success(finalAvatarUrl === null ? t('chat.avatarRemoved') : t('chat.avatarUpdated'))
       handleCloseAvatarDialog()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t('chat.profileUpdateFailed'))
     } finally {
+      avatarSavePending.current = false
+      setAvatarSavePhase(null)
+      setAvatarUploadPercent(null)
       setIsSavingAvatar(false)
     }
   }
@@ -554,7 +573,12 @@ export function ProfileSettings() {
       </button>
 
       {/* Avatar Edit Dialog */}
-      <Dialog open={isAvatarDialogOpen} onOpenChange={setIsAvatarDialogOpen}>
+      <Dialog
+        open={isAvatarDialogOpen}
+        onOpenChange={(open) => {
+          if (!avatarSavePending.current) setIsAvatarDialogOpen(open)
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="text-base font-bold">
@@ -594,7 +618,18 @@ export function ProfileSettings() {
             />
 
             <div
-              onClick={() => fileInputRef.current?.click()}
+              role="button"
+              tabIndex={isSavingAvatar ? -1 : 0}
+              aria-disabled={isSavingAvatar}
+              onClick={() => {
+                if (!avatarSavePending.current) fileInputRef.current?.click()
+              }}
+              onKeyDown={(e) => {
+                if ((e.key === 'Enter' || e.key === ' ') && !avatarSavePending.current) {
+                  e.preventDefault()
+                  fileInputRef.current?.click()
+                }
+              }}
               onDragOver={(e) => {
                 e.preventDefault()
                 setIsDragging(true)
@@ -631,7 +666,8 @@ export function ProfileSettings() {
               <button
                 type="button"
                 onClick={handleRemoveAvatarChoice}
-                className="inline-flex items-center gap-1.5 text-xs font-semibold text-destructive hover:underline"
+                disabled={isSavingAvatar}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-destructive hover:underline disabled:opacity-50"
               >
                 <DeleteIcon className="size-3.5" aria-hidden="true" />
                 <span>{t('chat.removePhoto')}</span>
@@ -639,6 +675,23 @@ export function ProfileSettings() {
             )}
           </div>
 
+          {avatarSavePhase && (
+            <div role="status" aria-live="polite" className="text-sm text-muted-foreground">
+              {avatarSavePhase === 'uploading' ? t('chat.avatarUploading') : t('chat.avatarSaving')}
+              {avatarSavePhase === 'uploading' && avatarUploadPercent !== null && (
+                <>
+                  {' '}
+                  {avatarUploadPercent}%
+                  <progress
+                    className="block w-full"
+                    max={100}
+                    value={avatarUploadPercent}
+                    aria-label={t('chat.avatarUploading')}
+                  />
+                </>
+              )}
+            </div>
+          )}
           <DialogFooter className="flex flex-row justify-end gap-2 pt-2">
             <button
               type="button"

@@ -12,6 +12,7 @@ import {
   type SocketConnectionStatus,
 } from '@/lib/socket'
 import {
+  applyConfirmedRead,
   applyRealtimeReaction,
   CHAT_QUERY_KEYS,
   type MessagePageParam,
@@ -33,6 +34,7 @@ import type { ConversationResponse } from '@/features/conversation/types/convers
 import { queryKeys } from '@/infrastructure/query/keys'
 import { ROUTES } from '@/config/constants'
 import { ApiError } from '@/infrastructure/api/errors'
+import { useAuthStore } from '@/infrastructure/auth/auth-store'
 
 const TYPING_STALE_TIMEOUT_MS = 4_500
 const SYNC_MISSED_MESSAGES_FRESH_MS = 60_000
@@ -146,6 +148,10 @@ export function useChatRealtime(activeConversationId: string | null) {
   const inFlightSyncRequests = useRef(new Map<string, Promise<void>>())
   const lastSyncedMap = useRef(new Map<string, number>())
   const revokedConversationIds = useRef(new Set<string>())
+  const readCursors = useRef({
+    generation: useAuthStore.getState().generation,
+    ids: new Map<string, string>(),
+  })
   const [conversationAccess, setConversationAccess] = useState<
     'verifying' | 'allowed' | 'revoked' | 'retryable-error'
   >(activeConversationId ? 'verifying' : 'allowed')
@@ -189,6 +195,13 @@ export function useChatRealtime(activeConversationId: string | null) {
         conversationsInvalidateTimer.current = null
         void queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.conversations })
       }, CONVERSATIONS_INVALIDATION_DELAY_MS)
+    }
+    const currentReadCursors = () => {
+      const generation = useAuthStore.getState().generation
+      if (readCursors.current.generation !== generation) {
+        readCursors.current = { generation, ids: new Map() }
+      }
+      return readCursors.current.ids
     }
     const refreshInbox = () => {
       if (refreshedInboxOnConnection.current) return
@@ -470,6 +483,7 @@ export function useChatRealtime(activeConversationId: string | null) {
     const handleNewMessage = (msg: MessageResponse) => {
       const convId = msg.conversationId
       if (revokedConversationIds.current.has(convId)) return
+      const alreadyRead = currentReadCursors().get(convId) === msg.id
       if (msg.senderId !== userIdRef.current) removeTypingMember(convId, msg.senderId)
 
       const sameMessage = (message: MessageResponse) =>
@@ -524,7 +538,7 @@ export function useChatRealtime(activeConversationId: string | null) {
             return {
               ...updateConversationLastMessage(conversation, msg),
               unreadCount:
-                msg.senderId === userIdRef.current || knownBefore
+                msg.senderId === userIdRef.current || knownBefore || alreadyRead
                   ? conversation.unreadCount
                   : (conversation.unreadCount || 0) + 1,
             }
@@ -552,7 +566,7 @@ export function useChatRealtime(activeConversationId: string | null) {
             pages: old.pages.map((page) => ({
               ...page,
               items: page.items.map((m) =>
-                m.id === updated.id
+                m.id === updated.id && !m.deletedAt
                   ? { ...m, body: updated.body, editedAt: updated.editedAt }
                   : m.replyTarget?.id === updated.id && !m.replyTarget.deletedAt
                     ? { ...m, replyTarget: { ...m.replyTarget, body: updated.body } }
@@ -566,7 +580,7 @@ export function useChatRealtime(activeConversationId: string | null) {
         CHAT_QUERY_KEYS.liveMessages(updated.conversationId),
         (old) =>
           old?.map((message) =>
-            message.id === updated.id
+            message.id === updated.id && !message.deletedAt
               ? { ...message, body: updated.body, editedAt: updated.editedAt }
               : message.replyTarget?.id === updated.id && !message.replyTarget.deletedAt
                 ? { ...message, replyTarget: { ...message.replyTarget, body: updated.body } }
@@ -700,13 +714,8 @@ export function useChatRealtime(activeConversationId: string | null) {
 
     const handleReadUpdated = (event: ReadUpdatedPayload) => {
       if (event.userId === userIdRef.current) {
-        queryClient.setQueryData<ConversationResponse[]>(CHAT_QUERY_KEYS.conversations, (current) =>
-          current?.map((conversation) =>
-            conversation.id === event.conversationId
-              ? { ...conversation, unreadCount: 0 }
-              : conversation,
-          ),
-        )
+        currentReadCursors().set(event.conversationId, event.lastReadMessageId)
+        applyConfirmedRead(queryClient, event.conversationId, event.lastReadMessageId)
       }
     }
 

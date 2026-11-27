@@ -35,11 +35,13 @@ export interface BackendStoryResponse {
   background?: string | null
   createdAt: string
   expiresAt: string
-  user: BackendStoryUser
+  user?: BackendStoryUser
   viewsCount?: number
   reactionsCount?: number
   viewerReaction?: string | null
+  myReaction?: string | null
   viewerHasViewed?: boolean
+  hasViewed?: boolean
   reactionsSummary?: BackendStoryReactionSummary[]
   allowReplies?: boolean
   allowReactions?: boolean
@@ -115,7 +117,7 @@ export function mapBackendStoryToEntry(
     name: item.user?.fullName || item.caption?.slice(0, 18) || 'Story',
     time: formatRelativeTime(item.createdAt),
     createdAt: item.createdAt,
-    viewed: Boolean(item.viewerHasViewed),
+    viewed: Boolean(item.viewerHasViewed ?? item.hasViewed),
     mine: isMine,
     online: true,
     authorId: item.userId,
@@ -132,8 +134,8 @@ export function mapBackendStoryToEntry(
     background: item.background,
     viewsCount: item.viewsCount ?? 0,
     reactionsCount: item.reactionsCount ?? 0,
-    viewerReaction: item.viewerReaction ?? null,
-    viewerHasViewed: item.viewerHasViewed ?? false,
+    viewerReaction: item.viewerReaction ?? item.myReaction ?? null,
+    viewerHasViewed: item.viewerHasViewed ?? item.hasViewed ?? false,
     reactionsSummary: item.reactionsSummary,
     allowReplies: item.allowReplies ?? true,
     allowReactions: item.allowReactions ?? true,

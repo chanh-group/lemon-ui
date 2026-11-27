@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -36,14 +36,35 @@ export function FindUserPane({
   const users = finder.data ?? []
 
   const createDirectChat = useCreateDirectChatMutation()
+  const [openingUserId, setOpeningUserId] = useState<string | null>(null)
+  const openingUserRef = useRef<string | null>(null)
+  const requestGeneration = useRef(0)
+  const mounted = useRef(false)
+
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+      requestGeneration.current += 1
+    }
+  }, [])
 
   const handleStartChat = async (userId: string) => {
+    if (openingUserRef.current) return
+    openingUserRef.current = userId
+    setOpeningUserId(userId)
+    const generation = ++requestGeneration.current
     try {
       const conv = await createDirectChat.mutateAsync(userId)
-      navigate(conversationPath(conv.id))
+      if (generation === requestGeneration.current) navigate(conversationPath(conv.id))
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : t('common.error')
-      toast.error(msg)
+      if (generation === requestGeneration.current) {
+        const msg = err instanceof Error ? err.message : t('common.error')
+        toast.error(msg)
+      }
+    } finally {
+      openingUserRef.current = null
+      if (mounted.current) setOpeningUserId(null)
     }
   }
 
@@ -57,7 +78,10 @@ export function FindUserPane({
         <label className="chat-search group flex items-center gap-2 rounded-lg border border-border bg-muted px-3.5 py-2.5 transition-all duration-150 focus-within:border-ring focus-within:bg-card">
           <input
             value={value}
-            onChange={(e) => setValue(e.target.value)}
+            onChange={(e) => {
+              requestGeneration.current += 1
+              setValue(e.target.value)
+            }}
             placeholder={
               mode === 'username' ? t('chat.searchPeopleHint') : t('chat.searchByEmailHint')
             }
@@ -78,7 +102,9 @@ export function FindUserPane({
               <SearchResultCard
                 key={user.id}
                 user={user}
-                onMessage={() => handleStartChat(user.id)}
+                onMessage={() => void handleStartChat(user.id)}
+                isOpeningChat={openingUserId === user.id}
+                isChatDisabled={Boolean(openingUserId)}
               />
             ))}
           </div>

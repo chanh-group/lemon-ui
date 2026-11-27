@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@/infrastructure/query/keys'
 import { ApiError } from '@/infrastructure/api/errors'
 import { FRIEND_STALE_MS, USER_SEARCH_MIN_LENGTH } from '@/config/constants'
@@ -74,50 +74,30 @@ export function useSendFriendRequest() {
   return useMutation({ mutationFn: sendFriendRequest, onSuccess: invalidate })
 }
 
+function removeCachedRequest(qc: QueryClient, requestId: string) {
+  qc.setQueryData<{ incoming: FriendRequest[]; outgoing: FriendRequest[] }>(
+    FRIEND_REQUESTS_KEY,
+    (old) => {
+      if (!old) return old
+      return {
+        ...old,
+        incoming: old.incoming.filter((request) => request.id !== requestId),
+        outgoing: old.outgoing.filter((request) => request.id !== requestId),
+      }
+    },
+  )
+}
+
 export function useAcceptFriendRequest() {
   const qc = useQueryClient()
   const invalidate = useInvalidateFriendData()
   return useMutation({
     mutationFn: acceptFriendRequest,
-    onMutate: async (requestId) => {
-      await qc.cancelQueries({ queryKey: FRIEND_REQUESTS_KEY })
-      const previous = qc.getQueryData<{ incoming: FriendRequest[]; outgoing: FriendRequest[] }>(
-        FRIEND_REQUESTS_KEY,
-      )
-      qc.setQueryData<{ incoming: FriendRequest[]; outgoing: FriendRequest[] }>(
-        FRIEND_REQUESTS_KEY,
-        (old) => {
-          if (!old) return old
-          return {
-            ...old,
-            incoming: old.incoming.filter((r) => r.id !== requestId),
-            outgoing: old.outgoing.filter((r) => r.id !== requestId),
-          }
-        },
-      )
-      return { previous }
+    onError: (error, requestId) => {
+      if (isFriendRequestNotFoundError(error)) removeCachedRequest(qc, requestId)
     },
-    onError: (err, requestId, context) => {
-      if (isFriendRequestNotFoundError(err)) {
-        // Tự phục hồi: Lời mời không còn tồn tại trên server, giữ việc xóa khỏi danh sách
-        qc.setQueryData<{ incoming: FriendRequest[]; outgoing: FriendRequest[] }>(
-          FRIEND_REQUESTS_KEY,
-          (old) => {
-            if (!old) return old
-            return {
-              ...old,
-              incoming: old.incoming.filter((r) => r.id !== requestId),
-              outgoing: old.outgoing.filter((r) => r.id !== requestId),
-            }
-          },
-        )
-        return
-      }
-      if (context?.previous) {
-        qc.setQueryData(FRIEND_REQUESTS_KEY, context.previous)
-      }
-    },
-    onSuccess: async (conversation) => {
+    onSuccess: (conversation, requestId) => {
+      removeCachedRequest(qc, requestId)
       qc.setQueryData<ConversationResponse[]>(queryKeys.chat.conversations, (current) => {
         if (!current) return [conversation]
         if (current.some((item) => item.id === conversation.id)) {
@@ -125,10 +105,6 @@ export function useAcceptFriendRequest() {
         }
         return [conversation, ...current]
       })
-      await Promise.all([
-        qc.invalidateQueries({ queryKey: FRIEND_REQUESTS_KEY }),
-        qc.invalidateQueries({ queryKey: FRIENDS_KEY }),
-      ])
     },
     onSettled: () => void invalidate(),
   })
@@ -139,45 +115,10 @@ export function useDeclineFriendRequest() {
   const invalidate = useInvalidateFriendData()
   return useMutation({
     mutationFn: declineFriendRequest,
-    onMutate: async (requestId) => {
-      await qc.cancelQueries({ queryKey: FRIEND_REQUESTS_KEY })
-      const previous = qc.getQueryData<{ incoming: FriendRequest[]; outgoing: FriendRequest[] }>(
-        FRIEND_REQUESTS_KEY,
-      )
-      qc.setQueryData<{ incoming: FriendRequest[]; outgoing: FriendRequest[] }>(
-        FRIEND_REQUESTS_KEY,
-        (old) => {
-          if (!old) return old
-          return {
-            ...old,
-            incoming: old.incoming.filter((r) => r.id !== requestId),
-            outgoing: old.outgoing.filter((r) => r.id !== requestId),
-          }
-        },
-      )
-      return { previous }
+    onError: (error, requestId) => {
+      if (isFriendRequestNotFoundError(error)) removeCachedRequest(qc, requestId)
     },
-    onError: (err, requestId, context) => {
-      if (isFriendRequestNotFoundError(err)) {
-        // Tự phục hồi: Lời mời không còn tồn tại trên server, giữ việc xóa khỏi danh sách
-        qc.setQueryData<{ incoming: FriendRequest[]; outgoing: FriendRequest[] }>(
-          FRIEND_REQUESTS_KEY,
-          (old) => {
-            if (!old) return old
-            return {
-              ...old,
-              incoming: old.incoming.filter((r) => r.id !== requestId),
-              outgoing: old.outgoing.filter((r) => r.id !== requestId),
-            }
-          },
-        )
-        return
-      }
-      if (context?.previous) {
-        qc.setQueryData(FRIEND_REQUESTS_KEY, context.previous)
-      }
-    },
-    onSuccess: invalidate,
+    onSuccess: (_data, requestId) => removeCachedRequest(qc, requestId),
     onSettled: () => void invalidate(),
   })
 }
@@ -187,45 +128,10 @@ export function useCancelFriendRequest() {
   const invalidate = useInvalidateFriendData()
   return useMutation({
     mutationFn: cancelFriendRequest,
-    onMutate: async (requestId) => {
-      await qc.cancelQueries({ queryKey: FRIEND_REQUESTS_KEY })
-      const previous = qc.getQueryData<{ incoming: FriendRequest[]; outgoing: FriendRequest[] }>(
-        FRIEND_REQUESTS_KEY,
-      )
-      qc.setQueryData<{ incoming: FriendRequest[]; outgoing: FriendRequest[] }>(
-        FRIEND_REQUESTS_KEY,
-        (old) => {
-          if (!old) return old
-          return {
-            ...old,
-            incoming: old.incoming.filter((r) => r.id !== requestId),
-            outgoing: old.outgoing.filter((r) => r.id !== requestId),
-          }
-        },
-      )
-      return { previous }
+    onError: (error, requestId) => {
+      if (isFriendRequestNotFoundError(error)) removeCachedRequest(qc, requestId)
     },
-    onError: (err, requestId, context) => {
-      if (isFriendRequestNotFoundError(err)) {
-        // Tự phục hồi: Lời mời không còn tồn tại trên server, giữ việc xóa khỏi danh sách
-        qc.setQueryData<{ incoming: FriendRequest[]; outgoing: FriendRequest[] }>(
-          FRIEND_REQUESTS_KEY,
-          (old) => {
-            if (!old) return old
-            return {
-              ...old,
-              incoming: old.incoming.filter((r) => r.id !== requestId),
-              outgoing: old.outgoing.filter((r) => r.id !== requestId),
-            }
-          },
-        )
-        return
-      }
-      if (context?.previous) {
-        qc.setQueryData(FRIEND_REQUESTS_KEY, context.previous)
-      }
-    },
-    onSuccess: invalidate,
+    onSuccess: (_data, requestId) => removeCachedRequest(qc, requestId),
     onSettled: () => void invalidate(),
   })
 }

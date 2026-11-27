@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Dialog,
@@ -19,24 +20,33 @@ export function StorySettingsModal({ open, onOpenChange }: StorySettingsModalPro
   const { t } = useTranslation()
   const { data: settings, isLoading } = useStorySettings()
   const updateSettings = useUpdateStorySettings()
+  const settingsRequestPending = useRef(false)
   const viewedReceipts = settings?.viewedReceiptsEnabled ?? true
   const archiveEnabled = settings?.archiveEnabled ?? true
 
   const handleToggleReceipts = async (checked: boolean) => {
+    if (settingsRequestPending.current) return
+    settingsRequestPending.current = true
     try {
       await updateSettings.mutateAsync({ viewedReceiptsEnabled: checked })
       toast.success(checked ? t('chat.receiptsEnabled') : t('chat.receiptsDisabled'))
     } catch {
       toast.error(t('chat.storySettingsError'))
+    } finally {
+      settingsRequestPending.current = false
     }
   }
 
   const handleToggleArchive = async (checked: boolean) => {
+    if (settingsRequestPending.current) return
+    settingsRequestPending.current = true
     try {
       await updateSettings.mutateAsync({ archiveEnabled: checked })
       toast.success(checked ? t('chat.storyArchiveEnabled') : t('chat.storyArchiveDisabled'))
     } catch {
       toast.error(t('chat.storySettingsError'))
+    } finally {
+      settingsRequestPending.current = false
     }
   }
 
@@ -67,7 +77,9 @@ export function StorySettingsModal({ open, onOpenChange }: StorySettingsModalPro
               </div>
               <Switch
                 checked={viewedReceipts}
-                disabled={isLoading}
+                aria-label={t('chat.storyReceiptsTitle')}
+                aria-busy={updateSettings.isPending}
+                disabled={isLoading || !settings}
                 onCheckedChange={handleToggleReceipts}
               />
             </div>
@@ -84,10 +96,17 @@ export function StorySettingsModal({ open, onOpenChange }: StorySettingsModalPro
               </div>
               <Switch
                 checked={archiveEnabled}
-                disabled={isLoading}
+                aria-label={t('chat.storyArchiveSettingTitle')}
+                aria-busy={updateSettings.isPending}
+                disabled={isLoading || !settings}
                 onCheckedChange={handleToggleArchive}
               />
             </div>
+            {updateSettings.isPending && (
+              <p role="status" className="text-xs text-muted-foreground">
+                {t('chat.pending')}
+              </p>
+            )}
           </div>
         </div>
       </DialogContent>

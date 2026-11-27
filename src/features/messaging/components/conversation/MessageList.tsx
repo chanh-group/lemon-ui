@@ -310,7 +310,7 @@ export function MessageReplyBubbleQuote({
   )
 }
 
-const MessageRowView = memo(function MessageRowView({
+export const MessageRowView = memo(function MessageRowView({
   conversationId,
   group,
   messageIndex,
@@ -470,6 +470,7 @@ const MessageRowView = memo(function MessageRowView({
   return (
     <div
       data-message-id={msg.id}
+      aria-busy={Boolean(pendingAction)}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
       onTouchCancel={handleTouchEnd}
@@ -684,6 +685,14 @@ const MessageRowView = memo(function MessageRowView({
               </div>
             </div>
 
+            {pendingAction && (
+              <span role="status" className="mt-1 px-1 text-[11px] text-muted-foreground">
+                {pendingAction === 'revoke'
+                  ? t('chat.revokingMessage')
+                  : t('chat.deletingMessage')}
+              </span>
+            )}
+
             {msg.editedAt && !msg.deletedAt && !isEditing && (
               <span className="mt-1 px-1 text-[11px] text-muted-foreground">
                 {t('chat.messageEditedLabel')}
@@ -721,6 +730,7 @@ const MessageRowView = memo(function MessageRowView({
                         e.stopPropagation()
                         onReact?.(msg.id, emoji)
                       }}
+                      disabled={Boolean(pendingAction)}
                       className={cn(
                         'flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs shadow-xs transition-all active:scale-95 cursor-pointer select-none',
                         myReaction
@@ -871,9 +881,9 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
   const editMutation = useEditMessageMutation(conversationId ?? null)
   const deleteForMeMutation = useDeleteMessageForMeMutation(conversationId ?? null)
   const reactMutation = useReactMessageMutation(conversationId ?? null)
-  const revokeMessage = revokeMutation.mutate
+  const revokeMessage = revokeMutation.mutateAsync
   const editMessage = editMutation.mutateAsync
-  const deleteForMe = deleteForMeMutation.mutate
+  const deleteForMe = deleteForMeMutation.mutateAsync
   const reactMessage = reactMutation.mutate
 
   // Callback ổn định để memo của từng row không bị phá khi list re-render lúc cuộn.
