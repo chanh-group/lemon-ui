@@ -879,9 +879,9 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
   const editMutation = useEditMessageMutation(conversationId ?? null)
   const deleteForMeMutation = useDeleteMessageForMeMutation(conversationId ?? null)
   const reactMutation = useReactMessageMutation(conversationId ?? null)
-  const revokeMessage = revokeMutation.mutateAsync
+  const revokeMessage = revokeMutation.mutate
   const editMessage = editMutation.mutateAsync
-  const deleteForMe = deleteForMeMutation.mutateAsync
+  const deleteForMe = deleteForMeMutation.mutate
   const reactMessage = reactMutation.mutate
 
   // Callback ổn định để memo của từng row không bị phá khi list re-render lúc cuộn.
