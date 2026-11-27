@@ -34,6 +34,7 @@ export function TextStoryEditor({
       >
         <textarea
           value={text}
+          disabled={isSharing}
           onChange={(e) => onTextChange(e.target.value)}
           placeholder={t('chat.addTextHint')}
           aria-label={t('chat.addTextHint')}
