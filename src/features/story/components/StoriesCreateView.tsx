@@ -33,7 +33,8 @@ import { TextStoryEditor } from './TextStoryEditor'
 import { MediaStoryEditor } from './MediaStoryEditor'
 import { StorySettingsModal } from './StorySettingsModal'
 import { StoryAudienceSelector, type StoryAudienceMode } from './StoryAudienceSelector'
-import { useFriends } from '@/features/friend/hooks/useFriends'
+import { useQuery } from '@tanstack/react-query'
+import { getAllStoryAudienceFriends } from '@/features/friend/api/friend.api'
 import { storyDisplayName, storyTime } from '@/features/story/data/storiesData'
 import { groupStories } from '@/features/story/utils/storyGroups'
 
@@ -66,7 +67,11 @@ export function StoriesCreateView() {
   }
   const [audienceMode, setAudienceMode] = useState<StoryAudienceMode>('ALL_FRIENDS')
   const [audienceIds, setAudienceIds] = useState<string[]>([])
-  const friends = useFriends()
+  const friends = useQuery({
+    queryKey: ['story-audience-friends', user?.id],
+    queryFn: getAllStoryAudienceFriends,
+    enabled: Boolean(user?.id),
+  })
   const audienceReady =
     audienceMode === 'ALL_FRIENDS' ||
     (!friends.isLoading &&
