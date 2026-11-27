@@ -11,12 +11,12 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { generateUUID } from '@/lib/utils'
 import {
-  isUncertainSendError,
   registerPendingMessagePreviews,
   releasePendingMessagePreviews,
   resolveSendMessageKind,
   retryUncertainSend,
 } from '@/features/messaging/utils/messageSend'
+import { isUncertainApiError } from '@/infrastructure/api/errors'
 import { queryKeys } from '@/infrastructure/query/keys'
 import {
   getConversationMessages,
@@ -599,7 +599,7 @@ export function useSendMessageMutation(conversationId: string | null) {
         return
       }
 
-      const sendState = isUncertainSendError(error) ? 'uncertain' : 'failed'
+      const sendState = isUncertainApiError(error) ? 'uncertain' : 'failed'
 
       if (context?.targetConversationId) {
         queryClient.setQueryData<MessageResponse[]>(
@@ -621,7 +621,7 @@ export function useSendMessageMutation(conversationId: string | null) {
         )
       }
       toast.error(
-        isUncertainSendError(error)
+        isUncertainApiError(error)
           ? t('chat.sendUncertain')
           : error instanceof Error
             ? error.message
@@ -718,7 +718,23 @@ export function useRevokeMessageMutation(conversationId: string | null) {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (messageId: string) => revokeMessage(messageId),
+    mutationFn: async (messageId: string) => {
+      try {
+        return await revokeMessage(messageId)
+      } catch (error) {
+        // Lỗi không xác định (timeout/mất kết nối): server có thể đã thu hồi rồi —
+        // xem lại trạng thái thật trước khi kết luận thất bại (tránh tin "hiện lại" oan).
+        if (!isUncertainApiError(error) || !conversationId) throw error
+        try {
+          const response = await getMessageWindow(conversationId, messageId, 1)
+          const message = response.items.find((item) => item.id === messageId)
+          if (message?.deletedAt) return message
+        } catch {
+          // Không reconcile được — giữ nguyên lỗi cũ.
+        }
+        throw error
+      }
+    },
     onSuccess: (revokedMsg) => {
       if (!conversationId) return
       queryClient.setQueryData<InfiniteData<MessageTimelineResponse, MessagePageParam>>(
@@ -826,7 +842,22 @@ export function useEditMessageMutation(conversationId: string | null) {
 export function useDeleteMessageForMeMutation(conversationId: string | null) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: deleteMessageForMe,
+    mutationFn: async (messageId: string) => {
+      try {
+        return await deleteMessageForMe(messageId)
+      } catch (error) {
+        // Tương tự revoke: lỗi không xác định — nếu tin đã biến mất khỏi cửa sổ của
+        // mình thì server đã xóa, coi là thành công.
+        if (!isUncertainApiError(error) || !conversationId) throw error
+        try {
+          const response = await getMessageWindow(conversationId, messageId, 1)
+          if (!response.items.some((item) => item.id === messageId)) return
+        } catch {
+          // Không reconcile được — giữ nguyên lỗi cũ.
+        }
+        throw error
+      }
+    },
     onSuccess: (_, messageId) => {
       if (!conversationId) return
       queryClient.setQueryData<InfiniteData<MessageTimelineResponse, MessagePageParam>>(

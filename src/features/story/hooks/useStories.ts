@@ -172,9 +172,47 @@ export function useUpdateStorySettings() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (payload: Partial<UserStorySettings>) => updateStorySettings(payload),
-    onSuccess: (data) => {
-      queryClient.setQueryData(STORY_SETTINGS_KEY, data)
-      queryClient.invalidateQueries({ queryKey: STORY_SETTINGS_KEY })
+    // Toggle phải lật ngay: áp payload lên cache ở onMutate, chỉ hoàn tác các trường
+    // của chính mutation khi lỗi để không đè thao tác toggle khác đang bay.
+    onMutate: async (payload) => {
+      await queryClient.cancelQueries({ queryKey: STORY_SETTINGS_KEY })
+      const previous = queryClient.getQueryData<UserStorySettings>(STORY_SETTINGS_KEY)
+      queryClient.setQueryData<UserStorySettings>(STORY_SETTINGS_KEY, (old) =>
+        old ? { ...old, ...payload } : old,
+      )
+      return { previous }
+    },
+    onError: (_error, payload, context) => {
+      const previous = context?.previous
+      if (!previous) return
+      queryClient.setQueryData<UserStorySettings>(STORY_SETTINGS_KEY, (old) => {
+        if (!old) return old
+        // Chỉ hoàn tác trường còn đúng giá trị mutation này vừa set — không đè
+        // thao tác toggle cùng field diễn ra sau đó.
+        return Object.fromEntries(
+          Object.entries(old).map(([key, value]) => [
+            key,
+            key in payload && value === payload[key as keyof UserStorySettings]
+              ? previous[key as keyof UserStorySettings]
+              : value,
+          ]),
+        ) as UserStorySettings
+      })
+    },
+    // Chỉ áp các field thuộc payload khi reconcile thành công — response của request
+    // khác field về muộn có thể chứa giá trị cũ, không được đè thao tác đang bay;
+    // và không đè field đã có ý định mới hơn (giá trị hiện tại khác payload của mình).
+    onSuccess: (data, payload) => {
+      queryClient.setQueryData<UserStorySettings>(STORY_SETTINGS_KEY, (old) => {
+        if (!old) return data
+        const applied = Object.fromEntries(
+          (Object.keys(payload) as Array<keyof UserStorySettings>)
+            .filter((key) => old[key] === payload[key])
+            .map((key) => [key, data[key]]),
+        ) as Partial<UserStorySettings>
+        return { ...old, ...applied }
+      })
+      void queryClient.invalidateQueries({ queryKey: STORY_SETTINGS_KEY })
     },
   })
 }

@@ -1,5 +1,5 @@
 import { AxiosError } from 'axios'
-import { ApiError } from '@/infrastructure/api/errors'
+import { ApiError, isUncertainApiError } from '@/infrastructure/api/errors'
 
 export function isAccessError(error: unknown): boolean {
   return (
@@ -7,19 +7,6 @@ export function isAccessError(error: unknown): boolean {
     (error instanceof AxiosError &&
       (error.response?.status === 403 || error.response?.status === 404))
   )
-}
-
-function isUncertainActionError(error: unknown): boolean {
-  const status =
-    error instanceof ApiError
-      ? error.status
-      : error instanceof AxiosError
-        ? error.response?.status
-        : undefined
-  if (error instanceof ApiError || error instanceof AxiosError) {
-    return status === undefined || status === 0 || status >= 500
-  }
-  return false
 }
 
 export async function resolveGroupAction(
@@ -30,7 +17,7 @@ export async function resolveGroupAction(
     await action()
     return 'applied'
   } catch (error) {
-    if (!isUncertainActionError(error)) throw error
+    if (!isUncertainApiError(error)) throw error
     try {
       if (verifyApplied && (await verifyApplied())) return 'applied'
     } catch {

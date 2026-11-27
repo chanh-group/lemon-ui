@@ -79,6 +79,20 @@ export function removeTypingUser(
   return { ...current, [conversationId]: users }
 }
 
+// Id message đã xử lý trong phiên — dedup socket replay cho cả hội thoại chưa mở
+// (không có message cache). Bounded đơn giản: đầy thì xóa hết, không giữ rác phiên dài.
+const DELIVERED_MESSAGE_ID_LIMIT = 5_000
+const deliveredMessageIds = new Set<string>()
+
+function isDeliveredMessage(message: MessageResponse): boolean {
+  return deliveredMessageIds.has(message.id)
+}
+
+function rememberDeliveredMessage(message: MessageResponse): void {
+  if (deliveredMessageIds.size >= DELIVERED_MESSAGE_ID_LIMIT) deliveredMessageIds.clear()
+  deliveredMessageIds.add(message.id)
+}
+
 export function mergeMessagesByTime(
   existing: MessageResponse[],
   incoming: MessageResponse[],
@@ -458,32 +472,38 @@ export function useChatRealtime(activeConversationId: string | null) {
       if (revokedConversationIds.current.has(convId)) return
       if (msg.senderId !== userIdRef.current) removeTypingMember(convId, msg.senderId)
 
+      const sameMessage = (message: MessageResponse) =>
+        message.id === msg.id ||
+        Boolean(message.clientMsgId && message.clientMsgId === msg.clientMsgId)
+      const timeline = queryClient.getQueryData<
+        InfiniteData<MessageTimelineResponse, MessagePageParam>
+      >(CHAT_QUERY_KEYS.messages(convId))
+      // Echo/replay từ socket có thể phát lại message:new — tin đã xử lý hoặc đã nằm
+      // trong cache thì không được cộng thêm unread (đếm đôi badge).
+      const knownBefore =
+        isDeliveredMessage(msg) ||
+        Boolean(timeline?.pages.some((page) => page.items.some(sameMessage))) ||
+        Boolean(
+          queryClient
+            .getQueryData<MessageResponse[]>(CHAT_QUERY_KEYS.liveMessages(convId))
+            ?.some(sameMessage),
+        )
+
       // Cập nhật messages cache nếu đang có dữ liệu trong cache
       if (
         convId === activeConversationIdRef.current ||
         queryClient.getQueryData(CHAT_QUERY_KEYS.messages(convId))
       ) {
-        const timeline = queryClient.getQueryData<
-          InfiniteData<MessageTimelineResponse, MessagePageParam>
-        >(CHAT_QUERY_KEYS.messages(convId))
         queryClient.setQueryData<MessageResponse[]>(CHAT_QUERY_KEYS.liveMessages(convId), (old) => {
-          const alreadyLoaded = timeline?.pages.some((page) =>
-            page.items.some(
-              (message) =>
-                message.id === msg.id ||
-                (message.clientMsgId && message.clientMsgId === msg.clientMsgId),
-            ),
-          )
+          const alreadyLoaded = timeline?.pages.some((page) => page.items.some(sameMessage))
           if (alreadyLoaded) {
-            return old?.filter(
-              (m) => m.id !== msg.id && (!msg.clientMsgId || m.clientMsgId !== msg.clientMsgId),
-            )
+            return old?.filter((m) => !sameMessage(m))
           }
 
           if (!old) return [msg]
           let replaced = false
           const updated = old.map((m) => {
-            if ((m.clientMsgId && m.clientMsgId === msg.clientMsgId) || m.id === msg.id) {
+            if (sameMessage(m)) {
               replaced = true
               return m.clientMsgId ? { ...msg, clientMsgId: m.clientMsgId } : msg
             }
@@ -504,7 +524,7 @@ export function useChatRealtime(activeConversationId: string | null) {
             return {
               ...updateConversationLastMessage(conversation, msg),
               unreadCount:
-                msg.senderId === userIdRef.current
+                msg.senderId === userIdRef.current || knownBefore
                   ? conversation.unreadCount
                   : (conversation.unreadCount || 0) + 1,
             }
@@ -513,6 +533,7 @@ export function useChatRealtime(activeConversationId: string | null) {
       } else {
         debouncedInvalidateConversations()
       }
+      rememberDeliveredMessage(msg)
     }
 
     // B. Tin nhắn được chỉnh sửa

@@ -1,5 +1,5 @@
 import type { MessageAttachmentInput } from '@/features/messaging/types/message.types'
-import { ApiError } from '@/infrastructure/api/errors'
+import { isUncertainApiError } from '@/infrastructure/api/errors'
 
 type MessageKind = 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE' | 'SYSTEM'
 
@@ -12,15 +12,12 @@ export function resolveSendMessageKind(
   if (body?.trim() || attachmentKinds.size > 1) return 'TEXT'
   return requestedKind ?? attachmentKinds.values().next().value ?? 'TEXT'
 }
-export function isUncertainSendError(error: unknown): boolean {
-  return error instanceof ApiError && (error.status === 0 || error.status >= 500)
-}
 
 export async function retryUncertainSend<T>(send: () => Promise<T>): Promise<T> {
   try {
     return await send()
   } catch (error) {
-    if (!isUncertainSendError(error)) throw error
+    if (!isUncertainApiError(error)) throw error
     return send()
   }
 }

@@ -20,6 +20,7 @@ import {
   Delete02Icon as DeleteData,
   Film01Icon as FilmData,
   Image01Icon as ImageIconData,
+  LoaderCircleIcon as LoaderData,
   Share01Icon as ForwardData,
   StickerIcon as StickerData,
 } from '@hugeicons/core-free-icons'
@@ -30,6 +31,7 @@ const Clock = createIcon(ClockData)
 const DeleteIcon = createIcon(DeleteData)
 const Film = createIcon(FilmData)
 const ImageIcon = createIcon(ImageIconData)
+const Loader = createIcon(LoaderData)
 const Sticker = createIcon(StickerData)
 const ForwardIcon = createIcon(ForwardData)
 const ReplyIcon = createIcon(ReplyData)
@@ -327,6 +329,7 @@ const MessageRowView = memo(function MessageRowView({
   onOpenStoryReply,
   onRetryMessage,
   highlighted,
+  pendingAction,
 }: {
   conversationId?: string
   group: MessageGroup
@@ -347,6 +350,8 @@ const MessageRowView = memo(function MessageRowView({
   onOpenStoryReply?: (storyId: string) => void
   onRetryMessage?: (messageId: string) => void
   highlighted?: boolean
+  /** Thao tác phá hủy đang chờ server xác nhận cho tin này (khóa thao tác lặp). */
+  pendingAction?: 'revoke' | 'delete'
 }) {
   const { t } = useTranslation()
   const isMe = group.fromMe
@@ -405,50 +410,49 @@ const MessageRowView = memo(function MessageRowView({
 
   // Floating 3-button Action Bar on hover/hold (Messenger-style: Emoji, Forward, 3-dots)
   const showActions = isHeld || isMenuOpen
-  const actionBar =
-    msg.deletedAt && onDeleteForMe ? (
-      <button
-        type="button"
-        onClick={() => onDeleteForMe(msg.id)}
-        aria-label={t('chat.deleteMessage')}
-        title={t('chat.deleteMessage')}
-        className="grid size-8 shrink-0 place-items-center rounded-full border border-border bg-card text-destructive hover:bg-muted"
-      >
-        <DeleteIcon className="size-4" aria-hidden="true" />
-      </button>
-    ) : !msg.deletedAt ? (
-      <div
-        className={cn(
-          'flex items-center gap-1 transition-opacity duration-150',
-          showActions
-            ? 'opacity-100 pointer-events-auto'
-            : 'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto',
-        )}
-      >
-        <MessageActionPill
-          message={msg}
-          attachment={firstAttachment}
-          isMe={isMe}
-          onPreview={handleQuickPreview}
-          onRevoke={onRevoke}
-          onDeleteForMe={onDeleteForMe}
-          onEdit={
-            onEdit
-              ? (message) => {
-                  setEditDraft(message.text ?? '')
-                  setIsEditing(true)
-                  setIsHeld(false)
-                }
-              : undefined
-          }
-          onReact={onReact}
-          onForward={onForward}
-          onReply={msg.status === 'sending' || msg.status === 'uncertain' ? undefined : onReply}
-          align={isMe ? 'end' : 'start'}
-          onOpenChange={setIsMenuOpen}
-        />
-      </div>
-    ) : null
+  const actionBar = pendingAction ? null : msg.deletedAt && onDeleteForMe ? (
+    <button
+      type="button"
+      onClick={() => onDeleteForMe(msg.id)}
+      aria-label={t('chat.deleteMessage')}
+      title={t('chat.deleteMessage')}
+      className="grid size-8 shrink-0 place-items-center rounded-full border border-border bg-card text-destructive hover:bg-muted"
+    >
+      <DeleteIcon className="size-4" aria-hidden="true" />
+    </button>
+  ) : !msg.deletedAt ? (
+    <div
+      className={cn(
+        'flex items-center gap-1 transition-opacity duration-150',
+        showActions
+          ? 'opacity-100 pointer-events-auto'
+          : 'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto',
+      )}
+    >
+      <MessageActionPill
+        message={msg}
+        attachment={firstAttachment}
+        isMe={isMe}
+        onPreview={handleQuickPreview}
+        onRevoke={onRevoke}
+        onDeleteForMe={onDeleteForMe}
+        onEdit={
+          onEdit
+            ? (message) => {
+                setEditDraft(message.text ?? '')
+                setIsEditing(true)
+                setIsHeld(false)
+              }
+            : undefined
+        }
+        onReact={onReact}
+        onForward={onForward}
+        onReply={msg.status === 'sending' || msg.status === 'uncertain' ? undefined : onReply}
+        align={isMe ? 'end' : 'start'}
+        onOpenChange={setIsMenuOpen}
+      />
+    </div>
+  ) : null
 
   const isPureMedia =
     hasAttachments &&
@@ -507,7 +511,8 @@ const MessageRowView = memo(function MessageRowView({
             'flex max-w-[78%] flex-col sm:max-w-[65%]',
             isEditing && 'w-[78%] sm:w-[min(65%,28rem)]',
             isMe ? 'items-end' : 'items-start',
-            msg.status === 'sending' && 'opacity-80',
+            msg.status === 'sending' && !pendingAction && 'opacity-80',
+            pendingAction && 'opacity-60',
           )}
         >
           <div
@@ -684,6 +689,16 @@ const MessageRowView = memo(function MessageRowView({
               </span>
             )}
 
+            {pendingAction && (
+              <span
+                role="status"
+                className="mt-1 flex items-center gap-1 px-1 text-[11px] text-muted-foreground"
+              >
+                <Loader className="size-3 animate-spin" aria-hidden="true" />
+                {pendingAction === 'revoke' ? t('chat.revokingMessage') : t('chat.deletingMessage')}
+              </span>
+            )}
+
             {/* Reactions floating independently outside the bubble, matching image 2 & Messenger */}
             {!msg.deletedAt && msg.reactions && msg.reactions.length > 0 && (
               <div
@@ -841,6 +856,8 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
 
   const [lightboxAttachment, setLightboxAttachment] = useState<MessageAttachmentItem | null>(null)
   const [documentAttachment, setDocumentAttachment] = useState<MessageAttachmentItem | null>(null)
+  const [pendingRemoval, setPendingRemoval] = useState<Record<string, 'revoke' | 'delete'>>({})
+  const pendingRemovalRef = useRef<Set<string>>(new Set())
   const [forwardingMessage, setForwardingMessage] = useState<ChatMessage | null>(null)
   const [highlightedMessage, setHighlightedMessage] = useState<string | null>(null)
   useEffect(() => {
@@ -859,8 +876,28 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
   const reactMessage = reactMutation.mutate
 
   // Callback ổn định để memo của từng row không bị phá khi list re-render lúc cuộn.
+  const beginPendingRemoval = useCallback(
+    (messageId: string, kind: 'revoke' | 'delete'): boolean => {
+      if (pendingRemovalRef.current.has(messageId)) return false
+      pendingRemovalRef.current.add(messageId)
+      setPendingRemoval((prev) => ({ ...prev, [messageId]: kind }))
+      return true
+    },
+    [],
+  )
+
+  const endPendingRemoval = useCallback((messageId: string) => {
+    pendingRemovalRef.current.delete(messageId)
+    setPendingRemoval((prev) => {
+      const next = { ...prev }
+      delete next[messageId]
+      return next
+    })
+  }, [])
+
   const handleRevokeMessage = useCallback(
     (messageId: string) => {
+      if (!beginPendingRemoval(messageId, 'revoke')) return
       revokeMessage(messageId, {
         onSuccess: () => {
           toast.success(t('chat.messageRevoked'))
@@ -868,9 +905,12 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
         onError: () => {
           toast.error(t('chat.messageRevokeFailed'))
         },
+        onSettled: () => {
+          endPendingRemoval(messageId)
+        },
       })
     },
-    [revokeMessage, t],
+    [revokeMessage, t, beginPendingRemoval, endPendingRemoval],
   )
 
   const handleEditMessage = useCallback(
@@ -896,12 +936,14 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
 
   const handleDeleteForMe = useCallback(
     (messageId: string) => {
+      if (!beginPendingRemoval(messageId, 'delete')) return
       deleteForMe(messageId, {
         onSuccess: () => toast.success(t('chat.messageDeletedForMe')),
         onError: () => toast.error(t('chat.messageDeleteFailed')),
+        onSettled: () => endPendingRemoval(messageId),
       })
     },
-    [deleteForMe, t],
+    [deleteForMe, t, beginPendingRemoval, endPendingRemoval],
   )
 
   const handleForwardMessage = useCallback((message: ChatMessage) => {
@@ -1095,6 +1137,7 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
         onOpenStoryReply={onOpenStoryReply}
         highlighted={row.key === highlightedMessage}
         onRetryMessage={onRetryMessage}
+        pendingAction={pendingRemoval[row.group.messages[row.messageIndex].id]}
       />
     )
 
