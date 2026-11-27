@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -43,6 +43,25 @@ export function StoriesCreateView() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const [step, setStep] = useState<StoryStep>('choose')
+  const [draftText, setDraftText] = useState('')
+  const draftKey = user?.id ? `story-text-draft:${user.id}` : null
+  useEffect(() => {
+    try {
+      setDraftText(draftKey ? (localStorage.getItem(draftKey) ?? '') : '')
+    } catch {
+      setDraftText('')
+    }
+  }, [draftKey])
+  const changeDraft = (value: string) => {
+    setDraftText(value)
+    if (!draftKey) return
+    try {
+      if (value) localStorage.setItem(draftKey, value)
+      else localStorage.removeItem(draftKey)
+    } catch {
+      /* Editing remains available when storage is blocked. */
+    }
+  }
   const [viewingOwn, setViewingOwn] = useState<StoryEntry | null>(null)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [mediaControls, setMediaControls] = useState<HTMLDivElement | null>(null)
@@ -60,6 +79,7 @@ export function StoriesCreateView() {
     createText.mutate(payload, {
       onError: (error) => toast.error(error.message),
       onSuccess: () => {
+        changeDraft('')
         toast.success(t('chat.storyCreated'))
         backToStories()
       },
@@ -224,7 +244,12 @@ export function StoriesCreateView() {
           )}
           {step === 'text' && (
             <TextStoryEditor
-              onDiscard={() => setStep('choose')}
+              onDiscard={() => {
+                changeDraft('')
+                setStep('choose')
+              }}
+              text={draftText}
+              onTextChange={changeDraft}
               onShare={shareText}
               isSharing={createText.isPending}
             />
@@ -244,7 +269,12 @@ export function StoriesCreateView() {
       {step === 'text' && (
         <div className="fixed inset-x-0 bottom-16 top-0 z-40 overflow-y-auto bg-background md:hidden">
           <TextStoryEditor
-            onDiscard={() => setStep('choose')}
+            onDiscard={() => {
+              changeDraft('')
+              setStep('choose')
+            }}
+            text={draftText}
+            onTextChange={changeDraft}
             onShare={shareText}
             isSharing={createText.isPending}
           />
