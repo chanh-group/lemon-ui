@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/infrastructure/api/errors'
 import {
   CHAT_QUERY_KEYS,
+  UnresolvedMessageActionError,
   useDeleteMessageForMeMutation,
   useRevokeMessageMutation,
 } from './useMessages'
@@ -99,10 +100,10 @@ describe('destructive actions with uncertain network results', () => {
     expect(mocks.window).not.toHaveBeenCalled()
   })
 
-  it('reconciles a delete-for-me that already applied on the server despite a timeout', async () => {
+  it('treats MESSAGE_NOT_FOUND from the window endpoint as an already-applied delete-for-me', async () => {
     const { client, wrapper, timeline } = setup()
     mocks.deleteForMe.mockRejectedValue(new ApiError('NETWORK_ERROR', 0, 'timeout'))
-    mocks.window.mockResolvedValue({ items: [], hasMore: false })
+    mocks.window.mockRejectedValue(new ApiError('MESSAGE_NOT_FOUND', 404, 'not found'))
     const hook = renderHook(() => useDeleteMessageForMeMutation('c'), { wrapper })
 
     act(() => hook.result.current.mutate('m'))
@@ -112,5 +113,31 @@ describe('destructive actions with uncertain network results', () => {
     expect(client.getQueryData<MessageResponse[]>(CHAT_QUERY_KEYS.liveMessages('c'))).toHaveLength(
       0,
     )
+  })
+
+  it('preserves an unresolved outcome when revoke reconciliation also fails', async () => {
+    const { wrapper, timeline } = setup()
+    mocks.revoke.mockRejectedValue(new ApiError('NETWORK_ERROR', 0, 'timeout'))
+    mocks.window.mockRejectedValue(new ApiError('SERVER_ERROR', 503, 'unavailable'))
+    const hook = renderHook(() => useRevokeMessageMutation('c'), { wrapper })
+
+    act(() => hook.result.current.mutate('m'))
+    await waitFor(() => expect(hook.result.current.isError).toBe(true))
+
+    expect(hook.result.current.error).toBeInstanceOf(UnresolvedMessageActionError)
+    expect(timeline().pages[0].items[0]).toEqual(message)
+  })
+
+  it('preserves an unresolved outcome when delete reconciliation also fails', async () => {
+    const { wrapper, timeline } = setup()
+    mocks.deleteForMe.mockRejectedValue(new ApiError('NETWORK_ERROR', 0, 'timeout'))
+    mocks.window.mockRejectedValue(new ApiError('SERVER_ERROR', 503, 'unavailable'))
+    const hook = renderHook(() => useDeleteMessageForMeMutation('c'), { wrapper })
+
+    act(() => hook.result.current.mutate('m'))
+    await waitFor(() => expect(hook.result.current.isError).toBe(true))
+
+    expect(hook.result.current.error).toBeInstanceOf(UnresolvedMessageActionError)
+    expect(timeline().pages[0].items[0]).toEqual(message)
   })
 })

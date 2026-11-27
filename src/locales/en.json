@@ -519,6 +519,7 @@
     "revokeForEveryone": "Delete for everyone",
     "messageDeletedForMe": "Message deleted for you",
     "messageDeleteFailed": "Could not delete message",
+    "messageActionUncertain": "Could not confirm whether this message action completed. Check the conversation before retrying.",
     "deletingMessage": "Deleting for you…",
     "revokingMessage": "Deleting for everyone…",
     "forward": "Forward",

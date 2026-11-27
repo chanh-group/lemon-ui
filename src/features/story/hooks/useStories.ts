@@ -160,6 +160,7 @@ export function useUnlikeStory() {
 }
 
 export const STORY_SETTINGS_KEY = ['stories', 'settings'] as const
+const STORY_SETTINGS_MUTATION_KEY = ['stories', 'update-settings'] as const
 
 export function useStorySettings() {
   return useQuery({
@@ -171,6 +172,7 @@ export function useStorySettings() {
 export function useUpdateStorySettings() {
   const queryClient = useQueryClient()
   return useMutation({
+    mutationKey: STORY_SETTINGS_MUTATION_KEY,
     mutationFn: (payload: Partial<UserStorySettings>) => updateStorySettings(payload),
     // Toggle phải lật ngay: áp payload lên cache ở onMutate, chỉ hoàn tác các trường
     // của chính mutation khi lỗi để không đè thao tác toggle khác đang bay.
@@ -212,7 +214,11 @@ export function useUpdateStorySettings() {
         ) as Partial<UserStorySettings>
         return { ...old, ...applied }
       })
-      void queryClient.invalidateQueries({ queryKey: STORY_SETTINGS_KEY })
+    },
+    onSettled: () => {
+      if (queryClient.isMutating({ mutationKey: STORY_SETTINGS_MUTATION_KEY }) === 1) {
+        void queryClient.invalidateQueries({ queryKey: STORY_SETTINGS_KEY })
+      }
     },
   })
 }

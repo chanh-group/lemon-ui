@@ -16,7 +16,7 @@ import {
   resolveSendMessageKind,
   retryUncertainSend,
 } from '@/features/messaging/utils/messageSend'
-import { isUncertainApiError } from '@/infrastructure/api/errors'
+import { ApiError, isUncertainApiError } from '@/infrastructure/api/errors'
 import { queryKeys } from '@/infrastructure/query/keys'
 import {
   getConversationMessages,
@@ -48,6 +48,17 @@ import { MESSAGE_PAGE_SIZE } from '@/config/constants'
 
 export const CHAT_QUERY_KEYS = queryKeys.chat
 const MESSAGE_CACHE_TIME = 30 * 60_000
+
+export class UnresolvedMessageActionError extends Error {
+  constructor() {
+    super('Could not confirm whether the message action completed')
+    this.name = 'UnresolvedMessageActionError'
+  }
+}
+
+function isMessageNotFound(error: unknown): boolean {
+  return error instanceof ApiError && error.code === 'MESSAGE_NOT_FOUND'
+}
 /** Media archive coi dữ liệu là tươi trong 1 phút. */
 const MEDIA_ARCHIVE_STALE_MS = 60_000
 const MESSAGE_STALE_TIME = Infinity
@@ -724,14 +735,17 @@ export function useRevokeMessageMutation(conversationId: string | null) {
       } catch (error) {
         // Lỗi không xác định (timeout/mất kết nối): server có thể đã thu hồi rồi —
         // xem lại trạng thái thật trước khi kết luận thất bại (tránh tin "hiện lại" oan).
-        if (!isUncertainApiError(error) || !conversationId) throw error
+        if (!isUncertainApiError(error)) throw error
+        if (!conversationId) throw new UnresolvedMessageActionError()
+        let response
         try {
-          const response = await getMessageWindow(conversationId, messageId, 1)
-          const message = response.items.find((item) => item.id === messageId)
-          if (message?.deletedAt) return message
+          response = await getMessageWindow(conversationId, messageId, 1)
         } catch {
-          // Không reconcile được — giữ nguyên lỗi cũ.
+          throw new UnresolvedMessageActionError()
         }
+        const message = response.items.find((item) => item.id === messageId)
+        if (message?.deletedAt) return message
+        if (!message) throw new UnresolvedMessageActionError()
         throw error
       }
     },
@@ -846,15 +860,18 @@ export function useDeleteMessageForMeMutation(conversationId: string | null) {
       try {
         return await deleteMessageForMe(messageId)
       } catch (error) {
-        // Tương tự revoke: lỗi không xác định — nếu tin đã biến mất khỏi cửa sổ của
-        // mình thì server đã xóa, coi là thành công.
-        if (!isUncertainApiError(error) || !conversationId) throw error
+        // Tin đã ẩn sẽ không truy cập được qua window API (MESSAGE_NOT_FOUND).
+        // Các lần gọi DELETE /for-me khác thì idempotent, nên đây là trạng thái đã xóa.
+        if (!isUncertainApiError(error)) throw error
+        if (!conversationId) throw new UnresolvedMessageActionError()
+        let response
         try {
-          const response = await getMessageWindow(conversationId, messageId, 1)
-          if (!response.items.some((item) => item.id === messageId)) return
-        } catch {
-          // Không reconcile được — giữ nguyên lỗi cũ.
+          response = await getMessageWindow(conversationId, messageId, 1)
+        } catch (reconcileError) {
+          if (isMessageNotFound(reconcileError)) return
+          throw new UnresolvedMessageActionError()
         }
+        if (!response.items.some((item) => item.id === messageId)) return
         throw error
       }
     },

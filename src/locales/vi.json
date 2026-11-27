@@ -519,6 +519,7 @@
     "revokeForEveryone": "Thu hồi với mọi người",
     "messageDeletedForMe": "Đã xóa tin nhắn ở phía bạn",
     "messageDeleteFailed": "Không thể xóa tin nhắn",
+    "messageActionUncertain": "Không thể xác nhận thao tác với tin nhắn đã hoàn tất hay chưa. Hãy kiểm tra lại cuộc trò chuyện trước khi thử lại.",
     "deletingMessage": "Đang xóa ở phía bạn…",
     "revokingMessage": "Đang thu hồi…",
     "forward": "Chuyển tiếp",

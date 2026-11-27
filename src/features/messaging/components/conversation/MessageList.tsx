@@ -54,6 +54,7 @@ import { TEXT_STORY_BG } from '@/features/story/data/storiesData'
 import { MESSAGE_MAX_BODY_LENGTH } from '@/config/constants'
 import { getMessageLengthState } from '@/features/messaging/utils/messageLength'
 import {
+  UnresolvedMessageActionError,
   useReactMessageMutation,
   useRevokeMessageMutation,
   useEditMessageMutation,
@@ -902,8 +903,14 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
         onSuccess: () => {
           toast.success(t('chat.messageRevoked'))
         },
-        onError: () => {
-          toast.error(t('chat.messageRevokeFailed'))
+        onError: (error) => {
+          toast.error(
+            t(
+              error instanceof UnresolvedMessageActionError
+                ? 'chat.messageActionUncertain'
+                : 'chat.messageRevokeFailed',
+            ),
+          )
         },
         onSettled: () => {
           endPendingRemoval(messageId)
@@ -939,7 +946,14 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
       if (!beginPendingRemoval(messageId, 'delete')) return
       deleteForMe(messageId, {
         onSuccess: () => toast.success(t('chat.messageDeletedForMe')),
-        onError: () => toast.error(t('chat.messageDeleteFailed')),
+        onError: (error) =>
+          toast.error(
+            t(
+              error instanceof UnresolvedMessageActionError
+                ? 'chat.messageActionUncertain'
+                : 'chat.messageDeleteFailed',
+            ),
+          ),
         onSettled: () => endPendingRemoval(messageId),
       })
     },
