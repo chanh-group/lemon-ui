@@ -262,7 +262,6 @@ export function useDeleteStory() {
       await Promise.all([
         client.invalidateQueries({ queryKey: STORIES_KEY }),
         client.invalidateQueries({ queryKey: STORY_ARCHIVE_KEY }),
-        client.invalidateQueries({ queryKey: queryKeys.chat.storyStorage }),
       ])
     },
   })
