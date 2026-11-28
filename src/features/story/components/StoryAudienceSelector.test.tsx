@@ -35,4 +35,19 @@ describe('story audience selector', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: 'An' }))
     expect(change).toHaveBeenCalledWith('CUSTOM', ['u1'])
   })
+  it('disables all audience controls while a story is being shared', () => {
+    render(
+      <StoryAudienceSelector
+        mode="CUSTOM"
+        selected={['u1']}
+        friends={[{ id: 'u1', name: 'An', username: 'an' }]}
+        loading={false}
+        error={false}
+        disabled
+        onChange={vi.fn()}
+      />,
+    )
+    expect(screen.getByRole('combobox').closest('fieldset')?.disabled).toBe(true)
+    expect(screen.getByRole('checkbox', { name: 'An' }).closest('fieldset')?.disabled).toBe(true)
+  })
 })

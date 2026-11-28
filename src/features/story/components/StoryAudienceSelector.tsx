@@ -8,6 +8,7 @@ interface Props {
   friends: ChatUser[]
   loading: boolean
   error: boolean
+  disabled?: boolean
   onChange: (mode: StoryAudienceMode, selected: string[]) => void
 }
 
@@ -17,11 +18,12 @@ export function StoryAudienceSelector({
   friends,
   loading,
   error,
+  disabled = false,
   onChange,
 }: Props) {
   const { t } = useTranslation()
   return (
-    <fieldset className="space-y-2 border-b border-border p-4 text-sm">
+    <fieldset disabled={disabled} className="space-y-2 border-b border-border p-4 text-sm">
       <legend className="font-semibold">{t('chat.storyAudienceLabel')}</legend>
       <select
         aria-label={t('chat.storyAudienceLabel')}

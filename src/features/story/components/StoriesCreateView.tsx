@@ -67,6 +67,8 @@ export function StoriesCreateView() {
   }
   const [audienceMode, setAudienceMode] = useState<StoryAudienceMode>('ALL_FRIENDS')
   const [audienceIds, setAudienceIds] = useState<string[]>([])
+  const createText = useCreateTextStory()
+  const createMedia = useCreateMediaStory()
   const friends = useQuery({
     queryKey: ['story-audience-friends', user?.id],
     queryFn: getAllStoryAudienceFriends,
@@ -89,6 +91,7 @@ export function StoriesCreateView() {
       friends={friends.data ?? []}
       loading={friends.isLoading}
       error={friends.isError}
+      disabled={createText.isPending || createMedia.isPending}
       onChange={(mode, ids) => {
         setAudienceMode(mode)
         setAudienceIds(ids)
@@ -98,8 +101,6 @@ export function StoriesCreateView() {
   const [viewingOwn, setViewingOwn] = useState<StoryEntry | null>(null)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [mediaControls, setMediaControls] = useState<HTMLDivElement | null>(null)
-  const createText = useCreateTextStory()
-  const createMedia = useCreateMediaStory()
 
   const userName = user?.fullName ?? user?.username ?? 'Lemon User'
   const backToStories = () => navigate(ROUTES.messages, { state: { tab: 'stories' } })
