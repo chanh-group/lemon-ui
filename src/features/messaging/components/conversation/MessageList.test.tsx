@@ -1,7 +1,12 @@
 // @vitest-environment happy-dom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { MediaBubble, MessageReplyBubbleQuote, StoryReplyQuote } from './MessageList'
+import {
+  MediaBubble,
+  MessageReplyBubbleQuote,
+  MessageRowView,
+  StoryReplyQuote,
+} from './MessageList'
 import { useReplyTarget } from '@/features/messaging/hooks/useReplyTarget'
 import type { MessageReplyTarget } from '@/features/messaging/types/message.types'
 
@@ -29,6 +34,76 @@ const alivePreview = {
   background: null,
   mediaUrl: 'https://r2/s1.jpg',
 }
+
+describe('message action pending', () => {
+  it('keeps an already revoked message visible and hides actions while pending', () => {
+    render(
+      <MessageRowView
+        conversationId="c1"
+        group={{
+          fromMe: false,
+          messages: [
+            {
+              id: 'm2',
+              fromMe: false,
+              text: '',
+              kind: 'text',
+              time: '10:00',
+              createdAt: '2026-01-01',
+              deletedAt: '2026-01-02',
+            },
+          ],
+        }}
+        messageIndex={0}
+        senderLabel="User"
+        onOpenLightbox={vi.fn()}
+        onOpenDocument={vi.fn()}
+        onDeleteForMe={vi.fn()}
+        pendingAction="delete"
+      />,
+    )
+    expect(screen.getByText('chat.messageRevokedText')).toBeTruthy()
+    expect(
+      screen.getAllByRole('status').filter((node) => node.textContent === 'chat.deletingMessage'),
+    ).toHaveLength(1)
+    expect(screen.queryByRole('button', { name: 'chat.deleteMessage' })).toBeNull()
+  })
+
+  it('keeps the message visible and disables its actions while revoking', () => {
+    render(
+      <MessageRowView
+        conversationId="c1"
+        group={{
+          fromMe: true,
+          messages: [
+            {
+              id: 'm1',
+              fromMe: true,
+              text: 'Hello',
+              kind: 'text',
+              time: '10:00',
+              createdAt: '2026-01-01',
+            },
+          ],
+        }}
+        messageIndex={0}
+        senderLabel="User"
+        onOpenLightbox={vi.fn()}
+        onOpenDocument={vi.fn()}
+        onRevoke={vi.fn()}
+        onDeleteForMe={vi.fn()}
+        onReply={vi.fn()}
+        pendingAction="revoke"
+      />,
+    )
+    expect(screen.getByText('Hello')).toBeTruthy()
+    expect(
+      screen.getAllByRole('status').filter((node) => node.textContent === 'chat.revokingMessage'),
+    ).toHaveLength(1)
+    expect(screen.queryByRole('button', { name: 'Tùy chọn khác' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'chat.replyMessage' })).toBeNull()
+  })
+})
 
 describe('StoryReplyQuote', () => {
   it('shows the gone label and stays inert when the story preview is redacted', () => {

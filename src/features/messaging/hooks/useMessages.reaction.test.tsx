@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider, type InfiniteData } from '@tanstack/r
 import { act, renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { describe, expect, it, vi } from 'vitest'
+import { useAuthStore } from '@/infrastructure/auth/auth-store'
 import { applyRealtimeReaction, CHAT_QUERY_KEYS, useReactMessageMutation } from './useMessages'
 import type {
   MessageReactionItem,
@@ -123,6 +124,27 @@ describe('optimistic reactions', () => {
     await waitFor(() => expect(mocks.error).toHaveBeenCalled())
     expect(timeline()).toEqual([reaction('👍', 'other', 'another')])
     expect(live()).toEqual(timeline())
+  })
+
+  it('does not dispatch queued reactions or write cache after a new session', async () => {
+    useAuthStore.getState().setAccessToken('old-session')
+    const { client, hook, live } = setup()
+    const first = deferred<{ messageId: string; reactions: MessageReactionItem[] }>()
+    mocks.react.mockReturnValue(first.promise)
+    act(() => {
+      hook.result.current.mutate({ messageId: 'm', emoji: '❤️' })
+      hook.result.current.mutate({ messageId: 'm', emoji: '👍' })
+    })
+    await waitFor(() => expect(mocks.react).toHaveBeenCalledTimes(1))
+    useAuthStore.getState().setAccessToken('new-session')
+    const newer = { ...message, reactions: [reaction('🔥', 'new-user')] }
+    client.setQueryData(CHAT_QUERY_KEYS.liveMessages('c'), [newer])
+    await act(async () => first.resolve({ messageId: 'm', reactions: [reaction('❤️', 'me')] }))
+    await waitFor(() => expect(hook.result.current.isError).toBe(true))
+    expect(mocks.react).toHaveBeenCalledTimes(1)
+    expect(live()).toEqual(newer.reactions)
+    expect(mocks.window).not.toHaveBeenCalled()
+    expect(mocks.error).not.toHaveBeenCalled()
   })
 
   it('toggles off and reconciles a later click after an earlier failure', async () => {

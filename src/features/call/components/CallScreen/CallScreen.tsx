@@ -9,7 +9,7 @@ import { useAuth } from '@/features/auth/api'
 import { useConversationQuery } from '@/features/conversation/hooks/useConversations'
 import { getChatSocket } from '@/lib/socket'
 import { cn } from '@/lib/utils'
-import { callApi, sendBeaconCallTermination } from '../../api/call.api'
+import { callApi, isBenignCallStateError, sendBeaconCallTermination } from '../../api/call.api'
 import { useLiveKitCall } from '../../hooks/useLiveKitCall'
 import { playConnectedTone, playHangupTone, playOutgoingDialingSound } from '../../utils/callSounds'
 import type {
@@ -614,10 +614,21 @@ export function CallScreen({
 
     const callId = activeCall?.id
     if (callId) {
+      const reportError = (error: unknown) => {
+        if (!isBenignCallStateError(error)) toast.error(t('common.error'))
+      }
       if (phase === 'ringing') {
-        void callApi.cancelCall(callId)
+        void callApi.cancelCall(callId).catch((error: unknown) => {
+          if (isBenignCallStateError(error)) {
+            // Cancel hụt vì callee vừa accept (hoặc call đã terminal) — endCall
+            // idempotent, dọn được cả hai case, tránh call ma phía người nhận.
+            void callApi.endCall(callId, 'NORMAL').catch(reportError)
+          } else {
+            reportError(error)
+          }
+        })
       } else {
-        void callApi.endCall(callId, 'NORMAL')
+        void callApi.endCall(callId, 'NORMAL').catch(reportError)
       }
     }
 
@@ -635,7 +646,9 @@ export function CallScreen({
 
     const callId = activeCall?.id || searchParams.get('callId')
     if (callId) {
-      void callApi.rejectCall(callId)
+      void callApi.rejectCall(callId).catch((error: unknown) => {
+        if (!isBenignCallStateError(error)) toast.error(t('common.error'))
+      })
     }
 
     livekit.disconnect()

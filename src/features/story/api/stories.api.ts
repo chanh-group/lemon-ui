@@ -35,11 +35,13 @@ export interface BackendStoryResponse {
   background?: string | null
   createdAt: string
   expiresAt: string
-  user: BackendStoryUser
+  user?: BackendStoryUser
   viewsCount?: number
   reactionsCount?: number
   viewerReaction?: string | null
+  myReaction?: string | null
   viewerHasViewed?: boolean
+  hasViewed?: boolean
   reactionsSummary?: BackendStoryReactionSummary[]
   allowReplies?: boolean
   allowReactions?: boolean
@@ -115,7 +117,7 @@ export function mapBackendStoryToEntry(
     name: item.user?.fullName || item.caption?.slice(0, 18) || 'Story',
     time: formatRelativeTime(item.createdAt),
     createdAt: item.createdAt,
-    viewed: Boolean(item.viewerHasViewed),
+    viewed: Boolean(item.viewerHasViewed ?? item.hasViewed),
     mine: isMine,
     online: true,
     authorId: item.userId,
@@ -132,8 +134,8 @@ export function mapBackendStoryToEntry(
     background: item.background,
     viewsCount: item.viewsCount ?? 0,
     reactionsCount: item.reactionsCount ?? 0,
-    viewerReaction: item.viewerReaction ?? null,
-    viewerHasViewed: item.viewerHasViewed ?? false,
+    viewerReaction: item.viewerReaction ?? item.myReaction ?? null,
+    viewerHasViewed: item.viewerHasViewed ?? item.hasViewed ?? false,
     reactionsSummary: item.reactionsSummary,
     allowReplies: item.allowReplies ?? true,
     allowReactions: item.allowReactions ?? true,
@@ -154,6 +156,7 @@ export interface CreateMediaStoryPayload {
   allowReactions?: boolean
   audienceMode?: 'ALL_FRIENDS' | 'CUSTOM' | 'EXCLUDE'
   audienceUserIds?: string[]
+  onProgress?: (percent: number | null) => void
 }
 
 export interface CreateTextStoryPayload {
@@ -297,10 +300,18 @@ export async function createMediaStory(payload: CreateMediaStoryPayload): Promis
     fileName: payload.file.name,
   })
   let objectKey = signed.objectKey
+  payload.onProgress?.(null)
   try {
-    await uploadBinaryToUrl(signed.uploadUrl, payload.file, payload.file.type)
+    await uploadBinaryToUrl(signed.uploadUrl, payload.file, payload.file.type, payload.onProgress)
   } catch {
-    const uploaded = await uploadFileViaBackend(payload.file, kind, undefined, payload.file.name)
+    payload.onProgress?.(null)
+    const uploaded = await uploadFileViaBackend(
+      payload.file,
+      kind,
+      undefined,
+      payload.file.name,
+      payload.onProgress,
+    )
     objectKey = uploaded.objectKey
   }
   const res = await api.post<BackendStoryResponse>('/stories', {

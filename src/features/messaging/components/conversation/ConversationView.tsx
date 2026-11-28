@@ -45,6 +45,7 @@ interface ConversationViewProps {
     pendingFiles?: PendingFile[],
     replyToId?: string | null,
     clientMsgId?: string,
+    onUploadProgress?: (percent: number | null) => void,
   ) => Promise<boolean>
   isSending: boolean
   onBack?: () => void
@@ -305,6 +306,7 @@ export function ConversationView({
     pendingFiles?: PendingFile[],
     replyToId?: string | null,
     clientMsgId?: string,
+    onUploadProgress?: (percent: number | null) => void,
   ) => {
     if (
       (!text &&
@@ -313,7 +315,14 @@ export function ConversationView({
       isSending
     )
       return false
-    const sent = await onSend(text, attachments, pendingFiles, replyToId ?? null, clientMsgId)
+    const sent = await onSend(
+      text,
+      attachments,
+      pendingFiles,
+      replyToId ?? null,
+      clientMsgId,
+      onUploadProgress,
+    )
     if (!sent) return false
     clearConversationDraft(conversation.id)
     setReplyingTo(null)

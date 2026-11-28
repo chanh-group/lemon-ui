@@ -11,7 +11,7 @@ import { toast } from 'sonner'
 import { useTranslation } from 'react-i18next'
 import { getChatSocket } from '@/lib/socket'
 import { useAuth } from '@/features/auth/api'
-import { callApi, sendBeaconCallTermination } from '../api/call.api'
+import { callApi, isBenignCallStateError, sendBeaconCallTermination } from '../api/call.api'
 import { playIncomingRingtone } from '../utils/callSounds'
 import { openCallWindow } from '../utils/callWindow'
 import {
@@ -324,9 +324,10 @@ export function CallProvider({ children }: { children: ReactNode }) {
         await callApi.rejectCall(callId, reason)
       } catch (err) {
         console.warn('Reject call error:', err)
+        if (!isBenignCallStateError(err)) toast.error(t('common.error'))
       }
     },
-    [dismissIncomingCall, incomingCall],
+    [dismissIncomingCall, incomingCall, t],
   )
 
   return (

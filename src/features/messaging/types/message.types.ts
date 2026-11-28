@@ -138,6 +138,7 @@ export interface SendMessageArg {
   replyToId?: string | null
   targetConversationId?: string
   clientMsgId?: string
+  onUploadProgress?: (percent: number | null) => void
 }
 
 export interface SendMessageDto {

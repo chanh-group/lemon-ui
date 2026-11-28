@@ -12,6 +12,7 @@ import {
   type SocketConnectionStatus,
 } from '@/lib/socket'
 import {
+  applyConfirmedRead,
   applyRealtimeReaction,
   CHAT_QUERY_KEYS,
   type MessagePageParam,
@@ -33,6 +34,7 @@ import type { ConversationResponse } from '@/features/conversation/types/convers
 import { queryKeys } from '@/infrastructure/query/keys'
 import { ROUTES } from '@/config/constants'
 import { ApiError } from '@/infrastructure/api/errors'
+import { useAuthStore } from '@/infrastructure/auth/auth-store'
 
 const TYPING_STALE_TIMEOUT_MS = 4_500
 const SYNC_MISSED_MESSAGES_FRESH_MS = 60_000
@@ -146,6 +148,12 @@ export function useChatRealtime(activeConversationId: string | null) {
   const inFlightSyncRequests = useRef(new Map<string, Promise<void>>())
   const lastSyncedMap = useRef(new Map<string, number>())
   const revokedConversationIds = useRef(new Set<string>())
+  const readCursors = useRef({
+    generation: useAuthStore.getState().generation,
+    // createdAt = vị trí timeline của message con trỏ (resolve từ cache local);
+    // readAt chỉ dùng để xếp thứ tự sự kiện, không dùng để phân loại tin đã đọc.
+    cursors: new Map<string, { id: string; createdAt: number | null; readAt: number }>(),
+  })
   const [conversationAccess, setConversationAccess] = useState<
     'verifying' | 'allowed' | 'revoked' | 'retryable-error'
   >(activeConversationId ? 'verifying' : 'allowed')
@@ -189,6 +197,62 @@ export function useChatRealtime(activeConversationId: string | null) {
         conversationsInvalidateTimer.current = null
         void queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.conversations })
       }, CONVERSATIONS_INVALIDATION_DELAY_MS)
+    }
+    const currentReadCursors = () => {
+      const generation = useAuthStore.getState().generation
+      if (readCursors.current.generation !== generation) {
+        readCursors.current = { generation, cursors: new Map() }
+      }
+      return readCursors.current.cursors
+    }
+    // Vị trí timeline của message con trỏ lấy từ cache local — cùng ngữ nghĩa với
+    // watermark `received_at <= received_at(message con trỏ)` của Signal Desktop:
+    // "đã đọc" chốt theo vị trí trên timeline, không theo wall-clock lúc người dùng đọc.
+    const findCachedMessageCreatedAt = (
+      conversationId: string,
+      messageId: string,
+    ): number | null => {
+      const conversations = queryClient.getQueryData<ConversationResponse[]>(
+        CHAT_QUERY_KEYS.conversations,
+      )
+      const lastMessage = conversations?.find(
+        (item) => item.id === conversationId,
+      )?.lastMessageDetail
+      const pages = queryClient.getQueryData<
+        InfiniteData<MessageTimelineResponse, MessagePageParam>
+      >(CHAT_QUERY_KEYS.messages(conversationId))
+      const live = queryClient.getQueryData<MessageResponse[]>(
+        CHAT_QUERY_KEYS.liveMessages(conversationId),
+      )
+      const found =
+        (lastMessage?.id === messageId ? lastMessage : undefined) ??
+        pages?.pages.flatMap((page) => page.items).find((item) => item.id === messageId) ??
+        live?.find((item) => item.id === messageId)
+      const createdAt = found ? Date.parse(found.createdAt) : NaN
+      return Number.isNaN(createdAt) ? null : createdAt
+    }
+    const isReadByCursor = (conversationId: string, message: MessageResponse) => {
+      const cursor = currentReadCursors().get(conversationId)
+      if (!cursor) return false
+      if (cursor.id === message.id) return true
+      const createdAt = Date.parse(message.createdAt)
+      if (Number.isNaN(createdAt)) return false
+      if (cursor.createdAt === null) {
+        // Message con trỏ chưa có trong cache lúc nhận event — resolve lại khi
+        // cần phân loại (replay thường kéo chính message đó về cache).
+        cursor.createdAt = findCachedMessageCreatedAt(conversationId, cursor.id)
+      }
+      if (cursor.createdAt !== null) {
+        // Đúng thứ tự timeline (createdAt, id) của backend: tin đứng trước hoặc
+        // tại con trỏ đã được đọc; tin đứng sau con trỏ thì chưa, kể cả khi nó
+        // được tạo trước thời điểm mark-read bị xử lý.
+        return (
+          createdAt < cursor.createdAt ||
+          (createdAt === cursor.createdAt && message.id <= cursor.id)
+        )
+      }
+      // Không resolve được vị trí con trỏ → xấp xỉ bằng readAt (xem MUTATION_AUDIT_45).
+      return createdAt <= cursor.readAt
     }
     const refreshInbox = () => {
       if (refreshedInboxOnConnection.current) return
@@ -470,6 +534,7 @@ export function useChatRealtime(activeConversationId: string | null) {
     const handleNewMessage = (msg: MessageResponse) => {
       const convId = msg.conversationId
       if (revokedConversationIds.current.has(convId)) return
+      const alreadyRead = isReadByCursor(convId, msg)
       if (msg.senderId !== userIdRef.current) removeTypingMember(convId, msg.senderId)
 
       const sameMessage = (message: MessageResponse) =>
@@ -524,7 +589,7 @@ export function useChatRealtime(activeConversationId: string | null) {
             return {
               ...updateConversationLastMessage(conversation, msg),
               unreadCount:
-                msg.senderId === userIdRef.current || knownBefore
+                msg.senderId === userIdRef.current || knownBefore || alreadyRead
                   ? conversation.unreadCount
                   : (conversation.unreadCount || 0) + 1,
             }
@@ -552,7 +617,7 @@ export function useChatRealtime(activeConversationId: string | null) {
             pages: old.pages.map((page) => ({
               ...page,
               items: page.items.map((m) =>
-                m.id === updated.id
+                m.id === updated.id && !m.deletedAt
                   ? { ...m, body: updated.body, editedAt: updated.editedAt }
                   : m.replyTarget?.id === updated.id && !m.replyTarget.deletedAt
                     ? { ...m, replyTarget: { ...m.replyTarget, body: updated.body } }
@@ -566,7 +631,7 @@ export function useChatRealtime(activeConversationId: string | null) {
         CHAT_QUERY_KEYS.liveMessages(updated.conversationId),
         (old) =>
           old?.map((message) =>
-            message.id === updated.id
+            message.id === updated.id && !message.deletedAt
               ? { ...message, body: updated.body, editedAt: updated.editedAt }
               : message.replyTarget?.id === updated.id && !message.replyTarget.deletedAt
                 ? { ...message, replyTarget: { ...message.replyTarget, body: updated.body } }
@@ -699,15 +764,37 @@ export function useChatRealtime(activeConversationId: string | null) {
     }
 
     const handleReadUpdated = (event: ReadUpdatedPayload) => {
-      if (event.userId === userIdRef.current) {
-        queryClient.setQueryData<ConversationResponse[]>(CHAT_QUERY_KEYS.conversations, (current) =>
-          current?.map((conversation) =>
-            conversation.id === event.conversationId
-              ? { ...conversation, unreadCount: 0 }
-              : conversation,
-          ),
-        )
+      if (event.userId !== userIdRef.current) return
+      const cursors = currentReadCursors()
+      const readAt = Date.parse(event.readAt)
+      const current = cursors.get(event.conversationId)
+      const nextCreatedAt = findCachedMessageCreatedAt(
+        event.conversationId,
+        event.lastReadMessageId,
+      )
+      if (current) {
+        const currentCreatedAt =
+          current.createdAt ?? findCachedMessageCreatedAt(event.conversationId, current.id)
+        if (nextCreatedAt !== null && currentCreatedAt !== null) {
+          // Ưu tiên vị trí timeline: updateLastRead phía server no-op khi mark-read
+          // ngược (scroll ngược) nhưng vẫn emit event với readAt mới — không được
+          // để event không làm cursor tiến lên đánh lùi cursor (Signal: "never go backwards").
+          if (
+            nextCreatedAt < currentCreatedAt ||
+            (nextCreatedAt === currentCreatedAt && event.lastReadMessageId <= current.id)
+          )
+            return
+        } else if (!Number.isNaN(readAt) && readAt <= current.readAt) {
+          // Không có vị trí để so → xếp thứ tự theo thời điểm sự kiện.
+          return
+        }
       }
+      cursors.set(event.conversationId, {
+        id: event.lastReadMessageId,
+        createdAt: nextCreatedAt,
+        readAt: Number.isNaN(readAt) ? (current?.readAt ?? 0) : readAt,
+      })
+      applyConfirmedRead(queryClient, event.conversationId, event.lastReadMessageId)
     }
 
     const handleConversationChanged = (event: { conversationId?: string }) => {

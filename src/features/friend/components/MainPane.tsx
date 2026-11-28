@@ -39,7 +39,19 @@ export function MainPane({
   const friendsQuery = useFriends()
   const conversationsQuery = useConversationsQuery()
   const createDirectChat = useCreateDirectChatMutation()
+  const [openingUserId, setOpeningUserId] = useState<string | null>(null)
+  const openingUserRef = useRef<string | null>(null)
+  const requestGeneration = useRef(0)
+  const mounted = useRef(false)
   const incoming = requests?.incoming ?? []
+
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+      requestGeneration.current += 1
+    }
+  }, [])
 
   const q = query.trim().toLowerCase()
   const friends = useMemo(
@@ -63,6 +75,7 @@ export function MainPane({
   )
 
   const openMessages = (selectId?: string) => {
+    requestGeneration.current += 1
     if (selectId) {
       navigate(conversationPath(selectId))
       return
@@ -70,11 +83,21 @@ export function MainPane({
     navigate(ROUTES.messages, { state: { tab: 'messages' } })
   }
 
-  const openConversationWith = (friendId: string) => {
-    createDirectChat.mutate(friendId, {
-      onSuccess: (conversation) => openMessages(conversation.id),
-      onError: (error) => toast.error(error instanceof Error ? error.message : t('common.error')),
-    })
+  const openConversationWith = async (friendId: string) => {
+    if (openingUserRef.current) return
+    openingUserRef.current = friendId
+    setOpeningUserId(friendId)
+    const generation = ++requestGeneration.current
+    try {
+      const conversation = await createDirectChat.mutateAsync(friendId)
+      if (generation === requestGeneration.current) openMessages(conversation.id)
+    } catch (error) {
+      if (generation === requestGeneration.current)
+        toast.error(error instanceof Error ? error.message : t('common.error'))
+    } finally {
+      openingUserRef.current = null
+      if (mounted.current) setOpeningUserId(null)
+    }
   }
 
   const prefetchTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
@@ -197,8 +220,10 @@ export function MainPane({
                 {/* div role=button vì bên trong có nút menu 3 chấm (không được lồng button trong button) */}
                 <div
                   role="button"
-                  tabIndex={0}
-                  onClick={() => openConversationWith(friend.id)}
+                  tabIndex={openingUserId ? -1 : 0}
+                  aria-disabled={Boolean(openingUserId)}
+                  aria-busy={openingUserId === friend.id}
+                  onClick={() => void openConversationWith(friend.id)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault()
@@ -216,6 +241,11 @@ export function MainPane({
                       @{friend.username}
                     </span>
                   </span>
+                  {openingUserId === friend.id && (
+                    <span role="status" className="text-xs text-muted-foreground">
+                      {t('common.loading')}
+                    </span>
+                  )}
                   <FriendRowMenu
                     id={friend.id}
                     name={friend.name}

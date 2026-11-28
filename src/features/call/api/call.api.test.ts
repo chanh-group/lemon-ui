@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { api } from '@/infrastructure/api/client'
-import { callApi, sendBeaconCallTermination } from './call.api'
+import { ApiError } from '@/infrastructure/api/errors'
+import { callApi, isBenignCallStateError, sendBeaconCallTermination } from './call.api'
 
 vi.mock('@/infrastructure/api/client', () => ({
   API_BASE_URL: 'http://localhost:3000/api',
@@ -162,5 +163,14 @@ describe('callApi', () => {
       },
       body: JSON.stringify({ reason: 'CALLEE_OFFLINE' }),
     })
+  })
+})
+
+describe('isBenignCallStateError', () => {
+  it('treats a terminal call state as benign and real failures as reportable', () => {
+    expect(isBenignCallStateError(new ApiError('CALL_INVALID_STATE', 409, 'state'))).toBe(true)
+    expect(isBenignCallStateError(new ApiError('CALL_NOT_FOUND', 404, 'missing'))).toBe(true)
+    expect(isBenignCallStateError(new ApiError('INTERNAL', 500, 'boom'))).toBe(false)
+    expect(isBenignCallStateError(new Error('offline'))).toBe(false)
   })
 })

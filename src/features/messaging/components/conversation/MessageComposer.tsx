@@ -62,6 +62,7 @@ interface MessageComposerProps {
     pendingFiles?: PendingFile[],
     replyToId?: string | null,
     clientMsgId?: string,
+    onUploadProgress?: (percent: number | null) => void,
   ) => boolean | void | Promise<boolean | void>
   replyToId?: string
   disabled?: boolean
@@ -98,6 +99,7 @@ export function MessageComposer({
   const [isRecording, setIsRecording] = useState(false)
   const [recordingSeconds, setRecordingSeconds] = useState(0)
   const [isUploadingAttachment, setIsUploadingAttachment] = useState(false)
+  const [attachmentProgress, setAttachmentProgress] = useState<number | null>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -217,7 +219,14 @@ export function MessageComposer({
         previewUrl,
         durationMs,
       }
-      const sent = await onSubmit('', undefined, [pendingFile], null, clientMsgId)
+      const sent = await onSubmit(
+        '',
+        undefined,
+        [pendingFile],
+        null,
+        clientMsgId,
+        setAttachmentProgress,
+      )
       if (sent === false) {
         setPendingFiles((prev) => [...prev, pendingFile])
         return
@@ -342,6 +351,7 @@ export function MessageComposer({
     const sentIds = new Set(filesToSend.map((file) => file.id))
     setPendingFiles((current) => current.filter((file) => !sentIds.has(file.id)))
     setIsUploadingAttachment(filesToSend.length > 0)
+    setAttachmentProgress(null)
     draftRef.current = ''
     setDraft('')
     setConversationDraft(conversationId, '')
@@ -353,6 +363,7 @@ export function MessageComposer({
         filesToSend.length > 0 ? filesToSend : undefined,
         replyToId,
         clientMsgId,
+        setAttachmentProgress,
       )
 
       if (submitted !== false) {
@@ -373,6 +384,7 @@ export function MessageComposer({
       // Failed attempts remain on the message timeline row where user can retry
     } finally {
       setIsUploadingAttachment(false)
+      setAttachmentProgress(null)
       submittingRef.current = false
     }
   }
@@ -428,9 +440,16 @@ export function MessageComposer({
         </div>
       )}
       {isUploadingAttachment && (
-        <p className="mb-2 px-1 text-xs text-muted-foreground" role="status" aria-live="polite">
+        <div className="mb-2 px-1 text-xs text-muted-foreground" role="status" aria-live="polite">
           {t('chat.uploadingFiles')}
-        </p>
+          {attachmentProgress !== null && ` ${attachmentProgress}%`}
+          <progress
+            className="block w-full"
+            max={100}
+            value={attachmentProgress ?? undefined}
+            aria-label={t('chat.uploadingFiles')}
+          />
+        </div>
       )}
 
       {/* Hidden File Input */}

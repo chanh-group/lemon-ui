@@ -4,6 +4,7 @@ import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/infrastructure/api/errors'
+import { useAuthStore } from '@/infrastructure/auth/auth-store'
 import { queryKeys } from '@/infrastructure/query/keys'
 import type { MessageResponse } from '@/features/messaging/types/message.types'
 import { CHAT_QUERY_KEYS } from './useMessages'
@@ -233,7 +234,13 @@ describe('useChatRealtime reconnect access', () => {
   })
 
   it('deduplicates an in-flight missed-message sync and updates read state locally', async () => {
-    const friend1 = { id: 'friend-1', kind: 'DIRECT', isGroup: false, unreadCount: 2 }
+    const friend1 = {
+      id: 'friend-1',
+      kind: 'DIRECT',
+      isGroup: false,
+      unreadCount: 2,
+      lastMessageDetail: { id: 'm-1' },
+    }
     const friend2 = { id: 'friend-2', kind: 'DIRECT', isGroup: false, unreadCount: 1 }
     queryClient.setQueryData(CHAT_QUERY_KEYS.conversations, [friend1, friend2])
     queryClient.setQueryData(CHAT_QUERY_KEYS.messages(friend1.id), {
@@ -271,6 +278,362 @@ describe('useChatRealtime reconnect access', () => {
     })
 
     await act(async () => resolveMissed([]))
+  })
+
+  it('does not clear newer unread messages when an older read event arrives', () => {
+    const conversation = {
+      id: 'friend-1',
+      kind: 'DIRECT',
+      unreadCount: 2,
+      lastMessageDetail: { id: 'new-message' },
+    }
+    queryClient.setQueryData(CHAT_QUERY_KEYS.conversations, [conversation])
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries')
+    renderHook(() => useChatRealtime(conversation.id), { wrapper })
+
+    act(() => {
+      socket.emit('read:updated', {
+        conversationId: conversation.id,
+        userId: 'viewer',
+        lastReadMessageId: 'old-message',
+        readAt: '2026-11-20T00:00:00.000Z',
+      })
+    })
+
+    expect(queryClient.getQueryData(CHAT_QUERY_KEYS.conversations)).toEqual([conversation])
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: CHAT_QUERY_KEYS.conversations })
+  })
+
+  it('does not count a delayed message as unread after its read event', () => {
+    const conversation = {
+      id: 'friend-1',
+      kind: 'DIRECT',
+      unreadCount: 0,
+      lastMessageDetail: { id: 'previous-message' },
+    }
+    queryClient.setQueryData(CHAT_QUERY_KEYS.conversations, [conversation])
+    renderHook(() => useChatRealtime(conversation.id), { wrapper })
+
+    act(() => {
+      socket.emit('read:updated', {
+        conversationId: conversation.id,
+        userId: 'viewer',
+        lastReadMessageId: 'new-message',
+        readAt: '2026-11-20T00:00:01.000Z',
+      })
+      socket.emit('message:new', {
+        id: 'new-message',
+        conversationId: conversation.id,
+        senderId: 'friend',
+        kind: 'TEXT',
+        body: 'Already read',
+        createdAt: '2026-11-20T00:00:00.000Z',
+      })
+    })
+
+    expect(
+      queryClient.getQueryData<(typeof conversation)[]>(CHAT_QUERY_KEYS.conversations)?.[0]
+        .unreadCount,
+    ).toBe(0)
+  })
+
+  it('counts a newer unread message locally after an older read event', () => {
+    const conversation = { id: 'friend-1', kind: 'DIRECT', unreadCount: 0 }
+    queryClient.setQueryData(CHAT_QUERY_KEYS.conversations, [conversation])
+    renderHook(() => useChatRealtime(conversation.id), { wrapper })
+    act(() => {
+      socket.emit('read:updated', {
+        conversationId: conversation.id,
+        userId: 'viewer',
+        lastReadMessageId: 'old-cursor-unique',
+        readAt: '2026-11-20T00:00:00.000Z',
+      })
+    })
+    act(() => {
+      socket.emit('message:new', {
+        id: 'new-message-after-read-unique',
+        conversationId: conversation.id,
+        senderId: 'friend',
+        kind: 'TEXT',
+        body: 'New',
+        createdAt: '2026-11-20T00:00:01.000Z',
+      })
+    })
+    expect(
+      queryClient.getQueryData<(typeof conversation)[]>(CHAT_QUERY_KEYS.conversations)?.[0]
+        .unreadCount,
+    ).toBe(1)
+  })
+
+  it('does not count a late message that predates the read cursor', () => {
+    const conversation = { id: 'late-1', kind: 'DIRECT', unreadCount: 0 }
+    queryClient.setQueryData(CHAT_QUERY_KEYS.conversations, [conversation])
+    renderHook(() => useChatRealtime(conversation.id), { wrapper })
+
+    act(() =>
+      socket.emit('read:updated', {
+        conversationId: conversation.id,
+        userId: 'viewer',
+        lastReadMessageId: 'late-cursor-m2',
+        readAt: '2026-11-20T00:01:00.000Z',
+      }),
+    )
+    act(() =>
+      socket.emit('message:new', {
+        id: 'late-message-unique',
+        conversationId: conversation.id,
+        senderId: 'friend',
+        kind: 'TEXT',
+        body: 'Late',
+        createdAt: '2026-11-20T00:00:30.000Z',
+      }),
+    )
+    expect(
+      queryClient.getQueryData<(typeof conversation)[]>(CHAT_QUERY_KEYS.conversations)?.[0]
+        .unreadCount,
+    ).toBe(0)
+  })
+
+  it('does not move the read cursor backwards on an older event', () => {
+    const conversation = { id: 'late-2', kind: 'DIRECT', unreadCount: 0 }
+    queryClient.setQueryData(CHAT_QUERY_KEYS.conversations, [conversation])
+    renderHook(() => useChatRealtime(conversation.id), { wrapper })
+
+    act(() =>
+      socket.emit('read:updated', {
+        conversationId: conversation.id,
+        userId: 'viewer',
+        lastReadMessageId: 'new-cursor',
+        readAt: '2026-11-20T00:02:00.000Z',
+      }),
+    )
+    act(() =>
+      socket.emit('read:updated', {
+        conversationId: conversation.id,
+        userId: 'viewer',
+        lastReadMessageId: 'old-cursor',
+        readAt: '2026-11-20T00:01:00.000Z',
+      }),
+    )
+    act(() =>
+      socket.emit('message:new', {
+        id: 'after-new-cursor-unique',
+        conversationId: conversation.id,
+        senderId: 'friend',
+        kind: 'TEXT',
+        body: 'Already read',
+        createdAt: '2026-11-20T00:01:30.000Z',
+      }),
+    )
+    expect(
+      queryClient.getQueryData<(typeof conversation)[]>(CHAT_QUERY_KEYS.conversations)?.[0]
+        .unreadCount,
+    ).toBe(0)
+  })
+
+  it('classifies a late message by the cursor message position, not the read wall-clock', () => {
+    const conversation = {
+      id: 'late-3',
+      kind: 'DIRECT',
+      unreadCount: 0,
+      lastMessageDetail: {
+        id: 'cursor-message',
+        conversationId: 'late-3',
+        senderId: 'friend',
+        kind: 'TEXT',
+        body: 'Cursor',
+        createdAt: '2026-11-20T00:01:00.000Z',
+      },
+    }
+    queryClient.setQueryData(CHAT_QUERY_KEYS.conversations, [conversation])
+    renderHook(() => useChatRealtime(conversation.id), { wrapper })
+
+    act(() =>
+      socket.emit('read:updated', {
+        conversationId: conversation.id,
+        userId: 'viewer',
+        lastReadMessageId: 'cursor-message',
+        readAt: '2026-11-20T00:02:00.000Z',
+      }),
+    )
+    const unreadCount = () =>
+      queryClient.getQueryData<(typeof conversation)[]>(CHAT_QUERY_KEYS.conversations)?.[0]
+        .unreadCount
+    // Trước vị trí con trỏ trên timeline → đã đọc, dù đến trễ.
+    act(() =>
+      socket.emit('message:new', {
+        id: 'late-before-cursor-unique',
+        conversationId: conversation.id,
+        senderId: 'friend',
+        kind: 'TEXT',
+        body: 'Old',
+        createdAt: '2026-11-20T00:00:30.000Z',
+      }),
+    )
+    expect(unreadCount()).toBe(0)
+    // Sau vị trí con trỏ nhưng được tạo trước thời điểm mark-read (00:02:00)
+    // → CHƯA đọc, phải đếm.
+    act(() =>
+      socket.emit('message:new', {
+        id: 'late-after-cursor-unique',
+        conversationId: conversation.id,
+        senderId: 'friend',
+        kind: 'TEXT',
+        body: 'New',
+        createdAt: '2026-11-20T00:01:30.000Z',
+      }),
+    )
+    expect(unreadCount()).toBe(1)
+  })
+
+  it('does not regress the cursor when a backward mark-read event carries a newer timestamp', () => {
+    const conversation = { id: 'late-4', kind: 'DIRECT', unreadCount: 0 }
+    queryClient.setQueryData(CHAT_QUERY_KEYS.conversations, [conversation])
+    queryClient.setQueryData(CHAT_QUERY_KEYS.messages(conversation.id), {
+      pages: [
+        {
+          items: [
+            {
+              id: 'm-old',
+              conversationId: conversation.id,
+              senderId: 'friend',
+              kind: 'TEXT',
+              body: 'old',
+              createdAt: '2026-11-20T00:00:10.000Z',
+            },
+            {
+              id: 'm-new',
+              conversationId: conversation.id,
+              senderId: 'friend',
+              kind: 'TEXT',
+              body: 'new',
+              createdAt: '2026-11-20T00:01:00.000Z',
+            },
+          ],
+          hasMore: false,
+        },
+      ],
+      pageParams: [{}],
+    })
+    renderHook(() => useChatRealtime(conversation.id), { wrapper })
+
+    act(() =>
+      socket.emit('read:updated', {
+        conversationId: conversation.id,
+        userId: 'viewer',
+        lastReadMessageId: 'm-new',
+        readAt: '2026-11-20T00:02:00.000Z',
+      }),
+    )
+    // Scroll ngược: mark-read chuỗi cũ — server no-op nhưng vẫn emit event với
+    // readAt MỚI HƠN; cursor không được lùi về m-old.
+    act(() =>
+      socket.emit('read:updated', {
+        conversationId: conversation.id,
+        userId: 'viewer',
+        lastReadMessageId: 'm-old',
+        readAt: '2026-11-20T00:03:00.000Z',
+      }),
+    )
+    // Tin nằm giữa hai cursor, đã được đọc — không được đếm lại vì cursor lùi.
+    act(() =>
+      socket.emit('message:new', {
+        id: 'm-late-between-cursors',
+        conversationId: conversation.id,
+        senderId: 'friend',
+        kind: 'TEXT',
+        body: 'Late',
+        createdAt: '2026-11-20T00:00:30.000Z',
+      }),
+    )
+    expect(
+      queryClient.getQueryData<(typeof conversation)[]>(CHAT_QUERY_KEYS.conversations)?.[0]
+        .unreadCount,
+    ).toBe(0)
+  })
+
+  it('does not reuse a read cursor across conversations or sessions', () => {
+    const first = { id: 'first', kind: 'DIRECT', unreadCount: 0 }
+    const second = { id: 'second', kind: 'DIRECT', unreadCount: 0 }
+    queryClient.setQueryData(CHAT_QUERY_KEYS.conversations, [first, second])
+    const { rerender } = renderHook(({ id }: { id: string }) => useChatRealtime(id), {
+      wrapper,
+      initialProps: { id: first.id },
+    })
+    act(() =>
+      socket.emit('read:updated', {
+        conversationId: first.id,
+        userId: 'viewer',
+        lastReadMessageId: 'cursor-first-unique',
+        readAt: '2026-11-20T00:00:00.000Z',
+      }),
+    )
+    rerender({ id: second.id })
+    act(() =>
+      socket.emit('message:new', {
+        id: 'cursor-cross-conv-unique',
+        conversationId: second.id,
+        senderId: 'friend',
+        kind: 'TEXT',
+        body: 'New',
+        createdAt: '2026-11-20T00:00:01.000Z',
+      }),
+    )
+    const unread = (index: number) =>
+      queryClient.getQueryData<(typeof first)[]>(CHAT_QUERY_KEYS.conversations)?.[index].unreadCount
+    expect(unread(0)).toBe(0)
+    expect(unread(1)).toBe(1)
+
+    useAuthStore.getState().setAccessToken('new-session')
+    act(() =>
+      socket.emit('message:new', {
+        id: 'cursor-after-session-unique',
+        conversationId: first.id,
+        senderId: 'friend',
+        kind: 'TEXT',
+        body: 'New',
+        createdAt: '2026-11-20T00:00:01.000Z',
+      }),
+    )
+    expect(unread(0)).toBe(1)
+  })
+
+  it('does not restore revoked content when a stale edit event arrives', () => {
+    const revoked = {
+      id: 'm-1',
+      conversationId: 'friend-1',
+      body: null,
+      deletedAt: '2026-11-20T00:00:00.000Z',
+    }
+    const reply = {
+      id: 'm-2',
+      conversationId: 'friend-1',
+      replyTarget: { id: 'm-1', body: null, deletedAt: revoked.deletedAt },
+    }
+    queryClient.setQueryData(CHAT_QUERY_KEYS.messages('friend-1'), {
+      pages: [{ items: [revoked, reply], hasMore: false }],
+      pageParams: [undefined],
+    })
+    queryClient.setQueryData(CHAT_QUERY_KEYS.liveMessages('friend-1'), [revoked, reply])
+    renderHook(() => useChatRealtime('friend-1'), { wrapper })
+
+    act(() => {
+      socket.emit('message:updated', {
+        id: 'm-1',
+        conversationId: 'friend-1',
+        body: 'sensitive stale content',
+        editedAt: '2026-11-19T00:00:00.000Z',
+      })
+    })
+
+    expect(queryClient.getQueryData(CHAT_QUERY_KEYS.liveMessages('friend-1'))).toEqual([
+      revoked,
+      reply,
+    ])
+    expect(queryClient.getQueryData(CHAT_QUERY_KEYS.messages('friend-1'))).toEqual({
+      pages: [{ items: [revoked, reply], hasMore: false }],
+      pageParams: [undefined],
+    })
   })
 
   it('purges stale message cache when switching to a group with an epoch mismatch', async () => {

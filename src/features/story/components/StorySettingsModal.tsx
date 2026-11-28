@@ -17,7 +17,7 @@ interface StorySettingsModalProps {
 
 export function StorySettingsModal({ open, onOpenChange }: StorySettingsModalProps) {
   const { t } = useTranslation()
-  const { data: settings, isLoading } = useStorySettings()
+  const { data: settings, isLoading, isError } = useStorySettings()
   const updateSettings = useUpdateStorySettings()
   const viewedReceipts = settings?.viewedReceiptsEnabled ?? true
   const archiveEnabled = settings?.archiveEnabled ?? true
@@ -67,7 +67,12 @@ export function StorySettingsModal({ open, onOpenChange }: StorySettingsModalPro
               </div>
               <Switch
                 checked={viewedReceipts}
-                disabled={isLoading}
+                aria-label={t('chat.storyReceiptsTitle')}
+                aria-busy={
+                  updateSettings.isPending &&
+                  updateSettings.variables?.viewedReceiptsEnabled !== undefined
+                }
+                disabled={isLoading || !settings}
                 onCheckedChange={handleToggleReceipts}
               />
             </div>
@@ -84,10 +89,24 @@ export function StorySettingsModal({ open, onOpenChange }: StorySettingsModalPro
               </div>
               <Switch
                 checked={archiveEnabled}
-                disabled={isLoading}
+                aria-label={t('chat.storyArchiveSettingTitle')}
+                aria-busy={
+                  updateSettings.isPending && updateSettings.variables?.archiveEnabled !== undefined
+                }
+                disabled={isLoading || !settings}
                 onCheckedChange={handleToggleArchive}
               />
             </div>
+            {isError && (
+              <p role="alert" className="text-xs text-destructive">
+                {t('chat.storySettingsError')}
+              </p>
+            )}
+            {updateSettings.isPending && (
+              <p role="status" className="text-xs text-muted-foreground">
+                {t('chat.pending')}
+              </p>
+            )}
           </div>
         </div>
       </DialogContent>

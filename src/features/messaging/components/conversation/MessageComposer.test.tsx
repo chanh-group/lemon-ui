@@ -48,7 +48,14 @@ describe('MessageComposer pending send', () => {
     const input = renderComposer('second-identical-draft', onSubmit)
 
     fireEvent.click(screen.getByRole('button', { name: 'chat.sendMessage' }))
-    expect(onSubmit).toHaveBeenCalledWith('ok', undefined, undefined, undefined, expect.any(String))
+    expect(onSubmit).toHaveBeenCalledWith(
+      'ok',
+      undefined,
+      undefined,
+      undefined,
+      expect.any(String),
+      expect.any(Function),
+    )
     fireEvent.change(input, { target: { value: 'ok' } })
 
     await act(async () => {
@@ -159,6 +166,7 @@ describe('MessageComposer pending send', () => {
         undefined,
         undefined,
         expect.any(String),
+        expect.any(Function),
       ),
     )
   })

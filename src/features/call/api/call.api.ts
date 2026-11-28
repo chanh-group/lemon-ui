@@ -1,4 +1,5 @@
 import { api, API_BASE_URL } from '@/infrastructure/api/client'
+import { ApiError } from '@/infrastructure/api/errors'
 import { useAuthStore } from '@/infrastructure/auth/auth-store'
 import type {
   AcceptCallResponse,
@@ -125,4 +126,16 @@ export const callApi = {
     const res = await api.post<CallResponse>(`/calls/${callId}/end`, { reason })
     return res.data
   },
+}
+
+/**
+ * Call đã ở trạng thái terminal (đối phương vừa end/cancel/reject trước mình) —
+ * backend ném CALL_INVALID_STATE / CALL_NOT_FOUND. Race vô hại, không báo lỗi
+ * cho người dùng (giống Signal: signaling đến muộn chỉ log và bỏ qua).
+ */
+export function isBenignCallStateError(error: unknown): boolean {
+  return (
+    error instanceof ApiError &&
+    (error.code === 'CALL_INVALID_STATE' || error.code === 'CALL_NOT_FOUND')
+  )
 }

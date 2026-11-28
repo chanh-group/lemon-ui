@@ -1,10 +1,11 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useRef } from 'react'
+import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { isAuthBypass } from '@/config/env'
 import { AUTH_ME_STALE_MS, DEV_SESSION_KEY } from '@/config/constants'
 import { api, toApiError } from '@/infrastructure/api/client'
 import { clearAllDrafts } from '@/features/messaging/utils/draftStore'
 import { authEndpoints, userEndpoints } from '@/infrastructure/api/endpoints'
-import type { ApiError } from '@/infrastructure/api/errors'
+import { ApiError, INVALID_SESSION } from '@/infrastructure/api/errors'
 import { useAuthStore } from '@/infrastructure/auth/auth-store'
 import { signOutEverywhere } from '@/infrastructure/auth/session'
 import { queryKeys } from '@/infrastructure/query/keys'
@@ -251,20 +252,133 @@ export async function updateProfile(input: UpdateProfileInput): Promise<AuthUser
   }
 }
 
+type ProfileField = keyof UpdateProfileInput
+
+type ProfileUpdates = {
+  generation: number
+  userId?: string
+  pending: number
+  fields: Partial<Record<ProfileField, { confirmed: unknown; latest: symbol }>>
+}
+
+type ProfileUpdateContext = {
+  token: symbol
+  userId?: string
+  previous?: AuthUser
+  state: ProfileUpdates
+}
+
+const profileUpdates = new WeakMap<QueryClient, ProfileUpdates>()
+const profileFields = ['fullName', 'bio', 'avatarUrl', 'phone'] as const
+
 /** Hook cập nhật profile cá nhân và đồng bộ cache query 'me'. */
 export function useUpdateProfile() {
   const queryClient = useQueryClient()
-  return useMutation<AuthUser, ApiError, UpdateProfileInput>({
+  const generations = useRef(new WeakMap<UpdateProfileInput, number>()).current
+  const mutation = useMutation<AuthUser, ApiError, UpdateProfileInput, ProfileUpdateContext>({
+    scope: { id: 'update-profile' },
     mutationFn: async (input) => {
-      const updated = await updateProfile(input)
-      queryClient.setQueryData(queryKeys.me, updated)
-      return updated
+      const generation = generations.get(input)
+      if (generation !== useAuthStore.getState().generation)
+        throw new ApiError(INVALID_SESSION, 401, 'Session changed')
+      const result = await updateProfile(input)
+      if (generation !== useAuthStore.getState().generation)
+        throw new ApiError(INVALID_SESSION, 401, 'Session changed')
+      return result
     },
-    onSuccess: (data) => {
-      queryClient.setQueryData(queryKeys.me, data)
-      void queryClient.invalidateQueries({ queryKey: queryKeys.me })
+    onMutate: (input) => {
+      const generation = generations.get(input)
+      if (generation === undefined || generation !== useAuthStore.getState().generation)
+        throw new ApiError(INVALID_SESSION, 401, 'Session changed')
+      void queryClient.cancelQueries({ queryKey: queryKeys.me })
+      const previous = queryClient.getQueryData<AuthUser>(queryKeys.me)
+      const active = profileUpdates.get(queryClient)
+      const state: ProfileUpdates =
+        active && active.generation === generation && active.userId === previous?.id
+          ? active
+          : { generation, userId: previous?.id, pending: 0, fields: {} }
+      profileUpdates.set(queryClient, state)
+      state.pending++
+      const token = Symbol()
+      if (previous) {
+        const changes: Partial<AuthUser> = {}
+        for (const field of profileFields) {
+          if (input[field] === undefined) continue
+          const entry = state.fields[field] ?? { confirmed: previous[field], latest: token }
+          entry.latest = token
+          state.fields[field] = entry
+          if (field === 'fullName' || field === 'bio')
+            Object.assign(changes, { [field]: input[field] })
+        }
+        queryClient.setQueryData<AuthUser>(queryKeys.me, { ...previous, ...changes })
+      }
+      return { token, userId: previous?.id, previous, state }
+    },
+    onSuccess: (data, input, context) => {
+      if (!context?.previous || context.state.generation !== useAuthStore.getState().generation)
+        return
+      queryClient.setQueryData<AuthUser>(queryKeys.me, (current) => {
+        if (!current || current.id !== context.userId) return current
+        const changes: Partial<AuthUser> = {}
+        for (const field of profileFields) {
+          if (input[field] === undefined) continue
+          const entry = context.state.fields[field]
+          if (!entry) continue
+          entry.confirmed = data[field]
+          const expected =
+            field === 'fullName' || field === 'bio' ? input[field] : context.previous?.[field]
+          if (entry.latest === context.token && current[field] === expected)
+            Object.assign(changes, { [field]: data[field] })
+        }
+        return { ...current, ...changes }
+      })
+    },
+    onError: (_error, input, context) => {
+      if (!context?.previous || context.state.generation !== useAuthStore.getState().generation)
+        return
+      queryClient.setQueryData<AuthUser>(queryKeys.me, (current) => {
+        if (!current || current.id !== context.userId) return current
+        const changes: Partial<AuthUser> = {}
+        for (const field of ['fullName', 'bio'] as const) {
+          const entry = context.state.fields[field]
+          if (
+            input[field] !== undefined &&
+            entry?.latest === context.token &&
+            current[field] === input[field]
+          )
+            Object.assign(changes, { [field]: entry.confirmed })
+        }
+        return { ...current, ...changes }
+      })
+    },
+    onSettled: (_data, _error, input, context) => {
+      if (!context) return
+      for (const field of profileFields) {
+        if (input[field] !== undefined && context.state.fields[field]?.latest === context.token)
+          delete context.state.fields[field]
+      }
+      context.state.pending--
+      if (context.state.pending === 0 && profileUpdates.get(queryClient) === context.state) {
+        profileUpdates.delete(queryClient)
+        if (context.state.generation === useAuthStore.getState().generation)
+          void queryClient.invalidateQueries({ queryKey: queryKeys.me })
+      }
     },
   })
+  const capture = (input: UpdateProfileInput) => {
+    const copy = { ...input }
+    generations.set(copy, useAuthStore.getState().generation)
+    return copy
+  }
+  return {
+    ...mutation,
+    mutate: (input: UpdateProfileInput, options?: Parameters<typeof mutation.mutate>[1]) =>
+      mutation.mutate(capture(input), options),
+    mutateAsync: (
+      input: UpdateProfileInput,
+      options?: Parameters<typeof mutation.mutateAsync>[1],
+    ) => mutation.mutateAsync(capture(input), options),
+  }
 }
 
 export function useLogout() {
