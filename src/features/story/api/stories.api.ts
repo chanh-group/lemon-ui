@@ -156,6 +156,7 @@ export interface CreateMediaStoryPayload {
   allowReactions?: boolean
   audienceMode?: 'ALL_FRIENDS' | 'CUSTOM' | 'EXCLUDE'
   audienceUserIds?: string[]
+  onProgress?: (percent: number | null) => void
 }
 
 export interface CreateTextStoryPayload {
@@ -299,10 +300,18 @@ export async function createMediaStory(payload: CreateMediaStoryPayload): Promis
     fileName: payload.file.name,
   })
   let objectKey = signed.objectKey
+  payload.onProgress?.(null)
   try {
-    await uploadBinaryToUrl(signed.uploadUrl, payload.file, payload.file.type)
+    await uploadBinaryToUrl(signed.uploadUrl, payload.file, payload.file.type, payload.onProgress)
   } catch {
-    const uploaded = await uploadFileViaBackend(payload.file, kind, undefined, payload.file.name)
+    payload.onProgress?.(null)
+    const uploaded = await uploadFileViaBackend(
+      payload.file,
+      kind,
+      undefined,
+      payload.file.name,
+      payload.onProgress,
+    )
     objectKey = uploaded.objectKey
   }
   const res = await api.post<BackendStoryResponse>('/stories', {

@@ -300,6 +300,7 @@ export function ConversationInfoPanel({
   const [isDisbandingGroup, setIsDisbandingGroup] = useState(false)
   const disbandingGroupRef = useRef(false)
   const [isUploadingGroupAvatar, setIsUploadingGroupAvatar] = useState(false)
+  const [groupAvatarProgress, setGroupAvatarProgress] = useState<number | null>(null)
   const groupAvatarInput = useRef<HTMLInputElement>(null)
   const memberSection = useRef<HTMLElement>(null)
   const [leaveGroupOpen, setLeaveGroupOpen] = useState(false)
@@ -449,10 +450,15 @@ export function ConversationInfoPanel({
       return
     }
     setIsUploadingGroupAvatar(true)
+    setGroupAvatarProgress(null)
     try {
-      await runGroupAction(() => uploadGroupAvatar(conversation.id, file), 'chat.groupUpdated')
+      await runGroupAction(
+        () => uploadGroupAvatar(conversation.id, file, setGroupAvatarProgress),
+        'chat.groupUpdated',
+      )
     } finally {
       setIsUploadingGroupAvatar(false)
+      setGroupAvatarProgress(null)
     }
   }
 
@@ -733,6 +739,14 @@ export function ConversationInfoPanel({
                 >
                   <CameraIcon className="size-4" aria-hidden="true" />
                 </button>
+                {isUploadingGroupAvatar && (
+                  <progress
+                    className="absolute -right-1 -bottom-6 w-20"
+                    max={100}
+                    value={groupAvatarProgress ?? undefined}
+                    aria-label={t('chat.uploadingFiles')}
+                  />
+                )}
               </>
             )}
             {conversation.online && (

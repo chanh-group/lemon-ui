@@ -41,13 +41,21 @@ export async function createGroup(payload: {
 export async function uploadGroupAvatar(
   conversationId: string,
   file: File,
+  onProgress?: (percent: number | null) => void,
 ): Promise<ConversationResponse> {
   const formData = new FormData()
   formData.append('file', file)
   const res = await api.post<ConversationResponse>(
     `/files/group-avatars/${conversationId}/upload`,
     formData,
-    { headers: { 'Content-Type': 'multipart/form-data' } },
+    {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      ...(onProgress && {
+        onUploadProgress: ({ loaded, total }) => {
+          onProgress(total && total > 0 ? Math.min(100, Math.floor((loaded / total) * 100)) : null)
+        },
+      }),
+    },
   )
   return res.data
 }

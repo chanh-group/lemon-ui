@@ -150,7 +150,7 @@ export function useChatRealtime(activeConversationId: string | null) {
   const revokedConversationIds = useRef(new Set<string>())
   const readCursors = useRef({
     generation: useAuthStore.getState().generation,
-    ids: new Map<string, string>(),
+    cursors: new Map<string, { id: string; readAt: number }>(),
   })
   const [conversationAccess, setConversationAccess] = useState<
     'verifying' | 'allowed' | 'revoked' | 'retryable-error'
@@ -199,9 +199,18 @@ export function useChatRealtime(activeConversationId: string | null) {
     const currentReadCursors = () => {
       const generation = useAuthStore.getState().generation
       if (readCursors.current.generation !== generation) {
-        readCursors.current = { generation, ids: new Map() }
+        readCursors.current = { generation, cursors: new Map() }
       }
-      return readCursors.current.ids
+      return readCursors.current.cursors
+    }
+    const isReadByCursor = (conversationId: string, message: MessageResponse) => {
+      const cursor = currentReadCursors().get(conversationId)
+      if (!cursor) return false
+      if (cursor.id === message.id) return true
+      // lastReadMessageId là cursor đến một mốc thời gian; tin replay/đến trễ có
+      // createdAt trước mốc đó đã được đọc, dù id không trùng chính xác.
+      const createdAt = Date.parse(message.createdAt)
+      return !Number.isNaN(createdAt) && createdAt <= cursor.readAt
     }
     const refreshInbox = () => {
       if (refreshedInboxOnConnection.current) return
@@ -483,7 +492,7 @@ export function useChatRealtime(activeConversationId: string | null) {
     const handleNewMessage = (msg: MessageResponse) => {
       const convId = msg.conversationId
       if (revokedConversationIds.current.has(convId)) return
-      const alreadyRead = currentReadCursors().get(convId) === msg.id
+      const alreadyRead = isReadByCursor(convId, msg)
       if (msg.senderId !== userIdRef.current) removeTypingMember(convId, msg.senderId)
 
       const sameMessage = (message: MessageResponse) =>
@@ -713,10 +722,17 @@ export function useChatRealtime(activeConversationId: string | null) {
     }
 
     const handleReadUpdated = (event: ReadUpdatedPayload) => {
-      if (event.userId === userIdRef.current) {
-        currentReadCursors().set(event.conversationId, event.lastReadMessageId)
-        applyConfirmedRead(queryClient, event.conversationId, event.lastReadMessageId)
-      }
+      if (event.userId !== userIdRef.current) return
+      const cursors = currentReadCursors()
+      const readAt = Date.parse(event.readAt)
+      const current = cursors.get(event.conversationId)
+      // Sự kiện cũ đến sau không được lùi cursor đã xử lý.
+      if (current && !Number.isNaN(readAt) && readAt <= current.readAt) return
+      cursors.set(event.conversationId, {
+        id: event.lastReadMessageId,
+        readAt: Number.isNaN(readAt) ? (current?.readAt ?? 0) : readAt,
+      })
+      applyConfirmedRead(queryClient, event.conversationId, event.lastReadMessageId)
     }
 
     const handleConversationChanged = (event: { conversationId?: string }) => {

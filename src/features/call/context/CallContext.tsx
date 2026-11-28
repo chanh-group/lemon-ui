@@ -324,9 +324,10 @@ export function CallProvider({ children }: { children: ReactNode }) {
         await callApi.rejectCall(callId, reason)
       } catch (err) {
         console.warn('Reject call error:', err)
+        toast.error(t('common.error'))
       }
     },
-    [dismissIncomingCall, incomingCall],
+    [dismissIncomingCall, incomingCall, t],
   )
 
   return (

@@ -615,9 +615,9 @@ export function CallScreen({
     const callId = activeCall?.id
     if (callId) {
       if (phase === 'ringing') {
-        void callApi.cancelCall(callId)
+        void callApi.cancelCall(callId).catch(() => toast.error(t('common.error')))
       } else {
-        void callApi.endCall(callId, 'NORMAL')
+        void callApi.endCall(callId, 'NORMAL').catch(() => toast.error(t('common.error')))
       }
     }
 

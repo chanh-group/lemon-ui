@@ -365,6 +365,72 @@ describe('useChatRealtime reconnect access', () => {
     ).toBe(1)
   })
 
+  it('does not count a late message that predates the read cursor', () => {
+    const conversation = { id: 'late-1', kind: 'DIRECT', unreadCount: 0 }
+    queryClient.setQueryData(CHAT_QUERY_KEYS.conversations, [conversation])
+    renderHook(() => useChatRealtime(conversation.id), { wrapper })
+
+    act(() =>
+      socket.emit('read:updated', {
+        conversationId: conversation.id,
+        userId: 'viewer',
+        lastReadMessageId: 'late-cursor-m2',
+        readAt: '2026-11-20T00:01:00.000Z',
+      }),
+    )
+    act(() =>
+      socket.emit('message:new', {
+        id: 'late-message-unique',
+        conversationId: conversation.id,
+        senderId: 'friend',
+        kind: 'TEXT',
+        body: 'Late',
+        createdAt: '2026-11-20T00:00:30.000Z',
+      }),
+    )
+    expect(
+      queryClient.getQueryData<(typeof conversation)[]>(CHAT_QUERY_KEYS.conversations)?.[0]
+        .unreadCount,
+    ).toBe(0)
+  })
+
+  it('does not move the read cursor backwards on an older event', () => {
+    const conversation = { id: 'late-2', kind: 'DIRECT', unreadCount: 0 }
+    queryClient.setQueryData(CHAT_QUERY_KEYS.conversations, [conversation])
+    renderHook(() => useChatRealtime(conversation.id), { wrapper })
+
+    act(() =>
+      socket.emit('read:updated', {
+        conversationId: conversation.id,
+        userId: 'viewer',
+        lastReadMessageId: 'new-cursor',
+        readAt: '2026-11-20T00:02:00.000Z',
+      }),
+    )
+    act(() =>
+      socket.emit('read:updated', {
+        conversationId: conversation.id,
+        userId: 'viewer',
+        lastReadMessageId: 'old-cursor',
+        readAt: '2026-11-20T00:01:00.000Z',
+      }),
+    )
+    act(() =>
+      socket.emit('message:new', {
+        id: 'after-new-cursor-unique',
+        conversationId: conversation.id,
+        senderId: 'friend',
+        kind: 'TEXT',
+        body: 'Already read',
+        createdAt: '2026-11-20T00:01:30.000Z',
+      }),
+    )
+    expect(
+      queryClient.getQueryData<(typeof conversation)[]>(CHAT_QUERY_KEYS.conversations)?.[0]
+        .unreadCount,
+    ).toBe(0)
+  })
+
   it('does not reuse a read cursor across conversations or sessions', () => {
     const first = { id: 'first', kind: 'DIRECT', unreadCount: 0 }
     const second = { id: 'second', kind: 'DIRECT', unreadCount: 0 }

@@ -60,6 +60,29 @@ export class UnresolvedMessageActionError extends Error {
 function isMessageNotFound(error: unknown): boolean {
   return error instanceof ApiError && error.code === 'MESSAGE_NOT_FOUND'
 }
+
+const RECONCILE_READ_ATTEMPTS = 2
+const RECONCILE_READ_DELAY_MS = 150
+
+/**
+ * Sau timeout, một lần đọc ngay có thể còn thấy trạng thái cũ. Đọc lại có giới hạn
+ * rồi mới kết luận; trả null khi tin đã ẩn, ném Unresolved nếu vẫn không rõ.
+ */
+async function readReconciledMessage(conversationId: string, messageId: string) {
+  for (let attempt = 0; attempt < RECONCILE_READ_ATTEMPTS; attempt++) {
+    try {
+      const response = await getMessageWindow(conversationId, messageId, 1)
+      const message = response.items.find((item) => item.id === messageId)
+      if (message?.deletedAt) return message
+      if (!message) return null
+    } catch (error) {
+      if (isMessageNotFound(error)) return null
+    }
+    if (attempt < RECONCILE_READ_ATTEMPTS - 1)
+      await new Promise<void>((resolve) => setTimeout(resolve, RECONCILE_READ_DELAY_MS))
+  }
+  throw new UnresolvedMessageActionError()
+}
 /** Media archive coi dữ liệu là tươi trong 1 phút. */
 const MEDIA_ARCHIVE_STALE_MS = 60_000
 const MESSAGE_STALE_TIME = Infinity
@@ -544,6 +567,7 @@ export function useSendMessageMutation(conversationId: string | null) {
           const mimeType = file.type || 'application/octet-stream'
           const kind = getKindFromMime(mimeType, file.name)
           let objectKey: string
+          arg.onUploadProgress?.(null)
           try {
             const presignRes = await presignFile({
               kind,
@@ -552,15 +576,17 @@ export function useSendMessageMutation(conversationId: string | null) {
               fileName: file.name,
               conversationId: targetConversationId,
             })
-            await uploadBinaryToUrl(presignRes.uploadUrl, file, mimeType)
+            await uploadBinaryToUrl(presignRes.uploadUrl, file, mimeType, arg.onUploadProgress)
             objectKey = presignRes.objectKey
           } catch (r2Err) {
             console.warn('R2 upload failed, using backend fallback:', r2Err)
+            arg.onUploadProgress?.(null)
             const fallbackRes = await uploadFileViaBackend(
               file,
               kind,
               targetConversationId,
               file.name,
+              arg.onUploadProgress,
             )
             objectKey = fallbackRes.objectKey
           }
@@ -843,16 +869,9 @@ export function useRevokeMessageMutation(conversationId: string | null) {
         // xem lại trạng thái thật trước khi kết luận thất bại (tránh tin "hiện lại" oan).
         if (!isUncertainApiError(error)) throw error
         if (!conversationId) throw new UnresolvedMessageActionError()
-        let response
-        try {
-          response = await getMessageWindow(conversationId, messageId, 1)
-        } catch {
-          throw new UnresolvedMessageActionError()
-        }
-        const message = response.items.find((item) => item.id === messageId)
-        if (message?.deletedAt) return message
-        if (!message) throw new UnresolvedMessageActionError()
-        throw error
+        const message = await readReconciledMessage(conversationId, messageId)
+        if (message) return message
+        throw new UnresolvedMessageActionError()
       }
     },
     onSuccess: (revokedMsg) => {
@@ -970,15 +989,9 @@ export function useDeleteMessageForMeMutation(conversationId: string | null) {
         // Các lần gọi DELETE /for-me khác thì idempotent, nên đây là trạng thái đã xóa.
         if (!isUncertainApiError(error)) throw error
         if (!conversationId) throw new UnresolvedMessageActionError()
-        let response
-        try {
-          response = await getMessageWindow(conversationId, messageId, 1)
-        } catch (reconcileError) {
-          if (isMessageNotFound(reconcileError)) return
-          throw new UnresolvedMessageActionError()
-        }
-        if (!response.items.some((item) => item.id === messageId)) return
-        throw error
+        const message = await readReconciledMessage(conversationId, messageId)
+        if (!message) return
+        throw new UnresolvedMessageActionError()
       }
     },
     onSuccess: (_, messageId) => {

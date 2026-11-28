@@ -80,14 +80,33 @@ describe('destructive actions with uncertain network results', () => {
     expect(item.body).toBeNull()
   })
 
-  it('reports failure when reconcile shows the message is still alive', async () => {
-    const { wrapper } = setup()
+  it('reports unresolved after a bounded re-read still shows the message alive', async () => {
+    const { wrapper, timeline } = setup()
     mocks.revoke.mockRejectedValue(new ApiError('NETWORK_ERROR', 0, 'timeout'))
     mocks.window.mockResolvedValue({ items: [{ ...message }], hasMore: false })
     const hook = renderHook(() => useRevokeMessageMutation('c'), { wrapper })
 
     act(() => hook.result.current.mutate('m'))
     await waitFor(() => expect(hook.result.current.isError).toBe(true))
+    expect(mocks.window).toHaveBeenCalledTimes(2)
+    expect(hook.result.current.error).toBeInstanceOf(UnresolvedMessageActionError)
+    expect(timeline().pages[0].items[0]).toEqual(message)
+  })
+
+  it('accepts a later reconcile read that confirms the action was applied', async () => {
+    const { wrapper, timeline } = setup()
+    mocks.revoke.mockRejectedValue(new ApiError('NETWORK_ERROR', 0, 'timeout'))
+    mocks.window
+      .mockResolvedValueOnce({ items: [{ ...message }], hasMore: false })
+      .mockResolvedValueOnce({
+        items: [{ ...message, body: null, deletedAt: '2025-01-02' }],
+        hasMore: false,
+      })
+    const hook = renderHook(() => useRevokeMessageMutation('c'), { wrapper })
+
+    act(() => hook.result.current.mutate('m'))
+    await waitFor(() => expect(hook.result.current.isSuccess).toBe(true))
+    expect(timeline().pages[0].items[0].deletedAt).toBe('2025-01-02')
   })
 
   it('does not reconcile a definite server rejection', async () => {
