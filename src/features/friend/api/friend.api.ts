@@ -51,6 +51,25 @@ export async function getFriends(): Promise<ChatUser[]> {
   return res.data.items
 }
 
+/** Load every friend page when choosing a story audience; never treat a partial list as complete. */
+export async function getAllStoryAudienceFriends(): Promise<ChatUser[]> {
+  const friends: ChatUser[] = []
+  const seen = new Set<string>()
+  let cursor: string | undefined
+  do {
+    const res = await api.get<CursorPage<ChatUser>>('/friends', {
+      params: { limit: FRIENDS_PAGE_SIZE, cursor },
+    })
+    friends.push(...res.data.items)
+    if (!res.data.hasMore) break
+    const next = res.data.nextCursor
+    if (!next || seen.has(next)) throw new Error('Unable to load all friends')
+    seen.add(next)
+    cursor = next
+  } while (cursor)
+  return friends
+}
+
 /** Chấp nhận lời mời kết bạn. */
 export async function acceptFriendRequest(requestId: string): Promise<ConversationResponse> {
   const res = await api.post<ConversationResponse>(`/friends/requests/${requestId}/accept`)

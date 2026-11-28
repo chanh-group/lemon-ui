@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 import { TEXT_STORY_BG } from '@/features/story/data/storiesData'
@@ -9,12 +8,19 @@ interface TextStoryEditorProps {
   /** Chỉ nhận text — không còn tùy chọn chủ đề/kiểu chữ. */
   onShare: (payload: { text: string }) => void
   isSharing: boolean
+  text: string
+  onTextChange: (value: string) => void
 }
 
 /** Editor tin văn bản gọn: gõ trực tiếp trên canvas nền cố định, không chủ đề. */
-export function TextStoryEditor({ onDiscard, onShare, isSharing }: TextStoryEditorProps) {
+export function TextStoryEditor({
+  onDiscard,
+  onShare,
+  isSharing,
+  text,
+  onTextChange,
+}: TextStoryEditorProps) {
   const { t } = useTranslation()
-  const [text, setText] = useState('')
   const canShare = text.trim().length > 0
 
   return (
@@ -28,7 +34,8 @@ export function TextStoryEditor({ onDiscard, onShare, isSharing }: TextStoryEdit
       >
         <textarea
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          disabled={isSharing}
+          onChange={(e) => onTextChange(e.target.value)}
           placeholder={t('chat.addTextHint')}
           aria-label={t('chat.addTextHint')}
           rows={1}
@@ -42,6 +49,7 @@ export function TextStoryEditor({ onDiscard, onShare, isSharing }: TextStoryEdit
         <button
           type="button"
           onClick={onDiscard}
+          disabled={isSharing}
           aria-label={t('chat.discard')}
           className="rounded-xl bg-muted px-4 py-2 text-sm font-semibold text-muted-foreground transition-colors hover:bg-border hover:text-foreground"
         >

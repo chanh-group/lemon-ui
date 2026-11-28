@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -32,6 +32,9 @@ import { ChooseStoryType } from './ChooseStoryType'
 import { TextStoryEditor } from './TextStoryEditor'
 import { MediaStoryEditor } from './MediaStoryEditor'
 import { StorySettingsModal } from './StorySettingsModal'
+import { StoryAudienceSelector, type StoryAudienceMode } from './StoryAudienceSelector'
+import { useQuery } from '@tanstack/react-query'
+import { getAllStoryAudienceFriends } from '@/features/friend/api/friend.api'
 import { storyDisplayName, storyTime } from '@/features/story/data/storiesData'
 import { groupStories } from '@/features/story/utils/storyGroups'
 
@@ -43,11 +46,61 @@ export function StoriesCreateView() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const [step, setStep] = useState<StoryStep>('choose')
+  const [draftText, setDraftText] = useState('')
+  const draftKey = user?.id ? `story-text-draft:${user.id}` : null
+  useEffect(() => {
+    try {
+      setDraftText(draftKey ? (localStorage.getItem(draftKey) ?? '') : '')
+    } catch {
+      setDraftText('')
+    }
+  }, [draftKey])
+  const changeDraft = (value: string) => {
+    setDraftText(value)
+    if (!draftKey) return
+    try {
+      if (value) localStorage.setItem(draftKey, value)
+      else localStorage.removeItem(draftKey)
+    } catch {
+      /* Editing remains available when storage is blocked. */
+    }
+  }
+  const [audienceMode, setAudienceMode] = useState<StoryAudienceMode>('ALL_FRIENDS')
+  const [audienceIds, setAudienceIds] = useState<string[]>([])
+  const createText = useCreateTextStory()
+  const createMedia = useCreateMediaStory()
+  const friends = useQuery({
+    queryKey: ['story-audience-friends', user?.id],
+    queryFn: getAllStoryAudienceFriends,
+    enabled: Boolean(user?.id),
+  })
+  const audienceReady =
+    audienceMode === 'ALL_FRIENDS' ||
+    (!friends.isLoading &&
+      !friends.isError &&
+      audienceIds.length > 0 &&
+      audienceIds.every((id) => friends.data?.some((friend) => friend.id === id)))
+  const audience = {
+    audienceMode,
+    audienceUserIds: audienceMode === 'ALL_FRIENDS' ? undefined : audienceIds,
+  }
+  const selector = (
+    <StoryAudienceSelector
+      mode={audienceMode}
+      selected={audienceIds}
+      friends={friends.data ?? []}
+      loading={friends.isLoading}
+      error={friends.isError}
+      disabled={createText.isPending || createMedia.isPending}
+      onChange={(mode, ids) => {
+        setAudienceMode(mode)
+        setAudienceIds(ids)
+      }}
+    />
+  )
   const [viewingOwn, setViewingOwn] = useState<StoryEntry | null>(null)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [mediaControls, setMediaControls] = useState<HTMLDivElement | null>(null)
-  const createText = useCreateTextStory()
-  const createMedia = useCreateMediaStory()
 
   const userName = user?.fullName ?? user?.username ?? 'Lemon User'
   const backToStories = () => navigate(ROUTES.messages, { state: { tab: 'stories' } })
@@ -57,26 +110,41 @@ export function StoriesCreateView() {
   const showingEditor = step !== 'choose'
 
   const shareText = (payload: CreateTextStoryPayload) => {
-    createText.mutate(payload, {
-      onError: (error) => toast.error(error.message),
-      onSuccess: () => {
-        toast.success(t('chat.storyCreated'))
-        backToStories()
+    if (!audienceReady) {
+      toast.error(t('chat.storyAudienceRequired'))
+      return
+    }
+    createText.mutate(
+      { ...payload, ...audience },
+      {
+        onError: (error) => toast.error(error.message),
+        onSuccess: () => {
+          changeDraft('')
+          toast.success(t('chat.storyCreated'))
+          backToStories()
+        },
       },
-    })
+    )
   }
 
   const [mediaUploadProgress, setMediaUploadProgress] = useState<number | null>(null)
 
   const shareMedia = (payload: CreateMediaStoryPayload) => {
-    createMedia.mutate(payload, {
-      onError: (error) => toast.error(error.message),
-      onSuccess: () => {
-        toast.success(t('chat.storyCreated'))
-        backToStories()
+    if (!audienceReady) {
+      toast.error(t('chat.storyAudienceRequired'))
+      return
+    }
+    createMedia.mutate(
+      { ...payload, ...audience },
+      {
+        onError: (error) => toast.error(error.message),
+        onSuccess: () => {
+          toast.success(t('chat.storyCreated'))
+          backToStories()
+        },
+        onSettled: () => setMediaUploadProgress(null),
       },
-      onSettled: () => setMediaUploadProgress(null),
-    })
+    )
   }
 
   const shareMediaPayload = (file: File, captionText: string, durationMs?: number) => {
@@ -151,6 +219,10 @@ export function StoriesCreateView() {
             <p className="truncate text-xs text-muted-foreground">{t('chat.addToStoryHint')}</p>
           </div>
         </div>
+
+        {showingEditor && (
+          <div className={step === 'text' ? 'hidden md:block' : ''}>{selector}</div>
+        )}
 
         {/* Trên mobile, panel lựa chọn nằm dưới thông tin tài khoản; panel desktop bị ẩn ở breakpoint md. */}
         {step === 'choose' && (
@@ -229,7 +301,12 @@ export function StoriesCreateView() {
           )}
           {step === 'text' && (
             <TextStoryEditor
-              onDiscard={() => setStep('choose')}
+              onDiscard={() => {
+                changeDraft('')
+                setStep('choose')
+              }}
+              text={draftText}
+              onTextChange={changeDraft}
               onShare={shareText}
               isSharing={createText.isPending}
             />
@@ -249,8 +326,14 @@ export function StoriesCreateView() {
       {/* Mobile (<md): editor mở overlay toàn màn */}
       {step === 'text' && (
         <div className="fixed inset-x-0 bottom-16 top-0 z-40 overflow-y-auto bg-background md:hidden">
+          {selector}
           <TextStoryEditor
-            onDiscard={() => setStep('choose')}
+            onDiscard={() => {
+              changeDraft('')
+              setStep('choose')
+            }}
+            text={draftText}
+            onTextChange={changeDraft}
             onShare={shareText}
             isSharing={createText.isPending}
           />
