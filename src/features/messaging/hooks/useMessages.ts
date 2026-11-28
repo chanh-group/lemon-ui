@@ -67,14 +67,20 @@ const RECONCILE_READ_DELAY_MS = 150
 /**
  * Sau timeout, một lần đọc ngay có thể còn thấy trạng thái cũ. Đọc lại có giới hạn
  * rồi mới kết luận; trả null khi tin đã ẩn, ném Unresolved nếu vẫn không rõ.
+ * `tombstoneResolves`: tin đã thu hồi (deletedAt) là thành công (revoke) hay vẫn còn
+ * nhìn thấy được (delete-for-me chưa ẩn xong — phải đọc tiếp thay vì kết luận sớm).
  */
-async function readReconciledMessage(conversationId: string, messageId: string) {
+async function readReconciledMessage(
+  conversationId: string,
+  messageId: string,
+  tombstoneResolves: boolean,
+) {
   for (let attempt = 0; attempt < RECONCILE_READ_ATTEMPTS; attempt++) {
     try {
       const response = await getMessageWindow(conversationId, messageId, 1)
       const message = response.items.find((item) => item.id === messageId)
-      if (message?.deletedAt) return message
       if (!message) return null
+      if (tombstoneResolves && message.deletedAt) return message
     } catch (error) {
       if (isMessageNotFound(error)) return null
     }
@@ -869,7 +875,7 @@ export function useRevokeMessageMutation(conversationId: string | null) {
         // xem lại trạng thái thật trước khi kết luận thất bại (tránh tin "hiện lại" oan).
         if (!isUncertainApiError(error)) throw error
         if (!conversationId) throw new UnresolvedMessageActionError()
-        const message = await readReconciledMessage(conversationId, messageId)
+        const message = await readReconciledMessage(conversationId, messageId, true)
         if (message) return message
         throw new UnresolvedMessageActionError()
       }
@@ -989,9 +995,10 @@ export function useDeleteMessageForMeMutation(conversationId: string | null) {
         // Các lần gọi DELETE /for-me khác thì idempotent, nên đây là trạng thái đã xóa.
         if (!isUncertainApiError(error)) throw error
         if (!conversationId) throw new UnresolvedMessageActionError()
-        const message = await readReconciledMessage(conversationId, messageId)
-        if (!message) return
-        throw new UnresolvedMessageActionError()
+        // Tin thu hồi (tombstone) vẫn còn nhìn thấy được = chưa xác nhận ẩn xong —
+        // đọc tiếp trong giới hạn thay vì kết luận ngay ở lần đọc đầu.
+        await readReconciledMessage(conversationId, messageId, false)
+        return
       }
     },
     onSuccess: (_, messageId) => {

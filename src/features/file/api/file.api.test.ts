@@ -65,23 +65,26 @@ describe('file uploads', () => {
     ).rejects.toThrow('(403)')
   })
 
-  it('rejects a timed-out direct upload so the caller can fall back', async () => {
+  it('does not cap the total duration of a direct upload', async () => {
+    let timeoutAtSend: number | undefined
     class MockRequest {
-      withCredentials = false
-      status = 0
       timeout = 0
+      withCredentials = false
+      status = 200
       upload = {}
-      ontimeout?: () => void
+      onload?: () => void
       open() {}
       setRequestHeader() {}
       send() {
-        this.ontimeout?.()
+        timeoutAtSend = this.timeout
+        this.onload?.()
       }
     }
     vi.stubGlobal('XMLHttpRequest', MockRequest)
-    await expect(
-      uploadBinaryToUrl('https://upload.example.test/avatar', new Blob(), 'image/png', vi.fn()),
-    ).rejects.toThrow('quá thời hạn')
+    await uploadBinaryToUrl('https://upload.example.test/avatar', new Blob(), 'image/png', vi.fn())
+    // File lớn (25MB) trên uplink chậm không được abort ở mốc 15s như trước —
+    // fetch trên main cũng không có timeout tổng.
+    expect(timeoutAtSend).toBe(0)
   })
 
   it('reports backend fallback progress only when total is known', async () => {

@@ -319,7 +319,7 @@ export function MediaStoryEditor({
               aria-label={t('chat.uploadingFiles')}
               className="flex items-center gap-2 text-xs text-muted-foreground"
             >
-              {uploadProgress !== null && `${uploadProgress}%`}
+              {uploadProgress != null && `${uploadProgress}%`}
               <progress
                 className="w-24"
                 max={100}

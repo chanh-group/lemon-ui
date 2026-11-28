@@ -618,7 +618,15 @@ export function CallScreen({
         if (!isBenignCallStateError(error)) toast.error(t('common.error'))
       }
       if (phase === 'ringing') {
-        void callApi.cancelCall(callId).catch(reportError)
+        void callApi.cancelCall(callId).catch((error: unknown) => {
+          if (isBenignCallStateError(error)) {
+            // Cancel hụt vì callee vừa accept (hoặc call đã terminal) — endCall
+            // idempotent, dọn được cả hai case, tránh call ma phía người nhận.
+            void callApi.endCall(callId, 'NORMAL').catch(reportError)
+          } else {
+            reportError(error)
+          }
+        })
       } else {
         void callApi.endCall(callId, 'NORMAL').catch(reportError)
       }
@@ -638,7 +646,9 @@ export function CallScreen({
 
     const callId = activeCall?.id || searchParams.get('callId')
     if (callId) {
-      void callApi.rejectCall(callId)
+      void callApi.rejectCall(callId).catch((error: unknown) => {
+        if (!isBenignCallStateError(error)) toast.error(t('common.error'))
+      })
     }
 
     livekit.disconnect()

@@ -685,12 +685,6 @@ export const MessageRowView = memo(function MessageRowView({
               </div>
             </div>
 
-            {pendingAction && (
-              <span role="status" className="mt-1 px-1 text-[11px] text-muted-foreground">
-                {pendingAction === 'revoke' ? t('chat.revokingMessage') : t('chat.deletingMessage')}
-              </span>
-            )}
-
             {msg.editedAt && !msg.deletedAt && !isEditing && (
               <span className="mt-1 px-1 text-[11px] text-muted-foreground">
                 {t('chat.messageEditedLabel')}

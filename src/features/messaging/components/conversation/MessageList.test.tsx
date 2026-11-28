@@ -64,8 +64,8 @@ describe('message action pending', () => {
     )
     expect(screen.getByText('chat.messageRevokedText')).toBeTruthy()
     expect(
-      screen.getAllByRole('status').some((node) => node.textContent === 'chat.deletingMessage'),
-    ).toBe(true)
+      screen.getAllByRole('status').filter((node) => node.textContent === 'chat.deletingMessage'),
+    ).toHaveLength(1)
     expect(screen.queryByRole('button', { name: 'chat.deleteMessage' })).toBeNull()
   })
 
@@ -98,8 +98,8 @@ describe('message action pending', () => {
     )
     expect(screen.getByText('Hello')).toBeTruthy()
     expect(
-      screen.getAllByRole('status').some((node) => node.textContent === 'chat.revokingMessage'),
-    ).toBe(true)
+      screen.getAllByRole('status').filter((node) => node.textContent === 'chat.revokingMessage'),
+    ).toHaveLength(1)
     expect(screen.queryByRole('button', { name: 'Tùy chọn khác' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'chat.replyMessage' })).toBeNull()
   })

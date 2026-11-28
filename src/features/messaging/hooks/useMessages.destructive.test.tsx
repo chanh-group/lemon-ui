@@ -134,6 +134,25 @@ describe('destructive actions with uncertain network results', () => {
     )
   })
 
+  it('keeps re-reading a still-visible tombstone instead of concluding delete-for-me', async () => {
+    const { wrapper, timeline } = setup()
+    mocks.deleteForMe.mockRejectedValue(new ApiError('NETWORK_ERROR', 0, 'timeout'))
+    // Tin thu hồi vẫn còn nhìn thấy được ở lần đọc đầu = chưa xác nhận ẩn xong;
+    // lần đọc sau MESSAGE_NOT_FOUND (đã ẩn) mới là thành công.
+    mocks.window
+      .mockResolvedValueOnce({
+        items: [{ ...message, body: null, deletedAt: '2025-01-02' }],
+        hasMore: false,
+      })
+      .mockRejectedValueOnce(new ApiError('MESSAGE_NOT_FOUND', 404, 'hidden'))
+    const hook = renderHook(() => useDeleteMessageForMeMutation('c'), { wrapper })
+
+    act(() => hook.result.current.mutate('m'))
+    await waitFor(() => expect(hook.result.current.isSuccess).toBe(true))
+    expect(mocks.window).toHaveBeenCalledTimes(2)
+    expect(timeline().pages[0].items).toHaveLength(0)
+  })
+
   it('preserves an unresolved outcome when revoke reconciliation also fails', async () => {
     const { wrapper, timeline } = setup()
     mocks.revoke.mockRejectedValue(new ApiError('NETWORK_ERROR', 0, 'timeout'))

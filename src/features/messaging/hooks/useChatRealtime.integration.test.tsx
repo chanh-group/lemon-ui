@@ -486,6 +486,72 @@ describe('useChatRealtime reconnect access', () => {
     expect(unreadCount()).toBe(1)
   })
 
+  it('does not regress the cursor when a backward mark-read event carries a newer timestamp', () => {
+    const conversation = { id: 'late-4', kind: 'DIRECT', unreadCount: 0 }
+    queryClient.setQueryData(CHAT_QUERY_KEYS.conversations, [conversation])
+    queryClient.setQueryData(CHAT_QUERY_KEYS.messages(conversation.id), {
+      pages: [
+        {
+          items: [
+            {
+              id: 'm-old',
+              conversationId: conversation.id,
+              senderId: 'friend',
+              kind: 'TEXT',
+              body: 'old',
+              createdAt: '2026-11-20T00:00:10.000Z',
+            },
+            {
+              id: 'm-new',
+              conversationId: conversation.id,
+              senderId: 'friend',
+              kind: 'TEXT',
+              body: 'new',
+              createdAt: '2026-11-20T00:01:00.000Z',
+            },
+          ],
+          hasMore: false,
+        },
+      ],
+      pageParams: [{}],
+    })
+    renderHook(() => useChatRealtime(conversation.id), { wrapper })
+
+    act(() =>
+      socket.emit('read:updated', {
+        conversationId: conversation.id,
+        userId: 'viewer',
+        lastReadMessageId: 'm-new',
+        readAt: '2026-11-20T00:02:00.000Z',
+      }),
+    )
+    // Scroll ngược: mark-read chuỗi cũ — server no-op nhưng vẫn emit event với
+    // readAt MỚI HƠN; cursor không được lùi về m-old.
+    act(() =>
+      socket.emit('read:updated', {
+        conversationId: conversation.id,
+        userId: 'viewer',
+        lastReadMessageId: 'm-old',
+        readAt: '2026-11-20T00:03:00.000Z',
+      }),
+    )
+    // Tin nằm giữa hai cursor, đã được đọc — không được đếm lại vì cursor lùi.
+    act(() =>
+      socket.emit('message:new', {
+        id: 'm-late-between-cursors',
+        conversationId: conversation.id,
+        senderId: 'friend',
+        kind: 'TEXT',
+        body: 'Late',
+        createdAt: '2026-11-20T00:00:30.000Z',
+      }),
+    )
+    expect(
+      queryClient.getQueryData<(typeof conversation)[]>(CHAT_QUERY_KEYS.conversations)?.[0]
+        .unreadCount,
+    ).toBe(0)
+  })
+
   it('does not reuse a read cursor across conversations or sessions', () => {
     const first = { id: 'first', kind: 'DIRECT', unreadCount: 0 }
     const second = { id: 'second', kind: 'DIRECT', unreadCount: 0 }

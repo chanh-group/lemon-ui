@@ -17,7 +17,7 @@ interface StorySettingsModalProps {
 
 export function StorySettingsModal({ open, onOpenChange }: StorySettingsModalProps) {
   const { t } = useTranslation()
-  const { data: settings, isLoading } = useStorySettings()
+  const { data: settings, isLoading, isError } = useStorySettings()
   const updateSettings = useUpdateStorySettings()
   const viewedReceipts = settings?.viewedReceiptsEnabled ?? true
   const archiveEnabled = settings?.archiveEnabled ?? true
@@ -68,7 +68,10 @@ export function StorySettingsModal({ open, onOpenChange }: StorySettingsModalPro
               <Switch
                 checked={viewedReceipts}
                 aria-label={t('chat.storyReceiptsTitle')}
-                aria-busy={updateSettings.isPending}
+                aria-busy={
+                  updateSettings.isPending &&
+                  updateSettings.variables?.viewedReceiptsEnabled !== undefined
+                }
                 disabled={isLoading || !settings}
                 onCheckedChange={handleToggleReceipts}
               />
@@ -87,11 +90,18 @@ export function StorySettingsModal({ open, onOpenChange }: StorySettingsModalPro
               <Switch
                 checked={archiveEnabled}
                 aria-label={t('chat.storyArchiveSettingTitle')}
-                aria-busy={updateSettings.isPending}
+                aria-busy={
+                  updateSettings.isPending && updateSettings.variables?.archiveEnabled !== undefined
+                }
                 disabled={isLoading || !settings}
                 onCheckedChange={handleToggleArchive}
               />
             </div>
+            {isError && (
+              <p role="alert" className="text-xs text-destructive">
+                {t('chat.storySettingsError')}
+              </p>
+            )}
             {updateSettings.isPending && (
               <p role="status" className="text-xs text-muted-foreground">
                 {t('chat.pending')}

@@ -19,7 +19,9 @@ export async function uploadBinaryToUrl(
     await new Promise<void>((resolve, reject) => {
       const request = new XMLHttpRequest()
       request.open('PUT', uploadUrl)
-      request.timeout = 15_000
+      // Không đặt timeout tổng: file đính kèm/story video tới 25MB trên uplink chậm
+      // cần hơn 15s — fetch trên main cũng không có timeout. shortcut: không có
+      // guard socket treo, nâng cấp timeout theo độ trễ (inactivity) nếu gặp thực tế.
       request.withCredentials = false
       request.setRequestHeader('Content-Type', mimeType)
       request.upload.onprogress = (event) => {
@@ -34,7 +36,6 @@ export async function uploadBinaryToUrl(
         else reject(new Error(`Upload lên máy chủ lưu trữ thất bại (${request.status})`))
       }
       request.onerror = () => reject(new Error('Upload lên máy chủ lưu trữ thất bại'))
-      request.ontimeout = () => reject(new Error('Upload lên máy chủ lưu trữ quá thời hạn'))
       request.onabort = () => reject(new Error('Upload lên máy chủ lưu trữ bị hủy'))
       request.send(file)
     })
@@ -63,6 +64,8 @@ export async function uploadFileViaBackend(
   const endpoint = kind === 'USER_AVATAR' ? '/files/avatars/upload' : '/files/upload'
   const res = await api.post<{ objectKey: string; avatarUrl?: string }>(endpoint, formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
+    // Fallback phục file lớn — không kế thừa timeout 15s của axios instance.
+    timeout: 0,
     ...(onProgress && {
       onUploadProgress: ({ loaded, total }) => {
         onProgress(total && total > 0 ? Math.min(100, Math.floor((loaded / total) * 100)) : null)

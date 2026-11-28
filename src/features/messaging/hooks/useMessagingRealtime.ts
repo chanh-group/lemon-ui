@@ -768,11 +768,30 @@ export function useChatRealtime(activeConversationId: string | null) {
       const cursors = currentReadCursors()
       const readAt = Date.parse(event.readAt)
       const current = cursors.get(event.conversationId)
-      // Sự kiện cũ đến sau không được lùi cursor đã xử lý (guard theo thời điểm sự kiện).
-      if (current && !Number.isNaN(readAt) && readAt <= current.readAt) return
+      const nextCreatedAt = findCachedMessageCreatedAt(
+        event.conversationId,
+        event.lastReadMessageId,
+      )
+      if (current) {
+        const currentCreatedAt =
+          current.createdAt ?? findCachedMessageCreatedAt(event.conversationId, current.id)
+        if (nextCreatedAt !== null && currentCreatedAt !== null) {
+          // Ưu tiên vị trí timeline: updateLastRead phía server no-op khi mark-read
+          // ngược (scroll ngược) nhưng vẫn emit event với readAt mới — không được
+          // để event không làm cursor tiến lên đánh lùi cursor (Signal: "never go backwards").
+          if (
+            nextCreatedAt < currentCreatedAt ||
+            (nextCreatedAt === currentCreatedAt && event.lastReadMessageId <= current.id)
+          )
+            return
+        } else if (!Number.isNaN(readAt) && readAt <= current.readAt) {
+          // Không có vị trí để so → xếp thứ tự theo thời điểm sự kiện.
+          return
+        }
+      }
       cursors.set(event.conversationId, {
         id: event.lastReadMessageId,
-        createdAt: findCachedMessageCreatedAt(event.conversationId, event.lastReadMessageId),
+        createdAt: nextCreatedAt,
         readAt: Number.isNaN(readAt) ? (current?.readAt ?? 0) : readAt,
       })
       applyConfirmedRead(queryClient, event.conversationId, event.lastReadMessageId)
