@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/infrastructure/api/errors'
 import {
   CHAT_QUERY_KEYS,
+  UnresolvedMessageActionError,
   useDeleteMessageForMeMutation,
   useRevokeMessageMutation,
 } from './useMessages'
@@ -79,14 +80,33 @@ describe('destructive actions with uncertain network results', () => {
     expect(item.body).toBeNull()
   })
 
-  it('reports failure when reconcile shows the message is still alive', async () => {
-    const { wrapper } = setup()
+  it('reports unresolved after a bounded re-read still shows the message alive', async () => {
+    const { wrapper, timeline } = setup()
     mocks.revoke.mockRejectedValue(new ApiError('NETWORK_ERROR', 0, 'timeout'))
     mocks.window.mockResolvedValue({ items: [{ ...message }], hasMore: false })
     const hook = renderHook(() => useRevokeMessageMutation('c'), { wrapper })
 
     act(() => hook.result.current.mutate('m'))
     await waitFor(() => expect(hook.result.current.isError).toBe(true))
+    expect(mocks.window).toHaveBeenCalledTimes(2)
+    expect(hook.result.current.error).toBeInstanceOf(UnresolvedMessageActionError)
+    expect(timeline().pages[0].items[0]).toEqual(message)
+  })
+
+  it('accepts a later reconcile read that confirms the action was applied', async () => {
+    const { wrapper, timeline } = setup()
+    mocks.revoke.mockRejectedValue(new ApiError('NETWORK_ERROR', 0, 'timeout'))
+    mocks.window
+      .mockResolvedValueOnce({ items: [{ ...message }], hasMore: false })
+      .mockResolvedValueOnce({
+        items: [{ ...message, body: null, deletedAt: '2025-01-02' }],
+        hasMore: false,
+      })
+    const hook = renderHook(() => useRevokeMessageMutation('c'), { wrapper })
+
+    act(() => hook.result.current.mutate('m'))
+    await waitFor(() => expect(hook.result.current.isSuccess).toBe(true))
+    expect(timeline().pages[0].items[0].deletedAt).toBe('2025-01-02')
   })
 
   it('does not reconcile a definite server rejection', async () => {
@@ -99,10 +119,10 @@ describe('destructive actions with uncertain network results', () => {
     expect(mocks.window).not.toHaveBeenCalled()
   })
 
-  it('reconciles a delete-for-me that already applied on the server despite a timeout', async () => {
+  it('treats MESSAGE_NOT_FOUND from the window endpoint as an already-applied delete-for-me', async () => {
     const { client, wrapper, timeline } = setup()
     mocks.deleteForMe.mockRejectedValue(new ApiError('NETWORK_ERROR', 0, 'timeout'))
-    mocks.window.mockResolvedValue({ items: [], hasMore: false })
+    mocks.window.mockRejectedValue(new ApiError('MESSAGE_NOT_FOUND', 404, 'not found'))
     const hook = renderHook(() => useDeleteMessageForMeMutation('c'), { wrapper })
 
     act(() => hook.result.current.mutate('m'))
@@ -112,5 +132,50 @@ describe('destructive actions with uncertain network results', () => {
     expect(client.getQueryData<MessageResponse[]>(CHAT_QUERY_KEYS.liveMessages('c'))).toHaveLength(
       0,
     )
+  })
+
+  it('keeps re-reading a still-visible tombstone instead of concluding delete-for-me', async () => {
+    const { wrapper, timeline } = setup()
+    mocks.deleteForMe.mockRejectedValue(new ApiError('NETWORK_ERROR', 0, 'timeout'))
+    // Tin thu hồi vẫn còn nhìn thấy được ở lần đọc đầu = chưa xác nhận ẩn xong;
+    // lần đọc sau MESSAGE_NOT_FOUND (đã ẩn) mới là thành công.
+    mocks.window
+      .mockResolvedValueOnce({
+        items: [{ ...message, body: null, deletedAt: '2025-01-02' }],
+        hasMore: false,
+      })
+      .mockRejectedValueOnce(new ApiError('MESSAGE_NOT_FOUND', 404, 'hidden'))
+    const hook = renderHook(() => useDeleteMessageForMeMutation('c'), { wrapper })
+
+    act(() => hook.result.current.mutate('m'))
+    await waitFor(() => expect(hook.result.current.isSuccess).toBe(true))
+    expect(mocks.window).toHaveBeenCalledTimes(2)
+    expect(timeline().pages[0].items).toHaveLength(0)
+  })
+
+  it('preserves an unresolved outcome when revoke reconciliation also fails', async () => {
+    const { wrapper, timeline } = setup()
+    mocks.revoke.mockRejectedValue(new ApiError('NETWORK_ERROR', 0, 'timeout'))
+    mocks.window.mockRejectedValue(new ApiError('SERVER_ERROR', 503, 'unavailable'))
+    const hook = renderHook(() => useRevokeMessageMutation('c'), { wrapper })
+
+    act(() => hook.result.current.mutate('m'))
+    await waitFor(() => expect(hook.result.current.isError).toBe(true))
+
+    expect(hook.result.current.error).toBeInstanceOf(UnresolvedMessageActionError)
+    expect(timeline().pages[0].items[0]).toEqual(message)
+  })
+
+  it('preserves an unresolved outcome when delete reconciliation also fails', async () => {
+    const { wrapper, timeline } = setup()
+    mocks.deleteForMe.mockRejectedValue(new ApiError('NETWORK_ERROR', 0, 'timeout'))
+    mocks.window.mockRejectedValue(new ApiError('SERVER_ERROR', 503, 'unavailable'))
+    const hook = renderHook(() => useDeleteMessageForMeMutation('c'), { wrapper })
+
+    act(() => hook.result.current.mutate('m'))
+    await waitFor(() => expect(hook.result.current.isError).toBe(true))
+
+    expect(hook.result.current.error).toBeInstanceOf(UnresolvedMessageActionError)
+    expect(timeline().pages[0].items[0]).toEqual(message)
   })
 })

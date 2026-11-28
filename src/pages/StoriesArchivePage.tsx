@@ -101,7 +101,7 @@ export function StoriesArchivePage() {
                 <div className="mt-4 space-y-2" aria-label={t('chat.storyStorage')}>
                   <p className="text-sm text-foreground">
                     {t('chat.storyStorageUsage', {
-                      used: (storage.data.usedBytes / 1024 / 1024).toFixed(1),
+                      used: (storage.data.usedBytes / 1024 / 1024).toFixed(3),
                       limit: (storage.data.limitBytes / 1024 / 1024).toFixed(0),
                     })}
                   </p>

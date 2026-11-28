@@ -21,6 +21,7 @@ interface MediaStoryActorProps {
   /** Nhận kèm captionText để gửi API. */
   onShare: (file: File, captionText: string, durationMs?: number) => void
   isSharing: boolean
+  uploadProgress?: number | null
   controlsTarget?: HTMLElement
 }
 
@@ -29,6 +30,7 @@ export function MediaStoryEditor({
   onDiscard,
   onShare,
   isSharing,
+  uploadProgress,
   controlsTarget,
 }: MediaStoryActorProps) {
   const { t } = useTranslation()
@@ -310,6 +312,21 @@ export function MediaStoryEditor({
             >
               {t('chat.cancel')}
             </button>
+          )}
+          {isSharing && (
+            <span
+              role="status"
+              aria-label={t('chat.uploadingFiles')}
+              className="flex items-center gap-2 text-xs text-muted-foreground"
+            >
+              {uploadProgress != null && `${uploadProgress}%`}
+              <progress
+                className="w-24"
+                max={100}
+                value={uploadProgress ?? undefined}
+                aria-label={t('chat.uploadingFiles')}
+              />
+            </span>
           )}
           <button
             type="button"

@@ -281,6 +281,7 @@ export function ChatShell() {
     pendingFiles?: SendMessagePendingFile[],
     replyToId?: string | null,
     clientMsgId?: string,
+    onUploadProgress?: (percent: number | null) => void,
   ): Promise<boolean> => {
     if (!selectedId) return false
     try {
@@ -291,6 +292,7 @@ export function ChatShell() {
         pendingFiles,
         replyToId,
         clientMsgId,
+        onUploadProgress,
       })
       return true
     } catch {

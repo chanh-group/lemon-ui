@@ -9,7 +9,17 @@ import type { ChatUser } from '@/features/friend/types/friend.types'
 import { Avatar } from './kit'
 
 /** Kết quả tìm user theo username / email. */
-export function SearchResultCard({ user, onMessage }: { user: ChatUser; onMessage: () => void }) {
+export function SearchResultCard({
+  user,
+  onMessage,
+  isOpeningChat = false,
+  isChatDisabled = false,
+}: {
+  user: ChatUser
+  onMessage: () => void
+  isOpeningChat?: boolean
+  isChatDisabled?: boolean
+}) {
   const { t } = useTranslation()
   const sendRequest = useSendFriendRequest()
   const requests = useFriendRequests()
@@ -40,9 +50,11 @@ export function SearchResultCard({ user, onMessage }: { user: ChatUser; onMessag
         <button
           type="button"
           onClick={onMessage}
-          className="shrink-0 rounded-full bg-primary px-3.5 py-1.5 text-xs font-bold text-primary-foreground transition-all hover:opacity-90 active:scale-95"
+          disabled={isChatDisabled}
+          aria-busy={isOpeningChat}
+          className="shrink-0 rounded-full bg-primary px-3.5 py-1.5 text-xs font-bold text-primary-foreground transition-all hover:opacity-90 active:scale-95 disabled:opacity-50"
         >
-          {t('chat.menuMessage')}
+          {isOpeningChat ? t('common.loading') : t('chat.menuMessage')}
         </button>
       ) : isPending ? (
         <span className="shrink-0 rounded-full bg-muted px-3.5 py-1.5 text-xs font-semibold text-muted-foreground">

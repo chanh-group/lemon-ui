@@ -1,5 +1,6 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@/infrastructure/query/keys'
+import { useAuthStore } from '@/infrastructure/auth/auth-store'
 import { STORY_MEDIA_STALE_MS } from '@/features/story/constants'
 import {
   createMediaStory,
@@ -67,14 +68,20 @@ export function useReactStory() {
     mutationFn: ({
       storyId,
       reaction,
+      generation,
     }: {
       storyId: string
       reaction: StoryReactionType | string
-    }) => reactStory(storyId, reaction),
-    onSuccess: (_data, variables) => {
+      generation: number
+    }) => {
+      if (generation !== useAuthStore.getState().generation) throw new Error('Session changed')
+      return reactStory(storyId, reaction)
+    },
+    onSuccess: (_data, { storyId, generation }) => {
+      if (generation !== useAuthStore.getState().generation) return
       queryClient.invalidateQueries({ queryKey: STORIES_KEY })
-      queryClient.invalidateQueries({ queryKey: STORY_REACTIONS_KEY(variables.storyId) })
-      queryClient.invalidateQueries({ queryKey: STORY_VIEWS_KEY(variables.storyId) })
+      queryClient.invalidateQueries({ queryKey: STORY_REACTIONS_KEY(storyId) })
+      queryClient.invalidateQueries({ queryKey: STORY_VIEWS_KEY(storyId) })
     },
   })
 }
@@ -82,8 +89,12 @@ export function useReactStory() {
 export function useUnreactStory() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (storyId: string) => unreactStory(storyId),
-    onSuccess: (_data, storyId) => {
+    mutationFn: ({ storyId, generation }: { storyId: string; generation: number }) => {
+      if (generation !== useAuthStore.getState().generation) throw new Error('Session changed')
+      return unreactStory(storyId)
+    },
+    onSuccess: (_data, { storyId, generation }) => {
+      if (generation !== useAuthStore.getState().generation) return
       queryClient.invalidateQueries({ queryKey: STORIES_KEY })
       queryClient.invalidateQueries({ queryKey: STORY_REACTIONS_KEY(storyId) })
       queryClient.invalidateQueries({ queryKey: STORY_VIEWS_KEY(storyId) })
@@ -138,8 +149,12 @@ export function useStoryViews(storyId?: string) {
 export function useLikeStory() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (storyId: string) => likeStory(storyId),
-    onSuccess: (_data, storyId) => {
+    mutationFn: ({ storyId, generation }: { storyId: string; generation: number }) => {
+      if (generation !== useAuthStore.getState().generation) throw new Error('Session changed')
+      return likeStory(storyId)
+    },
+    onSuccess: (_data, { storyId, generation }) => {
+      if (generation !== useAuthStore.getState().generation) return
       queryClient.invalidateQueries({ queryKey: STORIES_KEY })
       queryClient.invalidateQueries({ queryKey: STORY_VIEWS_KEY(storyId) })
       queryClient.invalidateQueries({ queryKey: STORY_REACTIONS_KEY(storyId) })
@@ -150,8 +165,12 @@ export function useLikeStory() {
 export function useUnlikeStory() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (storyId: string) => unlikeStory(storyId),
-    onSuccess: (_data, storyId) => {
+    mutationFn: ({ storyId, generation }: { storyId: string; generation: number }) => {
+      if (generation !== useAuthStore.getState().generation) throw new Error('Session changed')
+      return unlikeStory(storyId)
+    },
+    onSuccess: (_data, { storyId, generation }) => {
+      if (generation !== useAuthStore.getState().generation) return
       queryClient.invalidateQueries({ queryKey: STORIES_KEY })
       queryClient.invalidateQueries({ queryKey: STORY_VIEWS_KEY(storyId) })
       queryClient.invalidateQueries({ queryKey: STORY_REACTIONS_KEY(storyId) })
@@ -160,6 +179,8 @@ export function useUnlikeStory() {
 }
 
 export const STORY_SETTINGS_KEY = ['stories', 'settings'] as const
+const STORY_SETTINGS_MUTATION_KEY = ['stories', 'update-settings'] as const
+const settingsGenerations = new WeakMap<object, number>()
 
 export function useStorySettings() {
   return useQuery({
@@ -171,19 +192,29 @@ export function useStorySettings() {
 export function useUpdateStorySettings() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (payload: Partial<UserStorySettings>) => updateStorySettings(payload),
+    mutationKey: STORY_SETTINGS_MUTATION_KEY,
+    mutationFn: (payload: Partial<UserStorySettings>) => {
+      if (settingsGenerations.get(payload) !== useAuthStore.getState().generation)
+        throw new Error('Session changed')
+      return updateStorySettings(payload)
+    },
     // Toggle phải lật ngay: áp payload lên cache ở onMutate, chỉ hoàn tác các trường
     // của chính mutation khi lỗi để không đè thao tác toggle khác đang bay.
     onMutate: async (payload) => {
+      const generation = useAuthStore.getState().generation
+      settingsGenerations.set(payload, generation)
       await queryClient.cancelQueries({ queryKey: STORY_SETTINGS_KEY })
+      if (generation !== useAuthStore.getState().generation)
+        return { previous: undefined, generation, active: false }
       const previous = queryClient.getQueryData<UserStorySettings>(STORY_SETTINGS_KEY)
       queryClient.setQueryData<UserStorySettings>(STORY_SETTINGS_KEY, (old) =>
         old ? { ...old, ...payload } : old,
       )
-      return { previous }
+      return { previous, generation, active: true }
     },
     onError: (_error, payload, context) => {
-      const previous = context?.previous
+      if (!context?.active || context.generation !== useAuthStore.getState().generation) return
+      const previous = context.previous
       if (!previous) return
       queryClient.setQueryData<UserStorySettings>(STORY_SETTINGS_KEY, (old) => {
         if (!old) return old
@@ -202,7 +233,8 @@ export function useUpdateStorySettings() {
     // Chỉ áp các field thuộc payload khi reconcile thành công — response của request
     // khác field về muộn có thể chứa giá trị cũ, không được đè thao tác đang bay;
     // và không đè field đã có ý định mới hơn (giá trị hiện tại khác payload của mình).
-    onSuccess: (data, payload) => {
+    onSuccess: (data, payload, context) => {
+      if (!context?.active || context.generation !== useAuthStore.getState().generation) return
       queryClient.setQueryData<UserStorySettings>(STORY_SETTINGS_KEY, (old) => {
         if (!old) return data
         const applied = Object.fromEntries(
@@ -212,7 +244,15 @@ export function useUpdateStorySettings() {
         ) as Partial<UserStorySettings>
         return { ...old, ...applied }
       })
-      void queryClient.invalidateQueries({ queryKey: STORY_SETTINGS_KEY })
+    },
+    onSettled: (_data, _error, _payload, context) => {
+      if (
+        context?.active &&
+        context.generation === useAuthStore.getState().generation &&
+        queryClient.isMutating({ mutationKey: STORY_SETTINGS_MUTATION_KEY }) === 1
+      ) {
+        void queryClient.invalidateQueries({ queryKey: STORY_SETTINGS_KEY })
+      }
     },
   })
 }
@@ -257,12 +297,12 @@ export function useDeleteStory() {
   const client = useQueryClient()
   return useMutation({
     mutationFn: deleteStory,
-    onSuccess: () => {
-      void client.invalidateQueries({ queryKey: STORIES_KEY })
-      void client.invalidateQueries({ queryKey: STORY_ARCHIVE_KEY })
-      void client
-        .cancelQueries({ queryKey: queryKeys.chat.storyStorage })
-        .then(() => client.refetchQueries({ queryKey: queryKeys.chat.storyStorage }))
+    onSuccess: async () => {
+      await client.cancelQueries({ queryKey: queryKeys.chat.storyStorage })
+      await Promise.all([
+        client.invalidateQueries({ queryKey: STORIES_KEY }),
+        client.invalidateQueries({ queryKey: STORY_ARCHIVE_KEY }),
+      ])
     },
   })
 }

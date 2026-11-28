@@ -3,12 +3,13 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { describe, expect, it, vi } from 'vitest'
-import { STORY_SETTINGS_KEY, useUpdateStorySettings } from './useStories'
+import { STORY_SETTINGS_KEY, useStorySettings, useUpdateStorySettings } from './useStories'
 import type { UserStorySettings } from '../api/stories.api'
 
-const mocks = vi.hoisted(() => ({ update: vi.fn() }))
+const mocks = vi.hoisted(() => ({ get: vi.fn(), update: vi.fn() }))
 vi.mock('@/features/story/api/stories.api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../api/stories.api')>()),
+  getStorySettings: mocks.get,
   updateStorySettings: mocks.update,
 }))
 
@@ -19,7 +20,7 @@ const settings: UserStorySettings = {
 }
 
 function setup() {
-  vi.clearAllMocks()
+  vi.resetAllMocks()
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   })
@@ -29,7 +30,7 @@ function setup() {
   )
   const hook = renderHook(() => useUpdateStorySettings(), { wrapper })
   const current = () => client.getQueryData<UserStorySettings>(STORY_SETTINGS_KEY)!
-  return { client, hook, current }
+  return { client, wrapper, hook, current }
 }
 
 describe('useUpdateStorySettings', () => {
@@ -92,6 +93,41 @@ describe('useUpdateStorySettings', () => {
     // Request đầu lỗi SAU khi toggle cùng field đã thành công — không được đảo lại.
     await act(async () => rejectFirst(new Error('offline')))
     expect(current().viewedReceiptsEnabled).toBe(true)
+  })
+
+  it('defers active-query refetch until all story setting toggles settle', async () => {
+    const { wrapper, hook, current } = setup()
+    let resolveFirst!: (value: UserStorySettings) => void
+    let resolveSecond!: (value: UserStorySettings) => void
+    mocks.update
+      .mockImplementationOnce(() => new Promise((r) => (resolveFirst = r)))
+      .mockImplementationOnce(() => new Promise((r) => (resolveSecond = r)))
+    mocks.get.mockResolvedValue(settings)
+    renderHook(() => useStorySettings(), { wrapper })
+    await waitFor(() => expect(mocks.get).toHaveBeenCalledTimes(1))
+    mocks.get.mockClear()
+    mocks.get.mockResolvedValue({
+      ...settings,
+      viewedReceiptsEnabled: false,
+      archiveEnabled: false,
+    })
+
+    await act(async () => hook.result.current.mutate({ viewedReceiptsEnabled: false }))
+    await act(async () => hook.result.current.mutate({ archiveEnabled: false }))
+
+    await act(async () =>
+      resolveFirst({ ...settings, viewedReceiptsEnabled: false, archiveEnabled: true }),
+    )
+    expect(current()).toMatchObject({ viewedReceiptsEnabled: false, archiveEnabled: false })
+    expect(mocks.get).not.toHaveBeenCalled()
+
+    await act(async () =>
+      resolveSecond({ ...settings, viewedReceiptsEnabled: false, archiveEnabled: false }),
+    )
+    await waitFor(() => expect(mocks.get).toHaveBeenCalledTimes(1))
+    await waitFor(() =>
+      expect(current()).toMatchObject({ viewedReceiptsEnabled: false, archiveEnabled: false }),
+    )
   })
 
   it('applies success per field without clobbering another pending toggle', async () => {

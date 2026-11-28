@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import {
@@ -17,8 +18,10 @@ import {
 import { UserAvatar } from '@/components/common/UserAvatar'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { TEXT_STORY_BG, storyDisplayName } from '@/features/story/data/storiesData'
+import { getStoryById } from '@/features/story/api/stories.api'
 import { MESSAGE_MAX_BODY_LENGTH, STORY_MAX_CAPTION_LENGTH } from '@/config/constants'
 import { cn } from '@/lib/utils'
+import { useAuthStore } from '@/infrastructure/auth/auth-store'
 import {
   getMessageLengthState,
   isMessageWithinLimit,
@@ -49,6 +52,15 @@ interface StoryViewerProps {
 
 const reactions: StoryReactionType[] = ['👍', '❤️', '🥰', '😆', '😮', '😢', '😡']
 
+type ReactionState = {
+  reaction: string | null
+  kind: 'LIKE' | 'REACTION' | null
+  pending: boolean
+  token: symbol
+}
+const reactionKey = (storyId: string, generation: number) =>
+  ['story-viewer-reaction', generation, storyId] as const
+
 export function StoryViewer({
   story,
   stories = [],
@@ -75,7 +87,14 @@ export function StoryViewer({
   const [confirmDelete, setConfirmDelete] = useState(false)
   const replyLength = getMessageLengthState(draft.trim())
   const videoRef = useRef<HTMLVideoElement>(null)
-  const currentStoryId = useRef(story.id)
+  const queryClient = useQueryClient()
+  const generation = useAuthStore((state) => state.generation)
+  const authStatus = useAuthStore((state) => state.status)
+  const reactionQuery = useQuery<ReactionState | null>({
+    queryKey: reactionKey(story.id, generation),
+    queryFn: async () => null,
+    enabled: false,
+  })
   const items = stories.length ? stories : [story]
   const index = items.findIndex((item) => item.id === story.id)
   const sameAuthor = items.filter((item) =>
@@ -95,8 +114,9 @@ export function StoryViewer({
   const reply = useReplyStory()
   const update = useUpdateStory()
   const remove = useDeleteStory()
-  const [reaction, setReaction] = useState(story.viewerReaction ?? null)
-  const [reactionKind, setReactionKind] = useState(story.myReactionKind ?? null)
+  const reactionState = reactionQuery.data
+  const reactionPending = reactionState?.pending ?? false
+  const reaction = reactionState ? reactionState.reaction : (story.viewerReaction ?? null)
   const isVideo = story.mediaType === 'video'
   const isMedia = story.kind === 'MEDIA' || story.kind === 'media' || Boolean(story.mediaUrl)
   const stopped = paused || editing || showViews || confirmDelete || Boolean(draft)
@@ -112,7 +132,6 @@ export function StoryViewer({
   }
 
   useEffect(() => {
-    currentStoryId.current = story.id
     setProgress(0)
     setPaused(false)
     setDraft('')
@@ -122,12 +141,49 @@ export function StoryViewer({
     setCaption(story.caption ?? '')
     setAllowReplies(story.allowReplies !== false)
     setAllowReactions(story.allowReactions !== false)
-    setReaction(story.viewerReaction ?? null)
-    setReactionKind(story.myReactionKind ?? null)
     if (!story.mine && !story.viewed) view.mutate(story.id)
     // Reset for each selected story, not for query refreshes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [story.id])
+
+  useEffect(() => {
+    if (authStatus === 'anonymous') return
+    const refresh = () => {
+      const key = reactionKey(story.id, generation)
+      const current = queryClient.getQueryData<ReactionState | null>(key)
+      if (current?.pending) return
+      const token = Symbol()
+      queryClient.setQueryData<ReactionState>(key, {
+        reaction: current ? current.reaction : (story.viewerReaction ?? null),
+        kind: current ? current.kind : (story.myReactionKind ?? null),
+        pending: false,
+        token,
+      })
+      const query = queryClient.getQueryCache().find({ queryKey: key, exact: true })
+      void getStoryById(story.id).then(
+        (latest) => {
+          if (
+            generation !== useAuthStore.getState().generation ||
+            queryClient.getQueryCache().find({ queryKey: key, exact: true }) !== query
+          )
+            return
+          queryClient.setQueryData<ReactionState | null>(key, (entry) =>
+            entry?.token === token && !entry.pending
+              ? {
+                  ...entry,
+                  reaction: latest.viewerReaction ?? null,
+                  kind: latest.myReactionKind ?? null,
+                }
+              : entry,
+          )
+        },
+        () => {},
+      )
+    }
+    refresh()
+    window.addEventListener('focus', refresh)
+    return () => window.removeEventListener('focus', refresh)
+  }, [queryClient, generation, authStatus, story.id, story.viewerReaction, story.myReactionKind])
 
   useEffect(() => {
     if (stopped || isVideo || (isMedia && !mediaUrl)) return
@@ -172,31 +228,62 @@ export function StoryViewer({
 
   async function toggleReaction(emoji: StoryReactionType) {
     const selectedStoryId = story.id
+    const key = reactionKey(selectedStoryId, generation)
+    const existing = queryClient.getQueryData<ReactionState | null>(key)
+    if (existing?.pending) return
+    const previousReaction = existing ? existing.reaction : (story.viewerReaction ?? null)
+    const previousKind = existing ? existing.kind : (story.myReactionKind ?? null)
+    const removing = previousReaction === emoji
+    const token = Symbol()
+    const next: ReactionState = {
+      reaction: removing ? null : emoji,
+      kind: removing ? null : emoji === '❤️' ? 'LIKE' : 'REACTION',
+      pending: true,
+      token,
+    }
+    queryClient.setQueryData(key, next)
+    const query = queryClient.getQueryCache().find({ queryKey: key, exact: true })
+    const update = (value: Partial<ReactionState>) => {
+      if (
+        generation !== useAuthStore.getState().generation ||
+        queryClient.getQueryCache().find({ queryKey: key, exact: true }) !== query
+      )
+        return
+      queryClient.setQueryData<ReactionState | null>(key, (current) =>
+        current?.token === token ? { ...current, ...value } : current,
+      )
+    }
     try {
-      if (reaction === emoji) {
-        if (reactionKind === 'LIKE') await unlike.mutateAsync(story.id)
-        else await unreact.mutateAsync(story.id)
-        if (currentStoryId.current !== selectedStoryId) return
-        setReaction(null)
-        setReactionKind(null)
+      if (removing) {
+        if (previousKind === 'LIKE')
+          await unlike.mutateAsync({ storyId: selectedStoryId, generation })
+        else await unreact.mutateAsync({ storyId: selectedStoryId, generation })
+      } else if (emoji === '❤️') {
+        await like.mutateAsync({ storyId: selectedStoryId, generation })
       } else {
-        if (emoji === '❤️') {
-          await like.mutateAsync(story.id)
-          if (currentStoryId.current !== selectedStoryId) return
-          setReactionKind('LIKE')
-        } else {
-          await react.mutateAsync({ storyId: story.id, reaction: emoji })
-          if (currentStoryId.current !== selectedStoryId) return
-          setReactionKind('REACTION')
-        }
-        setReaction(emoji)
+        await react.mutateAsync({ storyId: selectedStoryId, reaction: emoji, generation })
       }
     } catch {
+      if (generation !== useAuthStore.getState().generation) return
+      update({ reaction: previousReaction, kind: previousKind })
       toast.error(
-        t('chat.storyActionError', {
-          defaultValue: 'Không thể thực hiện thao tác. Vui lòng thử lại.',
+        t('chat.storyReactionUncertain', {
+          defaultValue: 'Không thể xác nhận cảm xúc. Hãy kiểm tra lại sau.',
         }),
       )
+    }
+    if (
+      generation !== useAuthStore.getState().generation ||
+      queryClient.getQueryCache().find({ queryKey: key, exact: true }) !== query
+    )
+      return
+    try {
+      const latest = await getStoryById(selectedStoryId)
+      update({ reaction: latest.viewerReaction ?? null, kind: latest.myReactionKind ?? null })
+    } catch {
+      // Retain the last known value if the follow-up read fails.
+    } finally {
+      update({ pending: false })
     }
   }
   async function sendReply(event: React.FormEvent) {
@@ -458,10 +545,9 @@ export function StoryViewer({
                       key={emoji}
                       type="button"
                       onClick={() => void toggleReaction(emoji)}
-                      disabled={
-                        react.isPending || unreact.isPending || like.isPending || unlike.isPending
-                      }
+                      disabled={reactionPending}
                       aria-label={emoji}
+                      aria-busy={reactionPending}
                       aria-pressed={reaction === emoji}
                       className={cn(
                         'grid size-10 place-items-center rounded-full bg-muted text-2xl hover:bg-accent',

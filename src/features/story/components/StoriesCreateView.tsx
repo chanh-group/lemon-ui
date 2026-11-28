@@ -126,6 +126,8 @@ export function StoriesCreateView() {
     )
   }
 
+  const [mediaUploadProgress, setMediaUploadProgress] = useState<number | null>(null)
+
   const shareMedia = (payload: CreateMediaStoryPayload) => {
     if (!audienceReady) {
       toast.error(t('chat.storyAudienceRequired'))
@@ -139,12 +141,15 @@ export function StoriesCreateView() {
           toast.success(t('chat.storyCreated'))
           backToStories()
         },
+        onSettled: () => setMediaUploadProgress(null),
       },
     )
   }
 
-  const shareMediaPayload = (file: File, captionText: string, durationMs?: number) =>
-    shareMedia({ file, captionText, durationMs })
+  const shareMediaPayload = (file: File, captionText: string, durationMs?: number) => {
+    setMediaUploadProgress(null)
+    shareMedia({ file, captionText, durationMs, onProgress: setMediaUploadProgress })
+  }
   return (
     <main
       className={`flex h-dvh w-full bg-background pb-16 text-foreground md:overflow-hidden md:pb-0 ${step === 'media' ? 'flex-col overflow-y-auto md:flex-row' : 'overflow-hidden'}`}
@@ -310,6 +315,7 @@ export function StoriesCreateView() {
               onDiscard={() => setStep('choose')}
               onShare={shareMediaPayload}
               isSharing={createMedia.isPending}
+              uploadProgress={mediaUploadProgress}
               controlsTarget={mediaControls}
             />
           )}

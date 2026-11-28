@@ -16,7 +16,7 @@ import {
   resolveSendMessageKind,
   retryUncertainSend,
 } from '@/features/messaging/utils/messageSend'
-import { isUncertainApiError } from '@/infrastructure/api/errors'
+import { ApiError, isUncertainApiError } from '@/infrastructure/api/errors'
 import { queryKeys } from '@/infrastructure/query/keys'
 import {
   getConversationMessages,
@@ -31,6 +31,7 @@ import {
 import { presignFile, uploadBinaryToUrl, uploadFileViaBackend } from '@/features/file/api/file.api'
 import { getKindFromMime, isImage } from '@/features/file/utils/fileTypes'
 import { useAuth } from '@/features/auth/api'
+import { useAuthStore } from '@/infrastructure/auth/auth-store'
 import { updateConversationLastMessage } from '@/features/conversation/utils/chat.mapper'
 import type {
   MessageAttachmentInput,
@@ -48,6 +49,46 @@ import { MESSAGE_PAGE_SIZE } from '@/config/constants'
 
 export const CHAT_QUERY_KEYS = queryKeys.chat
 const MESSAGE_CACHE_TIME = 30 * 60_000
+
+export class UnresolvedMessageActionError extends Error {
+  constructor() {
+    super('Could not confirm whether the message action completed')
+    this.name = 'UnresolvedMessageActionError'
+  }
+}
+
+function isMessageNotFound(error: unknown): boolean {
+  return error instanceof ApiError && error.code === 'MESSAGE_NOT_FOUND'
+}
+
+const RECONCILE_READ_ATTEMPTS = 2
+const RECONCILE_READ_DELAY_MS = 150
+
+/**
+ * Sau timeout, một lần đọc ngay có thể còn thấy trạng thái cũ. Đọc lại có giới hạn
+ * rồi mới kết luận; trả null khi tin đã ẩn, ném Unresolved nếu vẫn không rõ.
+ * `tombstoneResolves`: tin đã thu hồi (deletedAt) là thành công (revoke) hay vẫn còn
+ * nhìn thấy được (delete-for-me chưa ẩn xong — phải đọc tiếp thay vì kết luận sớm).
+ */
+async function readReconciledMessage(
+  conversationId: string,
+  messageId: string,
+  tombstoneResolves: boolean,
+) {
+  for (let attempt = 0; attempt < RECONCILE_READ_ATTEMPTS; attempt++) {
+    try {
+      const response = await getMessageWindow(conversationId, messageId, 1)
+      const message = response.items.find((item) => item.id === messageId)
+      if (!message) return null
+      if (tombstoneResolves && message.deletedAt) return message
+    } catch (error) {
+      if (isMessageNotFound(error)) return null
+    }
+    if (attempt < RECONCILE_READ_ATTEMPTS - 1)
+      await new Promise<void>((resolve) => setTimeout(resolve, RECONCILE_READ_DELAY_MS))
+  }
+  throw new UnresolvedMessageActionError()
+}
 /** Media archive coi dữ liệu là tươi trong 1 phút. */
 const MEDIA_ARCHIVE_STALE_MS = 60_000
 const MESSAGE_STALE_TIME = Infinity
@@ -532,6 +573,7 @@ export function useSendMessageMutation(conversationId: string | null) {
           const mimeType = file.type || 'application/octet-stream'
           const kind = getKindFromMime(mimeType, file.name)
           let objectKey: string
+          arg.onUploadProgress?.(null)
           try {
             const presignRes = await presignFile({
               kind,
@@ -540,15 +582,17 @@ export function useSendMessageMutation(conversationId: string | null) {
               fileName: file.name,
               conversationId: targetConversationId,
             })
-            await uploadBinaryToUrl(presignRes.uploadUrl, file, mimeType)
+            await uploadBinaryToUrl(presignRes.uploadUrl, file, mimeType, arg.onUploadProgress)
             objectKey = presignRes.objectKey
           } catch (r2Err) {
             console.warn('R2 upload failed, using backend fallback:', r2Err)
+            arg.onUploadProgress?.(null)
             const fallbackRes = await uploadFileViaBackend(
               file,
               kind,
               targetConversationId,
               file.name,
+              arg.onUploadProgress,
             )
             objectKey = fallbackRes.objectKey
           }
@@ -687,28 +731,133 @@ export function useSendMessageMutation(conversationId: string | null) {
   })
 }
 
+type ReadSession = { userId: string | null; token: string; generation: number }
+type ReadResult = ReadSession | null
+const pendingReadRequests = new WeakMap<QueryClient, Map<string, Promise<ReadResult>>>()
+
+function tokenSubject(token: string): string | null {
+  try {
+    const payload = token.split('.')[1]
+    if (!payload) return null
+    const decoded: unknown = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')))
+    return typeof decoded === 'object' &&
+      decoded !== null &&
+      'sub' in decoded &&
+      typeof decoded.sub === 'string'
+      ? decoded.sub
+      : null
+  } catch {
+    return null
+  }
+}
+
+function currentReadSession(queryClient: QueryClient): ReadSession | null {
+  const { accessToken, status, generation } = useAuthStore.getState()
+  if (!accessToken || status !== 'authenticated') return null
+  const cachedUserId = queryClient.getQueryData<{ id: string }>(queryKeys.me)?.id
+  const subject = tokenSubject(accessToken)
+  if (subject && cachedUserId && subject !== cachedUserId) return null
+  return {
+    userId: subject ?? cachedUserId ?? null,
+    token: accessToken,
+    generation,
+  }
+}
+
+function isCurrentReadSession(queryClient: QueryClient, session: ReadSession): boolean {
+  const current = currentReadSession(queryClient)
+  return (
+    !!current &&
+    current.generation === session.generation &&
+    (!current.userId || !session.userId || current.userId === session.userId) &&
+    (current.token === session.token ||
+      (!!session.userId && tokenSubject(current.token) === session.userId))
+  )
+}
+
+class ReadRequestError extends Error {
+  readonly session: ReadSession
+  readonly original: unknown
+
+  constructor(session: ReadSession, original: unknown) {
+    super(original instanceof Error ? original.message : '')
+    this.session = session
+    this.original = original
+  }
+}
+
+export function applyConfirmedRead(
+  queryClient: QueryClient,
+  conversationId: string,
+  lastReadMessageId: string,
+) {
+  let needsRefresh = false
+  queryClient.setQueryData<ConversationResponse[]>(CHAT_QUERY_KEYS.conversations, (old) =>
+    old?.map((conversation) => {
+      if (conversation.id !== conversationId) return conversation
+      if (conversation.lastMessageDetail?.id !== lastReadMessageId) {
+        needsRefresh = true
+        return conversation
+      }
+      return { ...conversation, unreadCount: 0 }
+    }),
+  )
+  if (needsRefresh) {
+    void queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.conversations })
+  }
+}
+
 /** Hook đánh dấu đã đọc */
 export function useMarkReadMutation() {
   const queryClient = useQueryClient()
   const { t } = useTranslation()
 
+  const sessions = useRef(new WeakMap<object, ReadSession | null>()).current
   return useMutation({
-    mutationFn: ({
-      conversationId,
-      lastReadMessageId,
-    }: {
-      conversationId: string
-      lastReadMessageId: string
-    }) => markConversationRead(conversationId, lastReadMessageId),
-    onSuccess: (_, { conversationId }) => {
-      queryClient.setQueryData<ConversationResponse[]>(CHAT_QUERY_KEYS.conversations, (old) =>
-        old?.map((conversation) =>
-          conversation.id === conversationId ? { ...conversation, unreadCount: 0 } : conversation,
-        ),
-      )
+    onMutate: (variables: { conversationId: string; lastReadMessageId: string }) => {
+      sessions.set(variables, currentReadSession(queryClient))
+    },
+    mutationFn: (variables: { conversationId: string; lastReadMessageId: string }) => {
+      const { conversationId, lastReadMessageId } = variables
+      const session = sessions.get(variables)
+      if (!session) return Promise.resolve(null)
+      let requests = pendingReadRequests.get(queryClient)
+      if (!requests) {
+        requests = new Map()
+        pendingReadRequests.set(queryClient, requests)
+      }
+      const queue = requests
+      const previous = queue.get(conversationId) ?? Promise.resolve(null)
+      const request = previous
+        .catch(() => null)
+        .then(async () => {
+          if (!isCurrentReadSession(queryClient, session)) return null
+          try {
+            await markConversationRead(conversationId, lastReadMessageId)
+            return session
+          } catch (error) {
+            throw new ReadRequestError(session, error)
+          }
+        })
+      queue.set(conversationId, request)
+      void request
+        .finally(() => {
+          if (queue.get(conversationId) === request) queue.delete(conversationId)
+        })
+        .catch(() => {})
+      return request
+    },
+    onSuccess: (session, { conversationId, lastReadMessageId }) => {
+      if (session && isCurrentReadSession(queryClient, session)) {
+        applyConfirmedRead(queryClient, conversationId, lastReadMessageId)
+      }
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : t('chat.markReadError'))
+      if (error instanceof ReadRequestError && isCurrentReadSession(queryClient, error.session)) {
+        toast.error(
+          error.original instanceof Error ? error.original.message : t('chat.markReadError'),
+        )
+      }
     },
   })
 }
@@ -724,15 +873,11 @@ export function useRevokeMessageMutation(conversationId: string | null) {
       } catch (error) {
         // Lỗi không xác định (timeout/mất kết nối): server có thể đã thu hồi rồi —
         // xem lại trạng thái thật trước khi kết luận thất bại (tránh tin "hiện lại" oan).
-        if (!isUncertainApiError(error) || !conversationId) throw error
-        try {
-          const response = await getMessageWindow(conversationId, messageId, 1)
-          const message = response.items.find((item) => item.id === messageId)
-          if (message?.deletedAt) return message
-        } catch {
-          // Không reconcile được — giữ nguyên lỗi cũ.
-        }
-        throw error
+        if (!isUncertainApiError(error)) throw error
+        if (!conversationId) throw new UnresolvedMessageActionError()
+        const message = await readReconciledMessage(conversationId, messageId, true)
+        if (message) return message
+        throw new UnresolvedMessageActionError()
       }
     },
     onSuccess: (revokedMsg) => {
@@ -813,7 +958,7 @@ export function useEditMessageMutation(conversationId: string | null) {
     onSuccess: (edited) => {
       if (!conversationId) return
       const updateMessage = (message: MessageResponse): MessageResponse =>
-        message.id === edited.id
+        message.id === edited.id && !message.deletedAt
           ? { ...message, body: edited.body, editedAt: edited.editedAt }
           : message.replyTarget?.id === edited.id && !message.replyTarget.deletedAt
             ? { ...message, replyTarget: { ...message.replyTarget, body: edited.body } }
@@ -846,16 +991,14 @@ export function useDeleteMessageForMeMutation(conversationId: string | null) {
       try {
         return await deleteMessageForMe(messageId)
       } catch (error) {
-        // Tương tự revoke: lỗi không xác định — nếu tin đã biến mất khỏi cửa sổ của
-        // mình thì server đã xóa, coi là thành công.
-        if (!isUncertainApiError(error) || !conversationId) throw error
-        try {
-          const response = await getMessageWindow(conversationId, messageId, 1)
-          if (!response.items.some((item) => item.id === messageId)) return
-        } catch {
-          // Không reconcile được — giữ nguyên lỗi cũ.
-        }
-        throw error
+        // Tin đã ẩn sẽ không truy cập được qua window API (MESSAGE_NOT_FOUND).
+        // Các lần gọi DELETE /for-me khác thì idempotent, nên đây là trạng thái đã xóa.
+        if (!isUncertainApiError(error)) throw error
+        if (!conversationId) throw new UnresolvedMessageActionError()
+        // Tin thu hồi (tombstone) vẫn còn nhìn thấy được = chưa xác nhận ẩn xong —
+        // đọc tiếp trong giới hạn thay vì kết luận ngay ở lần đọc đầu.
+        await readReconciledMessage(conversationId, messageId, false)
+        return
       }
     },
     onSuccess: (_, messageId) => {
@@ -882,6 +1025,7 @@ export function useDeleteMessageForMeMutation(conversationId: string | null) {
 }
 
 type ReactionState = {
+  generation: number
   userId: string
   desired: string | null
   confirmed: string | null
@@ -944,9 +1088,13 @@ function updateReactions(
 
 /** Apply a socket snapshot while preserving the latest local intent. */
 export function applyRealtimeReaction(queryClient: QueryClient, payload: MessageReactionPayload) {
-  const state = reactionStates
-    .get(queryClient)
-    ?.get(reactionKey(payload.conversationId, payload.messageId))
+  const states = reactionStates.get(queryClient)
+  const key = reactionKey(payload.conversationId, payload.messageId)
+  let state = states?.get(key)
+  if (state && state.generation !== useAuthStore.getState().generation) {
+    states?.delete(key)
+    state = undefined
+  }
   if (state) {
     state.revision += 1
     state.confirmed = ownReaction(payload.reactions, state.userId)
@@ -963,10 +1111,12 @@ export function useReactMessageMutation(conversationId: string | null) {
   const { user } = useAuth()
   const { t } = useTranslation()
   const operations = useRef(new WeakMap<object, { state: ReactionState; target: string | null }>())
+  const generations = useRef(new WeakMap<object, number>()).current
 
-  return useMutation({
+  const mutation = useMutation({
     onMutate: (arg: { messageId: string; emoji: string }) => {
-      if (!conversationId || !user?.id) return
+      const generation = generations.get(arg)
+      if (generation !== useAuthStore.getState().generation || !conversationId || !user?.id) return
       void queryClient.cancelQueries({
         queryKey: CHAT_QUERY_KEYS.messages(conversationId),
         exact: true,
@@ -975,7 +1125,7 @@ export function useReactMessageMutation(conversationId: string | null) {
       if (!states) reactionStates.set(queryClient, (states = new Map()))
       const key = reactionKey(conversationId, arg.messageId)
       let state = states.get(key)
-      if (!state) {
+      if (!state || state.generation !== generation || state.userId !== user.id) {
         const timeline = queryClient.getQueryData<InfiniteData<MessageTimelineResponse>>(
           CHAT_QUERY_KEYS.messages(conversationId),
         )
@@ -986,6 +1136,7 @@ export function useReactMessageMutation(conversationId: string | null) {
             ?.find((item) => item.id === arg.messageId)
         const confirmed = ownReaction(message?.reactions, user.id)
         state = {
+          generation,
           userId: user.id,
           desired: confirmed,
           confirmed,
@@ -1011,9 +1162,13 @@ export function useReactMessageMutation(conversationId: string | null) {
         throw new Error('Cannot react without a conversation and user')
       const { state, target } = operation
       const run = state.queue.then(async () => {
+        if (state.generation !== useAuthStore.getState().generation)
+          throw new Error('Session changed')
         if (target === state.confirmed) return
         const revision = state.revision
         const data = await reactToMessage(arg.messageId, target ?? state.confirmed!)
+        if (state.generation !== useAuthStore.getState().generation)
+          throw new Error('Session changed')
         state.confirmed = ownReaction(data.reactions, state.userId)
         updateReactions(queryClient, conversationId, arg.messageId, (current) =>
           setOwnReaction(
@@ -1027,7 +1182,7 @@ export function useReactMessageMutation(conversationId: string | null) {
       try {
         await run
       } catch (error) {
-        if (state.pending === 1) {
+        if (state.generation === useAuthStore.getState().generation && state.pending === 1) {
           state.desired = state.confirmed
           updateReactions(queryClient, conversationId, arg.messageId, (current) =>
             setOwnReaction(current, state.userId, state.confirmed),
@@ -1036,13 +1191,19 @@ export function useReactMessageMutation(conversationId: string | null) {
         throw error
       } finally {
         state.pending -= 1
-        if (state.pending === 0) {
+        if (state.pending === 0 && state.generation === useAuthStore.getState().generation) {
           const revision = state.revision
           const sync = ++state.sync
           void getMessageWindow(conversationId, arg.messageId, 1)
             .then((response) => {
               const message = response.items.find((item) => item.id === arg.messageId)
-              if (!message || state.pending || state.revision !== revision) return
+              if (
+                state.generation !== useAuthStore.getState().generation ||
+                !message ||
+                state.pending ||
+                state.revision !== revision
+              )
+                return
               state.confirmed = ownReaction(message.reactions, state.userId)
               state.desired = state.confirmed
               updateReactions(
@@ -1053,21 +1214,53 @@ export function useReactMessageMutation(conversationId: string | null) {
               )
             })
             .catch(() => {
-              if (state.pending || state.sync !== sync) return
-              reactionStates.get(queryClient)?.delete(reactionKey(conversationId, arg.messageId))
+              if (
+                state.generation !== useAuthStore.getState().generation ||
+                state.pending ||
+                state.sync !== sync
+              )
+                return
+              const states = reactionStates.get(queryClient)
+              const key = reactionKey(conversationId, arg.messageId)
+              if (states?.get(key) === state) states.delete(key)
               void queryClient.invalidateQueries({
                 queryKey: CHAT_QUERY_KEYS.messages(conversationId),
                 exact: true,
               })
             })
             .finally(() => {
-              if (state.pending || state.sync !== sync) return
-              reactionStates.get(queryClient)?.delete(reactionKey(conversationId, arg.messageId))
+              if (
+                state.generation !== useAuthStore.getState().generation ||
+                state.pending ||
+                state.sync !== sync
+              )
+                return
+              const states = reactionStates.get(queryClient)
+              const key = reactionKey(conversationId, arg.messageId)
+              if (states?.get(key) === state) states.delete(key)
             })
         }
       }
     },
-    onError: (error) =>
-      toast.error(error instanceof Error ? error.message : t('chat.sendMessageError')),
+    onError: (error, arg) => {
+      if (generations.get(arg) === useAuthStore.getState().generation)
+        toast.error(error instanceof Error ? error.message : t('chat.sendMessageError'))
+    },
   })
+  const capture = (arg: { messageId: string; emoji: string }) => {
+    const copy = { ...arg }
+    generations.set(copy, useAuthStore.getState().generation)
+    return copy
+  }
+  return {
+    ...mutation,
+    mutate: (
+      arg: { messageId: string; emoji: string },
+      options?: Parameters<typeof mutation.mutate>[1],
+    ) => mutation.mutate(capture(arg), options),
+    mutateAsync: (
+      arg: { messageId: string; emoji: string },
+      options?: Parameters<typeof mutation.mutateAsync>[1],
+    ) => mutation.mutateAsync(capture(arg), options),
+  }
 }

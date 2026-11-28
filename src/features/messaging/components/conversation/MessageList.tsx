@@ -54,6 +54,7 @@ import { TEXT_STORY_BG } from '@/features/story/data/storiesData'
 import { MESSAGE_MAX_BODY_LENGTH } from '@/config/constants'
 import { getMessageLengthState } from '@/features/messaging/utils/messageLength'
 import {
+  UnresolvedMessageActionError,
   useReactMessageMutation,
   useRevokeMessageMutation,
   useEditMessageMutation,
@@ -309,7 +310,7 @@ export function MessageReplyBubbleQuote({
   )
 }
 
-const MessageRowView = memo(function MessageRowView({
+export const MessageRowView = memo(function MessageRowView({
   conversationId,
   group,
   messageIndex,
@@ -469,6 +470,7 @@ const MessageRowView = memo(function MessageRowView({
   return (
     <div
       data-message-id={msg.id}
+      aria-busy={Boolean(pendingAction)}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
       onTouchCancel={handleTouchEnd}
@@ -720,6 +722,7 @@ const MessageRowView = memo(function MessageRowView({
                         e.stopPropagation()
                         onReact?.(msg.id, emoji)
                       }}
+                      disabled={Boolean(pendingAction)}
                       className={cn(
                         'flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs shadow-xs transition-all active:scale-95 cursor-pointer select-none',
                         myReaction
@@ -902,8 +905,14 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
         onSuccess: () => {
           toast.success(t('chat.messageRevoked'))
         },
-        onError: () => {
-          toast.error(t('chat.messageRevokeFailed'))
+        onError: (error) => {
+          toast.error(
+            t(
+              error instanceof UnresolvedMessageActionError
+                ? 'chat.messageActionUncertain'
+                : 'chat.messageRevokeFailed',
+            ),
+          )
         },
         onSettled: () => {
           endPendingRemoval(messageId)
@@ -939,7 +948,14 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
       if (!beginPendingRemoval(messageId, 'delete')) return
       deleteForMe(messageId, {
         onSuccess: () => toast.success(t('chat.messageDeletedForMe')),
-        onError: () => toast.error(t('chat.messageDeleteFailed')),
+        onError: (error) =>
+          toast.error(
+            t(
+              error instanceof UnresolvedMessageActionError
+                ? 'chat.messageActionUncertain'
+                : 'chat.messageDeleteFailed',
+            ),
+          ),
         onSettled: () => endPendingRemoval(messageId),
       })
     },

@@ -39,6 +39,7 @@ export interface MessageActionPillProps {
   message: ChatMessage
   attachment?: MessageAttachmentItem
   isMe: boolean
+  disabled?: boolean
   onPreview?: (attachment: MessageAttachmentItem) => void
   onRevoke?: (messageId: string) => void
   onDeleteForMe?: (messageId: string) => void
@@ -55,6 +56,7 @@ export function MessageActionPill({
   message,
   attachment,
   isMe,
+  disabled = false,
   onPreview,
   onRevoke,
   onDeleteForMe,
@@ -144,9 +146,10 @@ export function MessageActionPill({
         <DropdownMenuTrigger asChild>
           <button
             type="button"
+            disabled={disabled}
             onClick={(e) => e.stopPropagation()}
             className={cn(
-              'grid size-7 sm:size-8 place-items-center rounded-full bg-white dark:bg-zinc-800 border border-border/80 text-foreground/80 shadow-sm transition-all hover:bg-muted hover:text-foreground active:scale-95 focus:outline-none',
+              'grid size-7 sm:size-8 place-items-center rounded-full bg-white dark:bg-zinc-800 border border-border/80 text-foreground/80 shadow-sm transition-all hover:bg-muted hover:text-foreground active:scale-95 focus:outline-none disabled:opacity-40 disabled:shadow-none',
               emojiOpen && 'bg-muted text-foreground ring-1 ring-border',
             )}
             title="Thả cảm xúc"
@@ -188,7 +191,7 @@ export function MessageActionPill({
           e.stopPropagation()
           onReply?.(message)
         }}
-        disabled={!onReply}
+        disabled={disabled || !onReply}
         className="grid size-7 sm:size-8 place-items-center rounded-full bg-white dark:bg-zinc-800 border border-border/80 text-foreground/80 shadow-sm transition-all hover:bg-muted hover:text-foreground active:scale-95 focus:outline-none disabled:opacity-40 disabled:shadow-none"
         title={t('chat.replyMessage', 'Trả lời')}
         aria-label={t('chat.replyMessage', 'Trả lời')}
@@ -201,9 +204,10 @@ export function MessageActionPill({
         <DropdownMenuTrigger asChild>
           <button
             type="button"
+            disabled={disabled}
             onClick={(e) => e.stopPropagation()}
             className={cn(
-              'grid size-7 sm:size-8 place-items-center rounded-full bg-white dark:bg-zinc-800 border border-border/80 text-foreground/80 shadow-sm transition-all hover:bg-muted hover:text-foreground active:scale-95 focus:outline-none',
+              'grid size-7 sm:size-8 place-items-center rounded-full bg-white dark:bg-zinc-800 border border-border/80 text-foreground/80 shadow-sm transition-all hover:bg-muted hover:text-foreground active:scale-95 focus:outline-none disabled:opacity-40 disabled:shadow-none',
               menuOpen && 'bg-muted text-foreground ring-1 ring-border',
             )}
             title="Tùy chọn khác"
