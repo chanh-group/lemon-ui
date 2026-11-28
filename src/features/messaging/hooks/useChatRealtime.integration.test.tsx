@@ -431,6 +431,61 @@ describe('useChatRealtime reconnect access', () => {
     ).toBe(0)
   })
 
+  it('classifies a late message by the cursor message position, not the read wall-clock', () => {
+    const conversation = {
+      id: 'late-3',
+      kind: 'DIRECT',
+      unreadCount: 0,
+      lastMessageDetail: {
+        id: 'cursor-message',
+        conversationId: 'late-3',
+        senderId: 'friend',
+        kind: 'TEXT',
+        body: 'Cursor',
+        createdAt: '2026-11-20T00:01:00.000Z',
+      },
+    }
+    queryClient.setQueryData(CHAT_QUERY_KEYS.conversations, [conversation])
+    renderHook(() => useChatRealtime(conversation.id), { wrapper })
+
+    act(() =>
+      socket.emit('read:updated', {
+        conversationId: conversation.id,
+        userId: 'viewer',
+        lastReadMessageId: 'cursor-message',
+        readAt: '2026-11-20T00:02:00.000Z',
+      }),
+    )
+    const unreadCount = () =>
+      queryClient.getQueryData<(typeof conversation)[]>(CHAT_QUERY_KEYS.conversations)?.[0]
+        .unreadCount
+    // Trước vị trí con trỏ trên timeline → đã đọc, dù đến trễ.
+    act(() =>
+      socket.emit('message:new', {
+        id: 'late-before-cursor-unique',
+        conversationId: conversation.id,
+        senderId: 'friend',
+        kind: 'TEXT',
+        body: 'Old',
+        createdAt: '2026-11-20T00:00:30.000Z',
+      }),
+    )
+    expect(unreadCount()).toBe(0)
+    // Sau vị trí con trỏ nhưng được tạo trước thời điểm mark-read (00:02:00)
+    // → CHƯA đọc, phải đếm.
+    act(() =>
+      socket.emit('message:new', {
+        id: 'late-after-cursor-unique',
+        conversationId: conversation.id,
+        senderId: 'friend',
+        kind: 'TEXT',
+        body: 'New',
+        createdAt: '2026-11-20T00:01:30.000Z',
+      }),
+    )
+    expect(unreadCount()).toBe(1)
+  })
+
   it('does not reuse a read cursor across conversations or sessions', () => {
     const first = { id: 'first', kind: 'DIRECT', unreadCount: 0 }
     const second = { id: 'second', kind: 'DIRECT', unreadCount: 0 }

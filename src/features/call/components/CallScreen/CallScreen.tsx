@@ -9,7 +9,7 @@ import { useAuth } from '@/features/auth/api'
 import { useConversationQuery } from '@/features/conversation/hooks/useConversations'
 import { getChatSocket } from '@/lib/socket'
 import { cn } from '@/lib/utils'
-import { callApi, sendBeaconCallTermination } from '../../api/call.api'
+import { callApi, isBenignCallStateError, sendBeaconCallTermination } from '../../api/call.api'
 import { useLiveKitCall } from '../../hooks/useLiveKitCall'
 import { playConnectedTone, playHangupTone, playOutgoingDialingSound } from '../../utils/callSounds'
 import type {
@@ -614,10 +614,13 @@ export function CallScreen({
 
     const callId = activeCall?.id
     if (callId) {
+      const reportError = (error: unknown) => {
+        if (!isBenignCallStateError(error)) toast.error(t('common.error'))
+      }
       if (phase === 'ringing') {
-        void callApi.cancelCall(callId).catch(() => toast.error(t('common.error')))
+        void callApi.cancelCall(callId).catch(reportError)
       } else {
-        void callApi.endCall(callId, 'NORMAL').catch(() => toast.error(t('common.error')))
+        void callApi.endCall(callId, 'NORMAL').catch(reportError)
       }
     }
 

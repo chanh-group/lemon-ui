@@ -150,7 +150,9 @@ export function useChatRealtime(activeConversationId: string | null) {
   const revokedConversationIds = useRef(new Set<string>())
   const readCursors = useRef({
     generation: useAuthStore.getState().generation,
-    cursors: new Map<string, { id: string; readAt: number }>(),
+    // createdAt = vị trí timeline của message con trỏ (resolve từ cache local);
+    // readAt chỉ dùng để xếp thứ tự sự kiện, không dùng để phân loại tin đã đọc.
+    cursors: new Map<string, { id: string; createdAt: number | null; readAt: number }>(),
   })
   const [conversationAccess, setConversationAccess] = useState<
     'verifying' | 'allowed' | 'revoked' | 'retryable-error'
@@ -203,14 +205,54 @@ export function useChatRealtime(activeConversationId: string | null) {
       }
       return readCursors.current.cursors
     }
+    // Vị trí timeline của message con trỏ lấy từ cache local — cùng ngữ nghĩa với
+    // watermark `received_at <= received_at(message con trỏ)` của Signal Desktop:
+    // "đã đọc" chốt theo vị trí trên timeline, không theo wall-clock lúc người dùng đọc.
+    const findCachedMessageCreatedAt = (
+      conversationId: string,
+      messageId: string,
+    ): number | null => {
+      const conversations = queryClient.getQueryData<ConversationResponse[]>(
+        CHAT_QUERY_KEYS.conversations,
+      )
+      const lastMessage = conversations?.find(
+        (item) => item.id === conversationId,
+      )?.lastMessageDetail
+      const pages = queryClient.getQueryData<
+        InfiniteData<MessageTimelineResponse, MessagePageParam>
+      >(CHAT_QUERY_KEYS.messages(conversationId))
+      const live = queryClient.getQueryData<MessageResponse[]>(
+        CHAT_QUERY_KEYS.liveMessages(conversationId),
+      )
+      const found =
+        (lastMessage?.id === messageId ? lastMessage : undefined) ??
+        pages?.pages.flatMap((page) => page.items).find((item) => item.id === messageId) ??
+        live?.find((item) => item.id === messageId)
+      const createdAt = found ? Date.parse(found.createdAt) : NaN
+      return Number.isNaN(createdAt) ? null : createdAt
+    }
     const isReadByCursor = (conversationId: string, message: MessageResponse) => {
       const cursor = currentReadCursors().get(conversationId)
       if (!cursor) return false
       if (cursor.id === message.id) return true
-      // lastReadMessageId là cursor đến một mốc thời gian; tin replay/đến trễ có
-      // createdAt trước mốc đó đã được đọc, dù id không trùng chính xác.
       const createdAt = Date.parse(message.createdAt)
-      return !Number.isNaN(createdAt) && createdAt <= cursor.readAt
+      if (Number.isNaN(createdAt)) return false
+      if (cursor.createdAt === null) {
+        // Message con trỏ chưa có trong cache lúc nhận event — resolve lại khi
+        // cần phân loại (replay thường kéo chính message đó về cache).
+        cursor.createdAt = findCachedMessageCreatedAt(conversationId, cursor.id)
+      }
+      if (cursor.createdAt !== null) {
+        // Đúng thứ tự timeline (createdAt, id) của backend: tin đứng trước hoặc
+        // tại con trỏ đã được đọc; tin đứng sau con trỏ thì chưa, kể cả khi nó
+        // được tạo trước thời điểm mark-read bị xử lý.
+        return (
+          createdAt < cursor.createdAt ||
+          (createdAt === cursor.createdAt && message.id <= cursor.id)
+        )
+      }
+      // Không resolve được vị trí con trỏ → xấp xỉ bằng readAt (xem MUTATION_AUDIT_45).
+      return createdAt <= cursor.readAt
     }
     const refreshInbox = () => {
       if (refreshedInboxOnConnection.current) return
@@ -726,10 +768,11 @@ export function useChatRealtime(activeConversationId: string | null) {
       const cursors = currentReadCursors()
       const readAt = Date.parse(event.readAt)
       const current = cursors.get(event.conversationId)
-      // Sự kiện cũ đến sau không được lùi cursor đã xử lý.
+      // Sự kiện cũ đến sau không được lùi cursor đã xử lý (guard theo thời điểm sự kiện).
       if (current && !Number.isNaN(readAt) && readAt <= current.readAt) return
       cursors.set(event.conversationId, {
         id: event.lastReadMessageId,
+        createdAt: findCachedMessageCreatedAt(event.conversationId, event.lastReadMessageId),
         readAt: Number.isNaN(readAt) ? (current?.readAt ?? 0) : readAt,
       })
       applyConfirmedRead(queryClient, event.conversationId, event.lastReadMessageId)
