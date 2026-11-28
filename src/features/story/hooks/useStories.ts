@@ -297,12 +297,12 @@ export function useDeleteStory() {
   const client = useQueryClient()
   return useMutation({
     mutationFn: deleteStory,
-    onSuccess: () => {
-      void client.invalidateQueries({ queryKey: STORIES_KEY })
-      void client.invalidateQueries({ queryKey: STORY_ARCHIVE_KEY })
-      void client
-        .cancelQueries({ queryKey: queryKeys.chat.storyStorage })
-        .then(() => client.refetchQueries({ queryKey: queryKeys.chat.storyStorage }))
+    onSuccess: async () => {
+      await client.cancelQueries({ queryKey: queryKeys.chat.storyStorage })
+      await Promise.all([
+        client.invalidateQueries({ queryKey: STORIES_KEY }),
+        client.invalidateQueries({ queryKey: STORY_ARCHIVE_KEY }),
+      ])
     },
   })
 }
